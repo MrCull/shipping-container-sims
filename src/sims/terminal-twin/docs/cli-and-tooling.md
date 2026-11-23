@@ -1,6 +1,6 @@
 # CLI and tooling
 
-Checked against ENGINE_VERSION 0.60.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you run or change a `pnpm run tt:*` command or a file in `cli/`, need a flag, an output format or an
 exit code, or want to run heavy jobs (peak-day runs, the smoke suite) without colliding with other agents.

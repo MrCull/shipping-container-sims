@@ -39,7 +39,7 @@ describe('far-field wordmark atlas (#256)', () => {
   it('the atlas manifest names the far atlas and its layout equals the near one', () => {
     const far = (LIVERY_ATLAS as unknown as { far?: { file: string; size: number[]; ribPitchM: number } }).far
     expect(far?.file).toBe('livery-atlas-far.webp')
-    expect(far?.size).toEqual([1024, 1024])
+    expect(far?.size).toEqual([1024, 1536]) // half the near atlas (2048 x 3072 since #360)
     expect(far!.ribPitchM).toBeGreaterThan(0.56) // coarser than the LOD0 rib so it survives the mip chain
   })
 })

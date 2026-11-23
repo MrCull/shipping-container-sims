@@ -55,8 +55,8 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 
 ## Large tool results
 
-`list_issues` and `issue_read` with `get_sub_issues` can return more than fits in context. Pass `minimal_output: true` and a small page size first; if the result is saved to a file anyway, read it with a short Python filter (`number`, `title`, `labels`) rather than the tool again.
+`list_issues` and `issue_read` with `get_sub_issues` can return more than fits in context. `issue_read` has no `minimal_output` option, so `get_sub_issues` always returns every body and is saved to a file: split it with `node scripts/tickets-from-sub-issues.mjs <saved-result.json> <scratchpad-dir>` (one `ticket-<n>.md` per ticket, one summary line each with its `## Blocked by` issues) rather than calling the tool again. For `list_issues`, pass `fields` and a small page size.
 
-`issue_read` with `get` returns the whole body (a spec is about 30 KB). To check that tickets are attached to a spec, or any other fact that is not in the body, use `get_sub_issues` with `minimal_output: true`, or `list_issues` with `fields`.
+`issue_read` with `get` returns the whole body (a spec is about 30 KB). To check that tickets are attached to a spec, or any other fact that is not in the body, use `get` (its `sub_issues_summary`) or `list_issues` with `fields`.
 
 Fact-finding over many issues (status against the code, which PR closed what) goes to a subagent on a small model (`model: "haiku"`): the default model spent about 120k tokens on eight issues.

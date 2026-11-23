@@ -85,7 +85,7 @@ def build_containers(out_dir, previews=True, samples=48):
     if previews:
         B.reset_scene()
         img = B.load_image(atlas_png)
-        img.scale(1024, 1024)
+        img.scale(1024, 1536)
         scene = bpy.context.scene
         scene.render.image_settings.file_format = 'WEBP'
         scene.render.image_settings.quality = 85

@@ -93,6 +93,13 @@ check "merge without a #182 row still exits 0" "$code"
 check "missing row leaves handover.md unchanged" "$(git -C "$repo" show HEAD:handover.md | cmp -s - "$scratch/norow-before.md"; echo $?)"
 check "missing row is reported in the log" "$(grep -q 'no row for #182' "$repo/.merge-ticket.log"; echo $?)"
 
+# Case 3b: no handover.md at all (a one-session run): the merge is green and the log carries no handover warning.
+repo="$(make_repo nofile)"
+git -C "$repo" rm -q handover.md && git -C "$repo" commit -q -m "integ: no handover" && git -C "$repo" push -q origin integ
+run_merge "$repo"; code=$?
+check "merge without handover.md exits 0" "$code"
+check "no handover.md gives no handover warning" "$(! grep -q 'handover:' "$repo/.merge-ticket.log"; echo $?)"
+
 # Cases 4 and 5: both sides bumped ENGINE_VERSION. Only that line conflicting is resolved by the script (higher, minor +1);
 # another conflicting line stops the merge as before.
 conflict_repo() { # conflict_repo <name> <extra: yes|no>

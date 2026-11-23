@@ -21,6 +21,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Berth:** a vessel's stretch of the continuous quay, from its stern (`berthX`) to its bow (LOA). Vessels keep a **berth gap** apart.
 - **Anchorage:** where an arrived vessel waits when no berth is free. **Anchorage wait** = berth allocation time − arrival time.
 - **Rail reservation:** the stretch of the STS rail a crane may occupy during its current gantry motion. Neighbouring reservations stay at least the minimum STS spacing apart.
+- **Rail reach:** the gantry X range a crane can ever reach on the shared rail (`railReach`). Cranes never pass, so the crane at rail index i stays at least i x the minimum STS spacing from the quay start and (n-1-i) x it from the end; berth allocation keeps a vessel where its able cranes reach every bay, and `sts.rail-reachable` fails a crane waiting for an X outside it.
 - **Rail yield:** a crane that waits for the rail empty-handed steps aside for a blocked neighbour (it repositions, then resumes its work). When two neighbours ask a crane to step opposite ways, the ask from the lower rail index is served first and the other waits, so a chain of three cranes never waits for ever.
 - **Ground position (STS ground position):** a buffer lane under an STS where discharged boxes are set down and from which load boxes are picked (`<stsId>-GP<n>`).
 - **WTP (waterside transfer point) pad:** a buffer position at the waterside end of a yard block. SHCs drop boxes there, and the ASC picks them up (and the reverse).
@@ -184,6 +185,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Attach point:** a named point where something connects (container twist-lock and stacking points, a spreader's container seat).
 - **Provenance tag:** how a value is known: `V` verified, `P` photo-supported, `A` approximated, `M` intentional modification. These are the TTI reference pack's tags.
 - **Livery:** a shipping line's container colours and wordmark. The **livery atlas** has one tile per line, and an instance's **livery index** is its tile.
+- **Leasing variant** (#360): a render-only livery tile of a generic lessor or old-stock box (rust, oxblood, brown, dull blue, faded green, grey, off-white; no wordmark). In the default colour mode about half the boxes with a known line are drawn in one, picked by a hash of the box id (`modules/boxLivery.ts`); the box keeps its engine line, and Colour by line shows that line.
 - **Wordmark:** the line's name set in a close open-licence typeface and the brand colours, standing in for the official logo.
 - **Asset budget:** the triangle, draw-call and file-size limits per asset kind (`assets/budgets.json`), enforced by the **budget check** (`pnpm run tt:assets:check`).
 - **SHC model:** the rigged Kalmar-style shuttle carrier asset `shc` (nodes `steer_*`, `wheel_*`, `hoist`, `spreader`, `twistlock_*`). Its **tunnel** is the open space between the legs that a box is carried through, and its **container attach point** is the centre of the twist-lock plane (the top of the carried box). *Avoid:* "SHC mesh".

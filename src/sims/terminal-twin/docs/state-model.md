@@ -1,6 +1,6 @@
 # State model: SimState, entities and indexes
 
-Checked against ENGINE_VERSION 0.60.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you read or write engine state: adding a field or entity, writing a reactor, invariant, KPI or
 strategy that looks at state, debugging a snapshot, or replacing a whole-state scan with an index. All types are in

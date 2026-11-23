@@ -29,7 +29,7 @@ import {
 import { hatchPanelId, hatchPanelOfRow, vesselClass } from '../../scenario/vesselClasses'
 import { continueWork, stsKinematics, variation, wakeQuayRail } from './quay'
 import { isInstant, planSequence } from './stsMotion'
-import { releaseRail, reserveRail } from './rail'
+import { inRailReach, railReach, releaseRail, reserveRail } from './rail'
 
 /** Hatch covers apply when enabled in the scenario and the quay subsystem runs. */
 export const hatchActive = (ctx: EngineContext): boolean => hatchEnabled(ctx.config) && ctx.state.subsystems.quay !== 'off'
@@ -172,11 +172,18 @@ export function startHatchJob(ctx: EngineContext, pkg: WorkPackage): HatchJob {
   }
 }
 
-/** Laydown bay for a panel: the nearest bay to its hatch with room, whose stack holds only panels of the same hatch. */
-function claimLaydown(ctx: EngineContext, panel: HatchPanelState): string {
+/**
+ * Laydown bay for a panel: the nearest bay to its hatch with room, whose stack holds only panels of the same hatch.
+ * Bays inside the crane's `railReach` come first (#365).
+ */
+function claimLaydown(ctx: EngineContext, panel: HatchPanelState, sts: StsState): string {
   const { state } = ctx
   const limit = settingsOf(ctx, panel).laydownStackLimit
-  const sites = laydownSites(ctx.config).sort((a, b) => Math.abs(a.x - panel.home.x) - Math.abs(b.x - panel.home.x) || a.x - b.x)
+  const reach = railReach(ctx.config, sts.railIndex)
+  const outside = (x: number): number => (inRailReach(reach, x) ? 0 : 1)
+  const sites = laydownSites(ctx.config).sort(
+    (a, b) => outside(a.x) - outside(b.x) || Math.abs(a.x - panel.home.x) - Math.abs(b.x - panel.home.x) || a.x - b.x,
+  )
   const bySite = new Map<string, HatchPanelState[]>()
   for (const p of Object.values(state.hatchPanels)) if (p.siteId) bySite.set(p.siteId, [...(bySite.get(p.siteId) ?? []), p])
   for (const site of sites) {
@@ -274,7 +281,7 @@ export const hatchReactors: ReactorMap = {
       waitForHatch(ctx, sts, panel.id, 'lashing', e.t)
       return
     }
-    job.siteId ??= claimLaydown(ctx, panel)
+    job.siteId ??= claimLaydown(ctx, panel, sts)
     if (job.op === 'replace' && state.hatchLaydown[job.siteId]?.panelIds.slice(-1)[0] !== panel.id)
       throw new Error(`${panel.id} is not on top of laydown bay ${job.siteId}`)
     const { leg1, sx } = legs(ctx, sts, panel, job.op, job.siteId)

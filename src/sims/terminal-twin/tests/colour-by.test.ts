@@ -97,10 +97,19 @@ describe('every mode colours every container', () => {
 describe('what each mode produces', () => {
   const subject = (o: Partial<ColourSubject> = {}): ColourSubject => ({ line: 'MSC', full: true, ...o })
 
-  it('line: the livery body of the line; an unknown line is the generic grey', () => {
+  it('line: the Colour by colour of the line; an unknown line is other', () => {
     expect(colourOf('line', subject({ line: 'Maersk' }), 0, ctx).hex).toBe('#42b0d5')
     expect(colourOf('line', subject({ line: 'Nobody' }), 0, ctx).key).toBe('other')
     expect(colourOf('default', subject({ line: 'MSC' }), 0, ctx).key).toBe('MSC')
+  })
+
+  it('line: its own bright palette, not the muted default liveries (spec #356 keeps Colour by as it was)', () => {
+    const want: Record<string, string> = {
+      HMM: '#f47b20', MSC: '#d8c9a3', Maersk: '#42b0d5', 'CMA CGM': '#1f3f8f', 'Hapag-Lloyd': '#ef7d00',
+      ONE: '#d6007f', Evergreen: '#00843d', COSCO: '#2f5fae', ZIM: '#c9ccd1', 'Yang Ming': '#f2c318',
+    }
+    expect(legendOf('line', ctx).map((e) => e.key)).toEqual([...Object.keys(want), 'other'])
+    for (const [line, hex] of Object.entries(want)) expect(colourOf('line', subject({ line }), 0, ctx).hex, line).toBe(hex)
   })
 
   it('pod: one colour per port of the rotation, the same in every view', () => {

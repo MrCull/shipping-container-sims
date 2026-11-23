@@ -1,6 +1,6 @@
 # Invariants
 
-Checked against ENGINE_VERSION 0.58.0.
+Checked against ENGINE_VERSION 0.60.0.
 
 Read this when a run fails with an invariant violation, when you add a rule the engine must never break, or when you want
 to make headless runs faster (invariant checking is the largest single cost of a long run). Everything here lives in
@@ -42,6 +42,7 @@ below).
 | `asc.wtp-handover` | an ASC never enters a WTP pad's lifting envelope (spreader below travel height within `PAD_HALF_X_M` 1.6 m / `PAD_HALF_Z_M` 6.5 m of the pad) while an SHC is on the pad | time | no |
 | `asc.no-passing` | the two ASCs of a block never pass or collide: waterside stays waterside, centres at least `ASC_MIN_SEPARATION_M` apart, now and at every breakpoint (start, middle, end of each planned segment) | equipment | yes: blocks whose ASCs the event named; skipped unless `subsystems.asc` is `real` |
 | `sts.rail-order` | STS cranes keep rail order: each crane inside its rail reservation, reservations on the quay and `stsMinSpacingM` apart | time | no |
+| `sts.rail-reachable` | a crane waiting for the rail wants a gantry X its rail index leaves it: at least `i x stsMinSpacingM` from the quay start and `(n-1-i) x stsMinSpacingM` from its end (#365: otherwise it and every crane behind it wait forever and the run goes idle with open work; `tests/berth-reach.test.ts`) | time | no |
 | `sts.class-limits` | STS class limits (#303): no hoist segment ends above the crane's lift height and no trolley segment ends seaward of its outreach from the waterside rail. It checks planned segment ends only, so it reads `equipment`, not `time`. Test: `tests/sts-classes.test.ts` | equipment | no |
 | `sts.boom-working` | STS booms (#298): no hoist or trolley motion still under way unless the boom is at its working angle, and no gantry segment overlapping a boom transition. Early exit: returns at once in boom mode off, and skips a crane with no boom segment whose boom is at the working angle. Test: `tests/boom.test.ts` | time | no |
 | `stowage.order` | no box on board above an empty cell; a 20 ft never on a 40 ft; a 40 ft rests on a 40 ft or two filled 20 ft halves | vessel, container | yes: touched vessels |
@@ -63,7 +64,7 @@ below).
 | `hatch.no-departure-open` | a vessel does not leave (work complete, unmooring, departed) with a panel off or unsecured | vessel | yes |
 | `berth.no-overlap` | vessels on the quay (mooring, berthed, unmooring) lie within the quay and keep `berthGapM` apart | vessel | no |
 
-32 invariants. The seven `hatch.*` ones are proven on tampered snapshots in `tests/hatch.test.ts`.
+33 invariants. The seven `hatch.*` ones are proven on tampered snapshots in `tests/hatch.test.ts`.
 
 ## When checks run
 
@@ -128,7 +129,7 @@ check. Helpers that make scoped checks cheap:
 - `panelsToCheck(state, scope)`: hatch panels named in the event's equipment.
 - `roadZonesOf(graph)` (TT-176) and `blockSpecsById(config)`: caches per landside graph and per config (WeakMap).
 
-Invariants that read `time` (`asc.wtp-handover`, `sts.rail-order`, `sts.boom-working`, `landside.waiting-off-road`,
+Invariants that read `time` (`asc.wtp-handover`, `sts.rail-order`, `sts.rail-reachable`, `sts.boom-working`, `landside.waiting-off-road`,
 `landside.stranded-truck`, `yard.no-progress`) run after every checked event and are not scoped: positions move with the
 clock.
 

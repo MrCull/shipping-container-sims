@@ -71,7 +71,7 @@ Issue both sub-agent calls together, in the foreground, and aggregate the report
 
 - The diff command and commit list.
 - The path or fetched contents of the spec.
-- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
+- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. A changed golden, reference or expected-value file (`*.reference.json`, golden summaries, a test's expected colour or hash) is a finding unless a spec line asks for that change: name the file and the spec line it contradicts. Under 400 words."
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.
 

@@ -1,6 +1,6 @@
 # Yard: ASC blocks, allocation, rehandles and yard starts
 
-Checked against ENGINE_VERSION 0.60.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 Read this when you change how boxes are stacked, retrieved or dug out of an ASC block, touch ASC dispatch or the
 twin-ASC rail, tune a yard strategy (`yardAllocation`, `rehandleTarget`, `ascDispatch`, `emptyAllocation`), work on

@@ -1,6 +1,6 @@
 # Experiments: is config B better than A?
 
-Checked against ENGINE_VERSION 0.60.0.
+Checked against ENGINE_VERSION 0.61.0.
 
 An **experiment** runs several configs of one base preset or fixture on the same seeds and compares each config with a
 **baseline config**, seed by seed (spec #309). Use it whenever a question is "does this strategy, parameter, fleet size or

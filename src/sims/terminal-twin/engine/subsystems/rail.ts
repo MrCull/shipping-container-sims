@@ -27,6 +27,21 @@ export function railOrder(state: SimState): StsState[] {
   return Object.values(state.sts).sort((a, b) => a.railIndex - b.railIndex)
 }
 
+/**
+ * The gantry X range the crane at `railIndex` can ever reach (#365), the one reach rule (berth window, laydown choice,
+ * `sts.rail-reachable` all use it). Cranes never pass, so the crane at rail index i stays at least `i x stsMinSpacingM`
+ * from the quay start (every crane below it fits beside it) and `(n-1-i) x stsMinSpacingM` from its end.
+ */
+export function railReach(config: ScenarioConfig, railIndex: number): { lo: number; hi: number } {
+  const spacing = config.quay.stsMinSpacingM
+  return { lo: railIndex * spacing, hi: config.quay.lengthM - (config.sts.length - 1 - railIndex) * spacing }
+}
+
+/** Is gantry X `x` inside a `railReach` range (to within the rail tolerance)? */
+export function inRailReach(reach: { lo: number; hi: number }, x: number): boolean {
+  return x >= reach.lo - EPS && x <= reach.hi + EPS
+}
+
 /** Gantry position of a crane at sim time `t` (from its current motion plan). */
 export function gantryPositionAt(sts: StsState, t: number): number {
   const seg = sts.motion.find((m) => m.axis === 'gantry')
