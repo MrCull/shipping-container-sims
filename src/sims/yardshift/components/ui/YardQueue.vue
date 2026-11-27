@@ -47,6 +47,7 @@ defineProps<{
       <div>
         <dt>COMBO</dt>
         <dd
+          :key="combo"
           class="combo"
           data-testid="ys-combo"
         >
@@ -154,6 +155,21 @@ dd {
 }
 dd.combo {
   color: var(--ys-gold);
+  /* A new combo value pops in (re-keyed on every change); reduced motion shows it still. */
+  animation: combo-pop 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.5);
+}
+@keyframes combo-pop {
+  from {
+    transform: scale(1.7);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dd.combo {
+    animation: none;
+  }
 }
 .bonus {
   position: absolute;

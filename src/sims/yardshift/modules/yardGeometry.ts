@@ -154,8 +154,8 @@ export function truckIn(bay: Rect, g: YardGeometry, facing: 'left' | 'right' = '
   const h = Math.max(12, bottom - top)
   const groundY = bottom - 1
   // The truck grows with a tall bay (art pass 2 gives the bays the yard's spare height), led by the cab.
-  const cabW = Math.max(20, Math.min(70, bay.w * 0.26, h * 0.45))
-  const cabH = Math.max(14, Math.min(h * 0.7, cabW * 1.15))
+  const cabW = Math.max(20, Math.min(70, bay.w * 0.26, h * 0.6))
+  const cabH = Math.max(14, Math.min(h * 0.85, cabW * 1.15))
   const wheelR = Math.max(3.5, Math.min(12, cabW * 0.17))
   const axleY = groundY - wheelR
   const beamH = Math.max(3, wheelR * 0.7)

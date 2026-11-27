@@ -246,14 +246,26 @@ onBeforeUnmount(() => {
         class="burst"
         data-testid="ys-bonus-burst"
         :style="{
-          left: `${view.layout.collection.x + view.layout.collection.w / 2}px`,
-          top: `${Math.max(0, view.layout.collection.y - 36)}px`,
+          left: `${view.layout.collection.x + view.layout.collection.w * 0.4}px`,
+          top: `${view.layout.collection.y + 30}px`,
         }"
       >
         <span class="ring" />
-        <span class="float">+250 · +5s</span>
+        <span class="float">+250</span>
       </div>
     </div>
+    <span
+      v-if="store.bonusPulse > 0"
+      :key="`t${store.bonusPulse}`"
+      class="fly-time"
+      aria-hidden="true"
+      :style="{
+        left: `${screen.surface.x + view.layout.collection.x + view.layout.collection.w * 0.82}px`,
+        top: `${screen.surface.y + view.layout.collection.y + 70}px`,
+        '--fly-x': `${screen.hud.x + 60 - (screen.surface.x + view.layout.collection.x + view.layout.collection.w * 0.82)}px`,
+        '--fly-y': `${screen.hud.y + 50 - (screen.surface.y + view.layout.collection.y + 70)}px`,
+      }"
+    >+5s</span>
     <footer
       class="hint band"
       :style="rectStyle(screen.hint)"
@@ -444,10 +456,62 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  color: var(--ys-gold);
-  font-weight: 800;
-  text-shadow: 0 1px 2px var(--ys-ink);
-  animation: rise 1.2s ease-out forwards;
+  color: var(--ys-gold-bright);
+  font-size: 2rem;
+  font-weight: 900;
+  -webkit-text-stroke: 1px var(--ys-gold-deep);
+  text-shadow: 0 2px 0 var(--ys-gold-dark), 0 3px 6px var(--ys-ink);
+  animation: pop 1.1s cubic-bezier(0.2, 0.9, 0.3, 1.4) forwards;
+}
+/* "+250" pops in with an overshoot, holds, then floats up and fades. */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.2);
+  }
+  25% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.35);
+  }
+  40% {
+    transform: translateX(-50%) scale(0.92);
+  }
+  55% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-28px) scale(1);
+  }
+}
+/* "+5s" flies from the collection truck up to the shift clock. */
+.fly-time {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  color: var(--ys-gold-bright);
+  font-size: 1.3rem;
+  font-weight: 900;
+  text-shadow: 0 2px 4px var(--ys-ink);
+  animation: fly 0.9s cubic-bezier(0.5, 0, 0.6, 1) 0.25s both;
+}
+@keyframes fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -8px) scale(1.2);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--fly-x)), var(--fly-y)) scale(0.8);
+  }
 }
 @keyframes burst {
   from {
@@ -475,7 +539,11 @@ onBeforeUnmount(() => {
     opacity: 0;
   }
   .burst .float {
+    transform: translateX(-50%);
     animation: fade 1.2s step-end forwards;
+  }
+  .fly-time {
+    display: none;
   }
   @keyframes fade {
     to {
