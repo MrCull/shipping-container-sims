@@ -56,7 +56,8 @@ export type ShiftStatus = 'playing' | 'complete' | 'failed'
  */
 export type PauseReason = 'intro' | 'player' | 'animation' | 'hidden'
 
-export type FailureReason = 'timeout'
+/** `timeout`: the shift clock ran out. `blocked`: no legal move exists (including a mandatory receipt with no space). */
+export type FailureReason = 'timeout' | 'blocked'
 
 /** Read-only shift state. A new object after every accepted action; never mutated in place. */
 export interface ShiftState {
@@ -130,6 +131,8 @@ export type ShiftEvent =
   | { type: 'rehandled'; id: number; from: number; to: number }
   | { type: 'received'; id: number; to: number }
   | { type: 'arrival'; id: number; moves: number }
+  /** The waiting truck's deadline reached 0: receiving is now mandatory. */
+  | { type: 'deadline-zero'; id: number }
   | { type: 'completed' }
   /** The next-truck clock hit 0. */
   | { type: 'overtime-start' }

@@ -155,7 +155,7 @@ describe('Yardshift engine', () => {
     })
   })
 
-  describe('receipts (rule core used by the solver; gameplay in #384)', () => {
+  describe('receipts', () => {
     const level: LevelDef = {
       ...tiny,
       stacks: [[1], [2], []],
@@ -208,6 +208,91 @@ describe('Yardshift engine', () => {
       expect(shift.state.status).toBe('playing')
       expect(shift.dispatch({ type: 'collect', from: 2 }).ok).toBe(true)
       expect(shift.state.status).toBe('complete')
+    })
+    it('a truck with after > 0 arrives on the collection that reaches it, and that collection does not count', () => {
+      const shift = createShift({ ...level, arrivals: [{ after: 1, id: 3, moves: 2 }] })
+      expect(shift.state.deadline).toBeNull()
+      expect(shift.dispatch({ type: 'rehandle', from: 1, to: 2 }).ok).toBe(true)
+      expect(shift.state.deadline).toBeNull()
+      const r = shift.dispatch({ type: 'collect' })
+      expect(r.ok && r.events.filter((e) => e.type === 'arrival')).toEqual([{ type: 'arrival', id: 3, moves: 2 }])
+      expect(shift.state.deadline).toBe(2)
+    })
+
+    it('invalid input never counts the deadline down; receipts and pauses do not either', () => {
+      const shift = createShift(level)
+      expect(shift.dispatch({ type: 'collect', from: 1 }).ok).toBe(false)
+      expect(shift.dispatch({ type: 'rehandle', from: 2, to: 0 }).ok).toBe(false)
+      shift.dispatch({ type: 'pause', reason: 'player' })
+      shift.dispatch({ type: 'resume', reason: 'player' })
+      expect(shift.state.deadline).toBe(2)
+    })
+
+    it('receiving is optional before the deadline and legal at any count', () => {
+      const shift = createShift(level)
+      expect(shift.dispatch({ type: 'receive', to: 2 }).ok).toBe(true)
+      expect(shift.state).toMatchObject({ receipts: 1, deadline: null })
+    })
+
+    it('at deadline 0 only a receipt is legal, and receiving resets the next-truck clock', () => {
+      const shift = createShift(level)
+      shift.dispatch({ type: 'rehandle', from: 1, to: 2 })
+      shift.tick(100)
+      shift.tick(100)
+      expect(shift.dispatch({ type: 'collect' }).ok).toBe(true)
+      expect(shift.state.deadline).toBe(0)
+      expect(shift.dispatch({ type: 'rehandle', from: 2, to: 0 }).ok).toBe(false)
+      shift.tick(100)
+      const before = shift.state
+      expect(before.truckMs).toBeLessThan(before.truckAllowanceMs)
+      const r = shift.dispatch({ type: 'receive', to: 0 })
+      expect(r.ok).toBe(true)
+      expect(shift.state.operations).toBe(before.operations + 1)
+      expect(shift.state.truckMs).toBe(shift.state.truckAllowanceMs)
+      expect(shift.state).toMatchObject({ receipts: 1, deadline: 1, stacks: [[3], [], [2]] })
+    })
+
+    it('emits deadline-zero once when a waiting truck becomes mandatory', () => {
+      const shift = createShift(level)
+      shift.dispatch({ type: 'rehandle', from: 1, to: 2 })
+      const r = shift.dispatch({ type: 'collect' })
+      expect(r.ok && r.events.filter((e) => e.type === 'deadline-zero')).toEqual([{ type: 'deadline-zero', id: 3 }])
+    })
+  })
+
+  describe('no legal move', () => {
+    it('fails the shift when a mandatory receipt has no legal space', () => {
+      // Two full stacks, the truck brings #3 with one move allowed; the collection that would free space is too late.
+      const lvl: LevelDef = {
+        ...tiny,
+        stacks: [[2, 1], [4, 5]],
+        count: 5,
+        capacity: 2,
+        maxRehandles: 5,
+        arrivals: [{ after: 0, id: 3, moves: 0 }],
+      }
+      const shift = createShift(lvl)
+      expect(shift.state.status).toBe('failed')
+      expect(shift.state.failure?.reason).toBe('blocked')
+      expect(shift.state.failure?.message).toMatch(/receipt/i)
+    })
+
+    it('fails the shift after a move that leaves no legal move, with a clear reason, once', () => {
+      // No rehandles allowed: once #1 is collected, #2 is buried under #3 for good.
+      const lvl: LevelDef = { ...tiny, stacks: [[1], [2, 3]], count: 3, capacity: 2, maxRehandles: 0 }
+      const shift = createShift(lvl)
+      expect(shift.state.status).toBe('playing')
+      const r = shift.dispatch({ type: 'collect' })
+      expect(r.ok && r.events.map((e) => e.type)).toEqual(['collected', 'failed'])
+      expect(shift.state).toMatchObject({ status: 'failed', failure: { reason: 'blocked' } })
+      expect(shift.state.failure?.message).toMatch(/no legal move/i)
+      expect(shift.dispatch({ type: 'collect' }).ok).toBe(false)
+    })
+
+    it('does not fail while a move is still possible', () => {
+      const shift = createShift({ ...tiny, stacks: [[1], [2, 3]], count: 3, capacity: 2, maxRehandles: 1 })
+      shift.dispatch({ type: 'collect' })
+      expect(shift.state.status).toBe('playing')
     })
   })
 })
