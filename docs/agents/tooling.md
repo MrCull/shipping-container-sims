@@ -2,6 +2,12 @@
 
 Reference for `AGENTS.md`: reach for it when you run the smoke suite, label a PR with its smoke groups, work in a cloud session, take screenshots, record media, brief an implementer in a worktree, or benchmark Terminal Twin frame rate.
 
+## Unit-test scope
+
+- **`pnpm run verify [base]`**: `verify:checks` (dependency, tracked-file, em dash and other checks, the `node --test` script tests, lint, build; whole app) then `node scripts/unit-select.mjs --run [base]`, which prints `unit-select: base <sha> (<how>)`, `unit-select: scope all|none|<sim ids>`, one `<path>: <reason>` line per changed path, any `skip sim <id>` line (a sim with no unit tests has no vitest project) and the projects it runs, then runs `vitest run --project <id>...` (every project for `all`; nothing and exit 0 for `none`). An unresolvable base exits 2. Selection rule and base: AGENTS.md **Verification**. `--files-from FILE` reads the changed paths from a file; `--json` prints `{ base, how, scope, projects, skipped, reasons }` (`projects` is `"all"` or a list) for CI.
+- **`pnpm run verify:all`**: the same checks, then every unit test (`pnpm test`).
+- **`pnpm test:sim <id>`**: one sim's vitest project, with its total wall time (`scripts/test-sim.mjs`).
+
 ## Browser smoke tests
 
 - **Browser smoke tests** (`pnpm run test:smoke`, Playwright, `src/**/*.smoke.ts`) are not part of `verify`.
