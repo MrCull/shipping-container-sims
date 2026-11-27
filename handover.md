@@ -22,6 +22,9 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #389 | Y9 phone layout, cover, sim guide | #386, #387 | merged in branch (1542a3d) | |
 | #390 | Y10 background music | #388 | merged in branch (0d739ef) | |
 | #391 | Y11 smoke suite and regressions | all | merged in branch (72120bc) | |
+| review | Code review fixes (Yardshift) | #391 | in progress | session 1 |
+| #395 #396 #397 | Retro: derived counts, smoke-only paths, branch prefix | none | in progress | session 1 |
+| #394 #398 #399 | Retro: fetch-issues, smoke budget, to-tickets guidance | none | open | |
 
 ## Open points
 
