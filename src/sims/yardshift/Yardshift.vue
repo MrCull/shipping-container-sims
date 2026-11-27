@@ -6,6 +6,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import YardHud from './components/ui/YardHud.vue'
 import YardQueue from './components/ui/YardQueue.vue'
+import { useYardAudio } from './composables/useYardAudio'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
 import type { Rect } from './types/presentation'
@@ -24,6 +25,7 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 const view = computed(() => store.view)
 const move = computed(() => store.move)
 const { webglFailed } = useYardScene(canvas, view, move)
+useYardAudio(store.onCue)
 
 let observer: ResizeObserver | null = null
 let uninstallDevApi: (() => void) | null = null

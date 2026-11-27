@@ -93,7 +93,7 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   past the last container), `view.bonus` the open window (`{ id, text }`), `hud.score` and `hud.combo` (`×n`).
 - Renderers: the scene paints each face texture in the container colour with the number and, on bonus containers,
   a gold star medallion; `components/ui/YardQueue.vue` shows queue, bonus countdown, score and combo; the store's
-  `bonusPulse` replays a gold burst and "+250 · +5s" float over the collection bay. Sounds are #388's.
+  `bonusPulse` replays a gold burst and "+250 · +5s" float over the collection bay. Sounds: see Audio cues.
 
 ## Input, urgency and coaching (#387)
 
@@ -116,6 +116,26 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   order; `heavyHints` levels (11, 12) say "Heavy #n · Choose a highlighted stack: heavy on heavy or empty." or
   "... No valid stack. Make space first." while heavy cargo is selected; 13 has none. Rejection messages (the store's
   `message`, shown over the hint) stay on every level.
+
+## Audio cues (#388)
+
+- `modules/audioCues.ts` (pure): `cuesForStep(before, after, events)` maps one engine step (a `dispatch` or a `tick`)
+  to cues: event cues in event order (collect, combo, receive, rehandle, arrival, deadline-zero, overtime start and
+  end, bonus window, jackpot, bonus missed, win, timeout, blocked), then crossings the engine has no event for:
+  `deadline-one` (moves left drops to 1), `truck-low` (next-truck clock crosses `TRUCK_LOW_SHARE` 35% of its
+  allowance) and `shift-tick` at `SHIFT_TICK_SECONDS` 9, 5, 3, 2, 1 s. Each fires once per crossing, never per frame.
+  `rejectionCue()` (invalid), `craneStartCue()`, `comboCue(c)` (pitch 660 + min(c, 8) x 65 Hz, ascending) and
+  `craneCues(before, after)` (pick at progress `PICK_AT` 0.30, land at `LAND_AT` 0.88). Tones are V20's
+  `tone(f0, f1, dur, vol, delay, type)` with `vol` a relative sound gain.
+- Store: `step()` wraps every dispatch and tick and sends its cues to `onCue` listeners; `startMove` sends the
+  crane start, `frame` the pick and land crossings; reduced motion sends only the landing.
+- `composables/useYardAudio.ts` (mounted by `Yardshift.vue`): one Web Audio bus `GainNode` set from
+  `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live; the context starts on the
+  first pointer or key press. No fixed volumes.
+- Samples in `assets/audio/` (mono 64 kbit/s, trimmed with a fade out from `available-media/sound-samples`):
+  `crane-pick.mp3` (first 0.6 s of `container-loaded-to-ship.mp3`), `crane-land.mp3` (first 0.7 s of
+  `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and
+  receipt). Music is #390's.
 
 ## Levels
 
@@ -148,7 +168,8 @@ coordinates so smoke tests tap real points.
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
   `modules/receiptsView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
-  `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
+  `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/audioCues.test.ts`,
+  `store/yardshiftStoreAudio.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
