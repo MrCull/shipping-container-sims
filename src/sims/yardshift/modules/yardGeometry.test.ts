@@ -39,8 +39,8 @@ describe('Yardshift 2D yard geometry', () => {
         for (const level of LEVELS) {
           const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
-          const stacksH = level.capacity * g.boxH
-          expect(stacksH / (g.groundY - g.floor.y), `level ${level.number}`).toBeGreaterThan(0.85)
+          // The sky band is at most about a fifth of the yard; spare height is concrete headroom, not sky.
+          expect(g.backdrop.h, `level ${level.number}`).toBeLessThanOrEqual(layout.yard.h * 0.22 + 1)
           // A carried box clears a full stack, and the beam sits just above it (spreader room only).
           const fullTop = g.groundY - level.capacity * g.boxH
           expect(g.carryY + g.boxH).toBeLessThanOrEqual(fullTop)
@@ -70,8 +70,6 @@ describe('Yardshift 2D yard geometry', () => {
           expect(g.backdrop.y + g.backdrop.h).toBe(g.floor.y)
           expect(g.groundY).toBeGreaterThan(g.floor.y)
           expect(g.groundY).toBeLessThan(layout.yard.y + layout.yard.h)
-          // The backdrop band holds the sky strip, the beam and the crane headroom.
-          expect(g.backdrop.h).toBeGreaterThan(g.boxH)
           // Container shaped (art pass 3): a side-on box 1.8 to 2.4 times as long as tall, that fills its column unless
           // the room is short, when it narrows to keep its shape instead of flattening.
           const aspect = g.boxW / g.boxH

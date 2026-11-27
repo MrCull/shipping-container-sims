@@ -63,6 +63,8 @@ export const ASPECT_MAX = 2.4
 export const LIFT = 0.3
 /** The sky strip kept above the gantry beam. */
 export const SKY_MIN = 22
+/** Most of the yard height the sky band takes (art pass 4). */
+export const SKY_SHARE = 0.22
 /** Room between the beam and the top of a carried box, for the spreader. */
 const SPREADER = 8
 
@@ -109,8 +111,9 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   // The crane carries a box one box above a full stack; the beam sits just above that, the spreader between.
   const carryY = groundY - (cap + 1) * boxH - 2
   const beamY = Math.floor(carryY - dy - SPREADER - beamH)
-  // The concrete starts just above the top slot; the headroom, beam and sky are the backdrop band.
-  const floorY = Math.round(groundY - cap * boxH - dy - 3)
+  // The sky band is at most `SKY_SHARE` of the yard: the concrete starts just above the top slot, or higher on a tall
+  // yard, so spare height becomes concrete headroom rather than empty sky.
+  const floorY = Math.round(Math.min(groundY - cap * boxH - dy - 3, Math.max(yard.y + SKY_MIN, yard.y + yard.h * SKY_SHARE)))
   const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: floorY - yard.y }
   const floor = { x: yard.x, y: floorY, w: yard.w, h: yard.y + yard.h - floorY }
   const legW = Math.max(6, Math.min(12, yard.x - 4))
@@ -161,7 +164,7 @@ export interface Truck {
 export const BAY_TITLE_PX = 24
 export const BAY_STATUS_PX = 20
 /** A truck's container may be drawn up to this much larger than a yard container. */
-export const MAX_CARGO_SCALE = 1.4
+export const MAX_CARGO_SCALE = 1.6
 
 /**
  * The truck drawn in a bay: a tractor cab at one end (the right end when facing right, where the receipt arrow,
@@ -174,7 +177,7 @@ export function truckIn(bay: Rect, g: YardGeometry, facing: 'left' | 'right' = '
   const bottom = bay.y + bay.h - BAY_STATUS_PX
   const h = Math.max(12, bottom - top)
   // The truck fills most of the bay width (art pass 3), led by the cab; its height follows from the cab and cargo.
-  const cabW = Math.max(20, Math.min(72, bay.w * 0.24, h * 0.8))
+  const cabW = Math.max(20, Math.min(72, bay.w * 0.28, h * 0.8))
   const cabH = Math.max(14, Math.min(h * 0.92, cabW * 1.12))
   const wheelR = Math.max(3.5, Math.min(12, cabW * 0.16))
   const beamH = Math.max(4, wheelR * 0.95)

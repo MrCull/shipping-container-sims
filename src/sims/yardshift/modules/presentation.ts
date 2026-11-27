@@ -59,33 +59,30 @@ const BAY_GAP = 12
 
 /** Share of the surface the truck bays take when the layout knows the capacity (art pass 3: 20 to 24 %). */
 export const BAY_SHARE = 0.22
+/** Most of the surface the bays grow to when a tall phone leaves height over. */
+export const MAX_BAY_SHARE = 0.3
 
 /**
  * Screen layout of the play surface: the yard band with one column per stack, and the two truck bays below. With the
  * `capacity` (art pass 3), the yard is exactly as tall as full stacks plus crane headroom need (`yardFit`, boxes sized
- * from the column width), the bays take `BAY_SHARE`, and height left on a tall phone goes first to the sky strip (up
- * to a fifth of the yard) and then centres the play area. Without it the bays take their usual share under a yard
+ * from the column width), the bays take `BAY_SHARE`, and height left on a tall phone goes to the bays first (up to
+ * `MAX_BAY_SHARE`), then to the yard's concrete headroom. Without it the bays take their usual share under a yard
  * that fills the rest.
  */
 export function layoutFor(stackCount: number, vp: Viewport, capacity?: number): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
-  let yardTop = Math.round(vp.height * 0.02)
-  let bayBottom = Math.max(yardTop, vp.height - 8)
+  const yardTop = Math.round(vp.height * 0.02)
+  const bayBottom = Math.max(yardTop, vp.height - 8)
   // The yard is the hero (playtest fix 8): the bays take a fixed share under it, with a small gap.
   let bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
   if (capacity !== undefined && stackCount > 0) {
     const total = bayBottom - yardTop
     bayH = Math.round(Math.min(total * 0.26, Math.max(84, total * BAY_SHARE)))
     const fit = yardFit(innerW / stackCount, capacity, total - bayH - 6)
-    // Height over on a tall phone: the bays grow to 26 %, then the quiet sky strip to 45 % of the fitted yard, and
-    // only what is left centres the play area.
-    const grow = Math.max(0, Math.min(Math.round(total * 0.26) - bayH, total - bayH - 6 - fit.h))
-    bayH += grow
-    const spare = Math.max(0, total - bayH - 6 - fit.h)
-    const sky = Math.min(spare, Math.round(fit.h * 0.45))
-    const offset = Math.floor((spare - sky) / 2)
-    yardTop += offset
-    bayBottom -= spare - sky - offset
+    // Height over on a tall phone goes to the bays first (their trucks scale up with them) up to `MAX_BAY_SHARE`;
+    // the yard takes the rest, where `yardGeometry` caps the sky and adds concrete headroom. The canvas always fills
+    // the whole play surface: no dark gaps.
+    bayH += Math.max(0, Math.min(Math.round(total * MAX_BAY_SHARE) - bayH, total - bayH - 6 - fit.h))
   }
   const bayTop = Math.max(yardTop, bayBottom - bayH)
   const yardBottom = Math.max(yardTop, bayTop - 6)

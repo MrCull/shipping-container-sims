@@ -47,22 +47,22 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   top rise 0.08), as tall as `ASPECT_MIN` 1.8:1 allows (`boxHFor`); a short room narrows a box rather than flattening
   it past `ASPECT_MAX` 2.4. The stacks need full capacity plus one box of crane headroom (a carried box, `carryY`,
   clears a full stack); the gantry beam (`beamHFor`) sits just above that with spreader room only, under a sky strip
-  of at least `SKY_MIN`. The concrete floor starts just above the top slot, so the backdrop band (sky, beam,
-  headroom) never leaves bare concrete. `yardFit(colW, capacity, maxH)` gives the box height and the yard that fits it
+  of at least `SKY_MIN`. The sky band is at most `SKY_SHARE` (22 %) of the yard: the concrete starts just above the
+  top slot, or higher on a tall yard, so spare height becomes concrete headroom, never a tall empty sky. `yardFit(colW, capacity, maxH)` gives the box height and the yard that fits it
   exactly. Each bay's truck (`truckIn(bay, geo, facing)`): tractor cab at the end it faces (the receipt truck faces
   right with its cab under `arrowBox`, the collection truck faces left), a heavy skeletal trailer, three axles, cargo
-  a yard box scaled up to `MAX_CARGO_SCALE` 1.4, the whole truck filling most of the bay width and centred
+  a yard box scaled up to `MAX_CARGO_SCALE` 1.6, the cab up to 28 % of the bay width, the whole truck filling most of the bay width and centred
   vertically between the bay title and status rows. `boxAt(geo, layout, stack, tier, lift)` is a container's box;
   `boxBounds` its whole drawn area. `modules/yardGeometry.test.ts` proves, for every level and five surfaces, that
   every slot (the top one lifted too) lies inside its own column hit region and under the beam, the box aspect stays
-  1.8 to 2.4 (under 1.9 on a phone), full stacks take over 85 % of the concrete, the carried box clears a full stack
+  1.8 to 2.4 (under 1.9 on a phone), the sky band is at most 22 % of the yard, the carried box clears a full stack
   and the beam sits within 10 px above it, the legs touch no column, and each truck (both facings) lies inside its
   bay, fills most of its width, is vertically centred, has its cab ahead of the trailer and its wheels on the road,
   with the cargo on the trailer and the arrow over the receipt cab, clear of the cargo.
 - `layoutFor(stackCount, viewport, capacity)` (`present` passes the capacity): the bays take `BAY_SHARE` (22 %, at
   least 84 px) of the surface and the yard exactly what `yardFit` needs. Height left on a tall phone goes first to the
-  bays (up to 26 %), then to the sky strip (up to 45 % of the fitted yard), and the rest centres the play area in the
-  surface. Hit regions still come from the layout only. Without the capacity the bays take their old share.
+  bays (up to `MAX_BAY_SHARE`, 30 %; the trucks scale with them), then to the yard's concrete headroom. The canvas
+  always fills the whole play surface: no dark gaps (`playtestFixes.test.ts`). Hit regions still come from the layout only. Without the capacity the bays take their old share.
 - `modules/yardEffects.ts` (pure, `yardEffects.test.ts`): every render-only effect as a function of time.
   `urgencyStyle(container, current, reducedMotion)`: the current container on a calm turn (risk at `FOCUS_BASE_RISK`)
   glows with a breathing white outline; once the next-truck clock is low it vibrates (`vibrateX`: horizontal only,

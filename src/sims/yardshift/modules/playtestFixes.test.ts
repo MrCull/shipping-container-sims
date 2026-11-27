@@ -75,9 +75,10 @@ describe('Yardshift playtest fixes', () => {
       const fit = layoutFor(4, vp, 3)
       expect(fit.collection.y - (fit.yard.y + fit.yard.h)).toBeLessThanOrEqual(8)
       expect(fit.collection.h).toBeGreaterThanOrEqual(Math.min(84, vp.height * 0.2) - 1)
-      expect(fit.collection.h).toBeLessThanOrEqual(Math.max(84, vp.height * 0.26) + 1)
-      expect(fit.yard.y).toBeGreaterThanOrEqual(0)
-      expect(fit.collection.y + fit.collection.h).toBeLessThanOrEqual(vp.height)
+      expect(fit.collection.h).toBeLessThanOrEqual(Math.max(84, vp.height * 0.3) + 1)
+      // No dark gaps: the yard starts at the top margin and the bays end at the bottom margin.
+      expect(fit.yard.y).toBe(l.yard.y)
+      expect(fit.collection.y + fit.collection.h).toBe(l.collection.y + l.collection.h)
     }
   })
 })
