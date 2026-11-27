@@ -52,22 +52,46 @@ export const LABEL_PX = 18
 const FRONT = 0.86
 const DEPTH = 0.06
 const RISE = 0.08
-/** Length to height of a container side on screen: a 20 ft box, about 2.25:1, kept within 2.1 to 2.4. */
-export const ASPECT = 2.25
-export const ASPECT_MIN = 2.1
+/**
+ * Length to height of a container side on screen (art pass 3): boxes are sized from the column width first, as tall
+ * as `ASPECT_MIN` (1.8:1, a chunky 20 ft box on a narrow phone) allows; a short room narrows a box rather than
+ * flattening it past `ASPECT_MAX`.
+ */
+export const ASPECT_MIN = 1.8
 export const ASPECT_MAX = 2.4
 /** Lift of the selected container, as a share of its height. */
 export const LIFT = 0.3
-/** Share of the play surface (yard top to bay bottom) the harbour backdrop band takes: the target's quarter. */
-export const BACKDROP = 0.25
+/** The sky strip kept above the gantry beam. */
+export const SKY_MIN = 22
+/** Room between the beam and the top of a carried box, for the spreader. */
+const SPREADER = 8
+
+/** Gantry beam height for a column width. */
+export function beamHFor(colW: number): number {
+  return Math.max(10, Math.min(16, Math.round(colW * 0.16)))
+}
+
+/** Yard height besides the stacks: sky, beam, spreader, top face, a clearance pixel pair and the stack labels. */
+function fixedFor(colW: number): number {
+  return SKY_MIN + beamHFor(colW) + SPREADER + colW * RISE + 2 + LABEL_PX
+}
 
 /**
- * The yard height full stacks of `capacity` side-on containers need in a column `colW` wide, on a play surface
- * `surfaceH` tall: the backdrop band, the stacks with the lift, the stack labels and some air under the hook.
+ * Box height in a column `colW` wide with `room` px for the stacks: full stacks of `capacity` plus one box of crane
+ * headroom (a carried box clears a full stack), never taller than `ASPECT_MIN` allows. Whole pixels.
  */
-export function yardHeightFor(colW: number, surfaceH: number, capacity: number): number {
-  const boxH = (colW * FRONT) / ASPECT
-  return Math.ceil(surfaceH * BACKDROP + colW * RISE + (Math.max(1, capacity) + LIFT + 0.9) * boxH + LABEL_PX + 12)
+export function boxHFor(colW: number, capacity: number, room: number): number {
+  return Math.floor(Math.max(6, Math.min((colW * FRONT) / ASPECT_MIN, room / (Math.max(1, capacity) + 1))))
+}
+
+/**
+ * The yard height full stacks of `capacity` need in a column `colW` wide when the yard may be at most `maxH` tall:
+ * the box height (`boxHFor`) and the yard that fits it exactly (sky strip, beam, headroom, stacks, labels).
+ */
+export function yardFit(colW: number, capacity: number, maxH: number): { boxH: number; h: number } {
+  const fixed = fixedFor(colW)
+  const boxH = boxHFor(colW, capacity, maxH - fixed)
+  return { boxH, h: Math.ceil(fixed + (Math.max(1, capacity) + 1) * boxH) }
 }
 
 export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
@@ -76,22 +100,19 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const fullW = colW * FRONT
   const dx = colW * DEPTH
   const dy = colW * RISE
-  const groundY = Math.round(yard.y + yard.h - LABEL_PX)
-  const surfaceH = Math.max(layout.collection.y + layout.collection.h, yard.y + yard.h) - yard.y
-  const backdropBottom = Math.round(yard.y + Math.min(yard.h * 0.45, surfaceH * BACKDROP))
-  const beamH = Math.max(10, Math.min(18, yard.h * 0.045))
-  // The gantry beam runs across the backdrop band, so the band sits behind it.
-  const beamY = Math.round(yard.y + (backdropBottom - yard.y) * 0.3)
-  const hookRoom = beamH + 10
   const cap = Math.max(1, capacity)
-  // The stacks (top face and lift included) rise from the ground to the backdrop band, under the beam and hook.
-  const room = groundY - Math.max(beamY + hookRoom, backdropBottom) - dy
-  // Whole pixels, so neighbouring tiers share an edge exactly.
-  const boxH = Math.floor(Math.max(6, Math.min(fullW / ASPECT, room / (cap + LIFT))))
+  const groundY = Math.round(yard.y + yard.h - LABEL_PX)
+  const beamH = beamHFor(colW)
+  const boxH = boxHFor(colW, cap, groundY - yard.y - (fixedFor(colW) - LABEL_PX))
   // A short room keeps the box container shaped: it narrows instead of flattening.
   const boxW = Math.min(fullW, boxH * ASPECT_MAX)
-  const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: backdropBottom - yard.y }
-  const floor = { x: yard.x, y: backdropBottom, w: yard.w, h: yard.y + yard.h - backdropBottom }
+  // The crane carries a box one box above a full stack; the beam sits just above that, the spreader between.
+  const carryY = groundY - (cap + 1) * boxH - 2
+  const beamY = Math.floor(carryY - dy - SPREADER - beamH)
+  // The concrete starts just above the top slot; the headroom, beam and sky are the backdrop band.
+  const floorY = Math.round(groundY - cap * boxH - dy - 3)
+  const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: floorY - yard.y }
+  const floor = { x: yard.x, y: floorY, w: yard.w, h: yard.y + yard.h - floorY }
   const legW = Math.max(6, Math.min(12, yard.x - 4))
   const gantry: Gantry = {
     left: Math.max(0, yard.x - legW - 2),
@@ -101,7 +122,7 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
     beamH,
     footY: yard.y + yard.h - 4,
   }
-  return { backdrop, floor, groundY, boxW, boxH, dx, dy, lift: boxH * LIFT, gantry, carryY: beamY + hookRoom + dy }
+  return { backdrop, floor, groundY, boxW, boxH, dx, dy, lift: boxH * LIFT, gantry, carryY }
 }
 
 /** The box of the container at `tier` (0 = bottom) of stack `stack`, raised by `lift` px. */
@@ -140,7 +161,7 @@ export interface Truck {
 export const BAY_TITLE_PX = 24
 export const BAY_STATUS_PX = 20
 /** A truck's container may be drawn up to this much larger than a yard container. */
-export const MAX_CARGO_SCALE = 1.35
+export const MAX_CARGO_SCALE = 1.4
 
 /**
  * The truck drawn in a bay: a tractor cab at one end (the right end when facing right, where the receipt arrow,
@@ -152,27 +173,31 @@ export function truckIn(bay: Rect, g: YardGeometry, facing: 'left' | 'right' = '
   const top = bay.y + BAY_TITLE_PX
   const bottom = bay.y + bay.h - BAY_STATUS_PX
   const h = Math.max(12, bottom - top)
-  const groundY = bottom - 1
-  // The truck grows with a tall bay (art pass 2 gives the bays the yard's spare height), led by the cab.
-  const cabW = Math.max(20, Math.min(70, bay.w * 0.26, h * 0.6))
-  const cabH = Math.max(14, Math.min(h * 0.85, cabW * 1.15))
-  const wheelR = Math.max(3.5, Math.min(12, cabW * 0.17))
+  // The truck fills most of the bay width (art pass 3), led by the cab; its height follows from the cab and cargo.
+  const cabW = Math.max(20, Math.min(72, bay.w * 0.24, h * 0.8))
+  const cabH = Math.max(14, Math.min(h * 0.92, cabW * 1.12))
+  const wheelR = Math.max(3.5, Math.min(12, cabW * 0.16))
+  const beamH = Math.max(4, wheelR * 0.95)
+  const under = wheelR * 1.55 + beamH
+  const trailerMax = bay.w - 2 * pad - cabW - 3
+  const scale = Math.min(MAX_CARGO_SCALE, (trailerMax - 6) / (g.boxW + g.dx), (h - under - 2) / (g.boxH + g.dy))
+  // The trailer carries its box with a little deck to spare; on a wide bay it stays a believable length.
+  const trailerW = Math.min(trailerMax, Math.max(cabW * 2.2, (g.boxW + g.dx) * scale + 14, Math.min(bay.w * 0.62, cabW * 4)))
+  const cargoH = (g.boxH + g.dy) * scale
+  const truckH = Math.max(cabH + wheelR * 0.8, under + cargoH)
+  // Centred in the room between the bay title and its status line.
+  const groundY = bottom - Math.max(0, (h - truckH) / 2)
   const axleY = groundY - wheelR
-  const beamH = Math.max(3, wheelR * 0.7)
   const deckY = axleY - wheelR * 0.55 - beamH
   const cabBottom = axleY + wheelR * 0.2
   const cabX = facing === 'right' ? bay.x + bay.w - pad - cabW : bay.x + pad
   const cab: Rect = { x: cabX, y: cabBottom - cabH, w: cabW, h: cabH }
-  // The trailer runs back from the cab, at most about four cabs long on a wide desktop bay.
-  const trailerW = Math.min(bay.w - 2 * pad - cabW - 3, cabW * 4.2)
   const trailerX = facing === 'right' ? cab.x - 3 - trailerW : cab.x + cabW + 3
   const trailer: Rect = { x: trailerX, y: deckY, w: trailerW, h: beamH }
   const rear = facing === 'right' ? trailer.x + wheelR * 1.4 : trailer.x + trailer.w - wheelR * 1.4
   const forward = facing === 'right' ? 1 : -1
   const cabAxle = cab.x + cabW * (facing === 'right' ? 0.62 : 0.38)
   const wheels = [cabAxle, rear, rear + forward * wheelR * 2.3].map((x) => ({ x, y: axleY }))
-  // The cargo: as long as a yard container where the trailer allows, as tall as the room above the deck allows.
-  const scale = Math.min(MAX_CARGO_SCALE, (trailer.w - 4) / (g.boxW + g.dx), (deckY - top - 2) / (g.boxH + g.dy))
   const w = g.boxW * scale
   const ch = g.boxH * scale
   const cdx = g.dx * scale

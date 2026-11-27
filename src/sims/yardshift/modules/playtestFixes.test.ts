@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { createShift } from './engine'
 import { levelByNumber, TUTORIAL } from './levels'
-import { arrowBox, input, layoutFor, MAX_BAY_SHARE, present } from './presentation'
+import { arrowBox, input, layoutFor, present } from './presentation'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type { UiState, Viewport } from '../types/presentation'
 
@@ -70,11 +70,14 @@ describe('Yardshift playtest fixes', () => {
       expect(l.collection.y - (l.yard.y + l.yard.h)).toBeLessThanOrEqual(8)
       expect(l.collection.h).toBeLessThanOrEqual(vp.height * 0.25)
       expect(l.yard.h / vp.height).toBeGreaterThan(0.68)
-      // Art pass 2: with the capacity, a yard taller than its full stacks need gives the spare height to the bays.
+      // Art pass 3: with the capacity, the bays take about a fifth of the surface right under a yard that fits its
+      // stacks; the play area stays inside the surface (centred when a tall phone leaves height over).
       const fit = layoutFor(4, vp, 3)
       expect(fit.collection.y - (fit.yard.y + fit.yard.h)).toBeLessThanOrEqual(8)
-      expect(fit.collection.h).toBeGreaterThanOrEqual(l.collection.h)
-      expect(fit.collection.h).toBeLessThanOrEqual(vp.height * MAX_BAY_SHARE + 1)
+      expect(fit.collection.h).toBeGreaterThanOrEqual(Math.min(84, vp.height * 0.2) - 1)
+      expect(fit.collection.h).toBeLessThanOrEqual(Math.max(84, vp.height * 0.26) + 1)
+      expect(fit.yard.y).toBeGreaterThanOrEqual(0)
+      expect(fit.collection.y + fit.collection.h).toBeLessThanOrEqual(vp.height)
     }
   })
 })

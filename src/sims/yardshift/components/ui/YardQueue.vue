@@ -101,9 +101,11 @@ defineProps<{
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-/* A bonus container's chip is gold, with its sequence colour kept as the lower rail. */
+/* A bonus container's chip is the yard boxes' metallic gold, with its sequence colour kept as the lower rail. */
 .queue li.gold {
-  background: linear-gradient(135deg, var(--ys-gold-light), var(--ys-gold-mid) 55%, var(--ys-gold));
+  background:
+    linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 45%) 42%, transparent 54%),
+    linear-gradient(var(--ys-yard-gold-shine), var(--ys-yard-gold-body) 45%, var(--ys-yard-gold-deep));
   box-shadow:
     inset 0 4px 0 rgb(255 255 255 / 38%),
     inset 0 -5px 0 var(--chip),

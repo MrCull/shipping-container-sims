@@ -4,7 +4,7 @@
  * layout alone (never from animated positions), so a tap target never moves.
  */
 import { exposedNextStack, rejectionFor, waitingArrival } from './engine'
-import { yardHeightFor } from './yardGeometry'
+import { yardFit } from './yardGeometry'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type {
   ClocksView,
@@ -57,24 +57,35 @@ function queueFor(state: ShiftState): QueueItem[] {
 const SIDE = 16
 const BAY_GAP = 12
 
-/** Most of the surface height the truck bays take when the yard needs less (art pass 2). */
-export const MAX_BAY_SHARE = 0.34
+/** Share of the surface the truck bays take when the layout knows the capacity (art pass 3: 20 to 24 %). */
+export const BAY_SHARE = 0.22
 
 /**
  * Screen layout of the play surface: the yard band with one column per stack, and the two truck bays below. With the
- * `capacity`, a yard taller than its full stacks need (side-on containers are short on a narrow phone) gives the spare
- * height to the bays, up to `MAX_BAY_SHARE` of the surface (art pass 2); without it the bays take their usual share.
+ * `capacity` (art pass 3), the yard is exactly as tall as full stacks plus crane headroom need (`yardFit`, boxes sized
+ * from the column width), the bays take `BAY_SHARE`, and height left on a tall phone goes first to the sky strip (up
+ * to a fifth of the yard) and then centres the play area. Without it the bays take their usual share under a yard
+ * that fills the rest.
  */
 export function layoutFor(stackCount: number, vp: Viewport, capacity?: number): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
+  let yardTop = Math.round(vp.height * 0.02)
+  let bayBottom = Math.max(yardTop, vp.height - 8)
   // The yard is the hero (playtest fix 8): the bays take a fixed share under it, with a small gap.
   let bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
-  const yardTop = Math.round(vp.height * 0.02)
-  const bayBottom = Math.max(yardTop, vp.height - 8)
   if (capacity !== undefined && stackCount > 0) {
-    const need = yardHeightFor(innerW / stackCount, bayBottom - yardTop, capacity)
-    const spare = bayBottom - yardTop - 6 - bayH - need
-    if (spare > 0) bayH = Math.round(Math.min(vp.height * MAX_BAY_SHARE, bayH + spare))
+    const total = bayBottom - yardTop
+    bayH = Math.round(Math.min(total * 0.26, Math.max(84, total * BAY_SHARE)))
+    const fit = yardFit(innerW / stackCount, capacity, total - bayH - 6)
+    // Height over on a tall phone: the bays grow to 26 %, then the quiet sky strip to 45 % of the fitted yard, and
+    // only what is left centres the play area.
+    const grow = Math.max(0, Math.min(Math.round(total * 0.26) - bayH, total - bayH - 6 - fit.h))
+    bayH += grow
+    const spare = Math.max(0, total - bayH - 6 - fit.h)
+    const sky = Math.min(spare, Math.round(fit.h * 0.45))
+    const offset = Math.floor((spare - sky) / 2)
+    yardTop += offset
+    bayBottom -= spare - sky - offset
   }
   const bayTop = Math.max(yardTop, bayBottom - bayH)
   const yardBottom = Math.max(yardTop, bayTop - 6)

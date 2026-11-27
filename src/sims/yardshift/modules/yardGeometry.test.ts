@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LEVELS } from './levels'
 import { arrowBox, layoutFor } from './presentation'
 import { contains, overlaps, screenLayout } from './screenLayout'
-import { ASPECT_MAX, ASPECT_MIN, boxAt, boxBounds, freeSlots, slotsFor, truckIn, yardGeometry } from './yardGeometry'
+import { ASPECT_MAX, ASPECT_MIN, BAY_STATUS_PX, BAY_TITLE_PX, boxAt, boxBounds, freeSlots, slotsFor, truckIn, yardGeometry } from './yardGeometry'
 
 /** Play surfaces of a phone (with and without notch insets), a tablet and two desktops. */
 const SURFACES = [
@@ -35,12 +35,18 @@ describe('Yardshift 2D yard geometry', () => {
         }
       })
 
-      it('full stacks fill the yard: little bare concrete above the top slot on a phone', () => {
+      it('full stacks fill the yard: no bare concrete above the top slot, the beam just above the crane headroom', () => {
         for (const level of LEVELS) {
           const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
           const stacksH = level.capacity * g.boxH
-          if (s.w < 600 && level.capacity >= 3) expect(stacksH / (g.groundY - g.floor.y), `level ${level.number}`).toBeGreaterThan(0.45)
+          expect(stacksH / (g.groundY - g.floor.y), `level ${level.number}`).toBeGreaterThan(0.85)
+          // A carried box clears a full stack, and the beam sits just above it (spreader room only).
+          const fullTop = g.groundY - level.capacity * g.boxH
+          expect(g.carryY + g.boxH).toBeLessThanOrEqual(fullTop)
+          expect(g.carryY - g.dy - (g.gantry.beamY + g.gantry.beamH)).toBeLessThanOrEqual(10)
+          // Boxes are sized from the column width first: on a phone they are as tall as the 1.8:1 shape allows.
+          if (s.w < 600) expect(g.boxW / g.boxH, `level ${level.number}`).toBeLessThan(1.9)
         }
       })
 
@@ -64,12 +70,10 @@ describe('Yardshift 2D yard geometry', () => {
           expect(g.backdrop.y + g.backdrop.h).toBe(g.floor.y)
           expect(g.groundY).toBeGreaterThan(g.floor.y)
           expect(g.groundY).toBeLessThan(layout.yard.y + layout.yard.h)
-          // The target's proportions: the backdrop is a band of about a quarter, the containers nearly fill a column.
-          const canvasH = layout.collection.y + layout.collection.h - layout.yard.y
-          expect(g.backdrop.h / canvasH).toBeGreaterThan(0.2)
-          expect(g.backdrop.h / canvasH).toBeLessThanOrEqual(0.26)
-          // Container shaped (art pass 2): a side-on 20 ft box, about 2.1 to 2.4 times as long as tall, that fills its
-          // column unless the room is short, when it narrows to keep its shape instead of flattening.
+          // The backdrop band holds the sky strip, the beam and the crane headroom.
+          expect(g.backdrop.h).toBeGreaterThan(g.boxH)
+          // Container shaped (art pass 3): a side-on box 1.8 to 2.4 times as long as tall, that fills its column unless
+          // the room is short, when it narrows to keep its shape instead of flattening.
           const aspect = g.boxW / g.boxH
           expect(aspect, `level ${level.number}`).toBeGreaterThanOrEqual(ASPECT_MIN - 0.01)
           expect(aspect, `level ${level.number}`).toBeLessThanOrEqual(ASPECT_MAX + 0.01)
@@ -87,6 +91,11 @@ describe('Yardshift 2D yard geometry', () => {
         ] as const) {
           const t = truckIn(bay, g, facing)
           for (const r of [t.trailer, t.cab, boxBounds(t.cargo)]) expect(contains(bay, r)).toBe(true)
+          // The truck fills most of the bay width and sits in the middle of the room between title and status.
+          expect(t.cab.w + t.trailer.w).toBeGreaterThan(bay.w * (bay.w > 300 ? 0.45 : 0.8))
+          const room = { top: bay.y + BAY_TITLE_PX, bottom: bay.y + bay.h - BAY_STATUS_PX }
+          const truckTop = Math.min(t.cab.y, t.cargo.y - t.cargo.dy)
+          expect(Math.abs(truckTop - room.top - (room.bottom - t.groundY))).toBeLessThanOrEqual(2)
           expect(overlaps(t.trailer, t.cab)).toBe(false)
           // The cab is at the end the truck faces.
           if (facing === 'left') expect(t.cab.x).toBeLessThan(t.trailer.x)

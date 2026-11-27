@@ -246,8 +246,8 @@ onBeforeUnmount(() => {
         class="burst"
         data-testid="ys-bonus-burst"
         :style="{
-          left: `${view.layout.collection.x + view.layout.collection.w * 0.4}px`,
-          top: `${view.layout.collection.y + 30}px`,
+          left: `${view.layout.collection.x + view.layout.collection.w * 0.42}px`,
+          top: `${view.layout.collection.y + view.layout.collection.h * 0.42 - 18}px`,
         }"
       >
         <span class="ring" />
@@ -260,10 +260,10 @@ onBeforeUnmount(() => {
       class="fly-time"
       aria-hidden="true"
       :style="{
-        left: `${screen.surface.x + view.layout.collection.x + view.layout.collection.w * 0.82}px`,
-        top: `${screen.surface.y + view.layout.collection.y + 70}px`,
-        '--fly-x': `${screen.hud.x + 60 - (screen.surface.x + view.layout.collection.x + view.layout.collection.w * 0.82)}px`,
-        '--fly-y': `${screen.hud.y + 50 - (screen.surface.y + view.layout.collection.y + 70)}px`,
+        left: `${screen.surface.x + view.layout.collection.x + view.layout.collection.w * 0.78}px`,
+        top: `${screen.surface.y + view.layout.collection.y - 30}px`,
+        '--fly-x': `${screen.hud.x + 60 - (screen.surface.x + view.layout.collection.x + view.layout.collection.w * 0.78)}px`,
+        '--fly-y': `${screen.hud.y + 50 - (screen.surface.y + view.layout.collection.y - 30)}px`,
       }"
     >+5s</span>
     <footer
@@ -482,7 +482,7 @@ onBeforeUnmount(() => {
   }
   100% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-28px) scale(1);
+    transform: translateX(-50%) translateY(-8px) scale(1);
   }
 }
 /* "+5s" flies from the collection truck up to the shift clock. */

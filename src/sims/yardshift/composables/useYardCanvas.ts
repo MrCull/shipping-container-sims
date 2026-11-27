@@ -157,9 +157,11 @@ function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold
   const body = g.createLinearGradient(0, y, 0, y + h)
   if (gold) {
     // Metallic gold: a bright cream top edge, rich gold, a deep bronze foot, so it never reads as the yellow slot.
+    // Two-tone: a bright upper half over a deeper lower half, joined softly.
     body.addColorStop(0, C['gold-shine'])
-    body.addColorStop(0.3, C['gold-body'])
-    body.addColorStop(0.75, C['gold-deep'])
+    body.addColorStop(0.2, C['gold-body'])
+    body.addColorStop(0.5, C['gold-body'])
+    body.addColorStop(0.62, C['gold-deep'])
     body.addColorStop(1, C['medal-rim'])
   } else {
     body.addColorStop(0, shade(colour, 0.12))
@@ -167,17 +169,18 @@ function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold
   }
   g.fillStyle = body
   g.fillRect(x, y, w, h)
-  // Corrugated ribs: light and dark pairs across the side, short of the door end.
-  const ribs = Math.max(6, Math.round((w - door) / 5))
+  // Corrugated ribs: a few bold light and dark pairs across the side, short of the door end (smooth faint ones on gold,
+  // so the metal reads as one shine at phone size).
+  const ribs = Math.max(4, Math.round((w - door) / (gold ? 16 : 9)))
   const step = (w - door) / ribs
-  const lit = gold ? 'rgb(255 251 232 / 55%)' : shade(colour, 0.2)
-  const dark = gold ? 'rgb(120 76 18 / 35%)' : shade(colour, -0.16)
+  const lit = gold ? 'rgb(255 251 232 / 30%)' : shade(colour, 0.22)
+  const dark = gold ? 'rgb(120 76 18 / 18%)' : shade(colour, -0.2)
   for (let i = 0; i < ribs; i++) {
     const rx = x + i * step
     g.fillStyle = lit
-    g.fillRect(rx + step * 0.15, y + rail, Math.max(0.8, step * 0.22), h - 2 * rail)
+    g.fillRect(rx + step * 0.12, y + rail, Math.max(1, step * 0.3), h - 2 * rail)
     g.fillStyle = dark
-    g.fillRect(rx + step * 0.62, y + rail, Math.max(0.8, step * 0.22), h - 2 * rail)
+    g.fillRect(rx + step * 0.55, y + rail, Math.max(1, step * 0.3), h - 2 * rail)
   }
   // Door end: a panel with two vertical locking bars and their handles.
   const dxp = x + w - door
@@ -305,32 +308,15 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
     // Sparkles on the gold (faster while the bonus window is open).
     if (p.glint && !p.still) {
       g.fillStyle = C['gold-shine']
-      for (const sp of sparkles(now, p.seed, p.window != null)) {
+      for (const sp of sparkles(now, p.seed, p.window != null).slice(0, 3)) {
         if (sp.s < 0.05) continue
-        star(g, x + sp.u * w, y + sp.v * h, 1.5 + 3.5 * sp.s, 4, 0.3)
+        // Only at the box ends, never over the number in the middle.
+        const u = sp.u < 0.5 ? 0.04 + sp.u * 0.32 : 0.64 + (sp.u - 0.5) * 0.32
+        star(g, x + w * u, y + h * (0.15 + sp.v * 0.7), 2.5 + 5 * sp.s, 4, 0.28)
         g.fill()
       }
     }
-    // The star badge bounces on the top-left corner.
-    const r = Math.max(6, Math.min(h * 0.36, 10))
-    const bounce = p.glint && !p.still ? -3 * Math.abs(Math.sin(now * 0.005 + p.seed)) : 0
-    const bx = p.exposed ? x + r * 0.7 : x + r + 2
-    const by = p.exposed ? y - r * 0.35 + bounce : y + h / 2
-    medallion(g, bx, by, r)
-    if (p.window != null) {
-      // The bonus window's countdown ring round the badge.
-      g.lineCap = 'round'
-      g.lineWidth = 3
-      g.strokeStyle = 'rgb(255 255 255 / 45%)'
-      g.beginPath()
-      g.arc(bx, by, r + 3.5, 0, Math.PI * 2)
-      g.stroke()
-      g.strokeStyle = C['gold-shine']
-      g.beginPath()
-      g.arc(bx, by, r + 3.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, Math.min(1, p.window)))
-      g.stroke()
-      g.lineCap = 'butt'
-    }
+    // The star badge goes on the top-left corner casting in a second pass (`badge`), over every box.
   }
   if (p.glow && !p.red && !p.selected) {
     // The calm current container: a soft breathing white outline.
@@ -352,6 +338,31 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
     g.stroke()
   }
   g.restore()
+}
+
+/**
+ * The bonus star badge on a box's top-left corner casting, clear of the number: it bounces when the box is exposed and
+ * gets the bonus window's countdown ring while that window is open.
+ */
+function badge(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): void {
+  const r = Math.max(6, Math.min(b.h * 0.27, 10))
+  const bounce = p.glint && !p.still ? -2.5 * Math.abs(Math.sin(now * 0.005 + p.seed)) : 0
+  const bx = b.x + 1
+  const by = b.y - b.dy * 0.5 - 1 + bounce
+  medallion(g, bx, by, r)
+  if (p.window != null) {
+    g.lineCap = 'round'
+    g.lineWidth = 3
+    g.strokeStyle = 'rgb(255 255 255 / 45%)'
+    g.beginPath()
+    g.arc(bx, by, r + 3.5, 0, Math.PI * 2)
+    g.stroke()
+    g.strokeStyle = C['gold-shine']
+    g.beginPath()
+    g.arc(bx, by, r + 3.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, Math.min(1, p.window)))
+    g.stroke()
+    g.lineCap = 'butt'
+  }
 }
 
 /** A soft contact shadow on the ground under a box. */
@@ -401,7 +412,8 @@ function backdrop(g: CanvasRenderingContext2D, r: Rect, seed: number): void {
   g.globalAlpha = 0.28
   g.strokeStyle = C.distant
   g.lineWidth = 1.5
-  const craneH = (horizon - r.y) * 0.7
+  // Low on the horizon however tall the sky strip is, so they stay distant.
+  const craneH = Math.min((horizon - r.y) * 0.7, 56)
   for (let i = 0; i < 4; i++) {
     const cx = r.x + r.w * (0.1 + i * 0.26) + ((seed * 7 + i * 13) % 9)
     const top = horizon - craneH
@@ -531,9 +543,22 @@ function truck(g: CanvasRenderingContext2D, t: Truck, cabColour: string, stripe:
   g.fillStyle = C.chassis
   g.fillRect(trailer.x, trailer.y, trailer.w, trailer.h)
   g.fillRect(trailer.x + trailer.w - 2, trailer.y + trailer.h * 0.3, cab.x - trailer.x - trailer.w + cab.w * 0.5, trailer.h * 0.9)
-  const post = Math.max(2, trailer.h * 0.7)
-  g.fillStyle = C['gantry-dark']
-  for (const px of [trailer.x + 2, trailer.x + trailer.w - 2 - post]) g.fillRect(px, trailer.y - post * 0.8, post, post * 0.8)
+  // A lighter top flange and dark cross members make the beam read as a heavy steel chassis.
+  g.fillStyle = C['heavy-tile']
+  g.fillRect(trailer.x, trailer.y, trailer.w, Math.max(1.5, trailer.h * 0.3))
+  g.fillStyle = C.chassis
+  for (let cx = trailer.x + 6; cx < trailer.x + trailer.w - 6; cx += Math.max(10, trailer.w / 7)) {
+    g.fillRect(cx, trailer.y + trailer.h, 2, trailer.h * 0.6)
+  }
+  // Twist-lock posts at each end, bright so they read against the deck.
+  const post = Math.max(3, trailer.h * 0.8)
+  g.fillStyle = C.trolley
+  g.strokeStyle = C.outline
+  g.lineWidth = 1
+  for (const px of [trailer.x + 1, trailer.x + trailer.w - 1 - post]) {
+    g.fillRect(px, trailer.y - post, post, post)
+    g.strokeRect(px + 0.5, trailer.y - post + 0.5, post - 1, post - 1)
+  }
   // Mudguards over the trailer wheels.
   const rearWheels = t.wheels.slice(1)
   g.fillStyle = C.chassis
@@ -787,7 +812,11 @@ export function useYardCanvas(
     g.clip()
     g.translate(motion.x, motion.y)
     truckFacing(g, layout.collection, geo, 'left', C['cab-white'], C['cab-teal'])
-    if (collecting && motion.carrying) container(g, collectTruck.cargo, { ...collecting, heavy: false, seed: 1 }, now)
+    if (collecting && motion.carrying) {
+      const paint: Paint = { ...collecting, heavy: false, exposed: true, seed: 1 }
+      container(g, collectTruck.cargo, paint, now)
+      if (paint.bonus) badge(g, collectTruck.cargo, paint, now)
+    }
     g.restore()
     if (vm.receiptCargo) truckFacing(g, layout.receipt, geo, 'right', C['cab-orange'], C['gantry-dark'])
 
@@ -833,6 +862,7 @@ export function useYardCanvas(
       if (stackHeight(i) > 0 && moving?.stack !== i) shadow(g, boxAt(geo, layout, i, 0), geo.groundY)
       else if (stackHeight(i) > 1) shadow(g, boxAt(geo, layout, i, 0), geo.groundY)
     })
+    const badges: { b: Box; p: Paint }[] = []
     for (const c of vm.containers) {
       if (c === moving) continue
       const lift = c.selected && !m ? geo.lift : 0
@@ -840,7 +870,9 @@ export function useYardCanvas(
       const d = dressed(c, c.next, { kind: 'stack', index: c.stack }, top)
       if (c.glint) animated = true
       const b = moveBox(boxAt(geo, layout, c.stack, c.tier, lift), d.dx, 0)
-      container(g, b, { ...c, ...d.paint, exposed: top, seed: c.id }, now)
+      const paint: Paint = { ...c, ...d.paint, exposed: top, seed: c.id }
+      container(g, b, paint, now)
+      if (c.bonus) badges.push({ b, p: paint })
       if (d.land) dust(g, b, fxProgress(d.land, now))
       if (d.miss) poof(g, b, fxProgress(d.miss, now))
     }
@@ -850,9 +882,12 @@ export function useYardCanvas(
       const lift = c.selected ? geo.lift * 0.6 : 0
       const b = moveBox(receiptTruck.cargo, d.dx, -lift)
       if (c.bonus && !reduced) animated = true
-      container(g, b, { ...c, ...d.paint, colour: C['cab-orange'], glint: c.bonus && !reduced, exposed: true, seed: c.id }, now)
+      const paint: Paint = { ...c, ...d.paint, colour: C['cab-orange'], glint: c.bonus && !reduced, exposed: true, seed: c.id }
+      container(g, b, paint, now)
+      if (c.bonus) badges.push({ b, p: paint })
       if (d.miss) poof(g, b, fxProgress(d.miss, now))
     }
+    for (const { b, p } of badges) badge(g, b, p, now)
     // Ghost drop slots on every legal destination.
     if (!m) for (const to of vm.destinations) ghost(g, boxAt(geo, layout, to, stackHeight(to)))
 
@@ -890,6 +925,7 @@ export function useYardCanvas(
       }
       if (p.carrying || p.leg === 'release') shadow(g, { ...box, y: geo.groundY - box.h }, geo.groundY, 0.12)
       container(g, box, paint, now)
+      if (paint.bonus) badge(g, box, paint, now)
       if (m.progress >= 0.999) restX = centreX(dst)
     }
     trolley(g, geo, hookX, hookY, gripping)
