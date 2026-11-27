@@ -75,7 +75,7 @@ jobs:
         run: node scripts/check-smoke-groups.mjs
 
       - name: Smoke reporter, timing, shards, server, merge, group check, selection and CI script tests
-        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs scripts/test-smoke-ci.mjs
+        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs scripts/test-smoke-ci.mjs scripts/test-unit-select.mjs
 
       - name: Lint
         run: pnpm run lint
@@ -83,8 +83,20 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      # The PR's changed paths: the checkout is GitHub's merge commit, and HEAD^1 (fetched by fetch-depth 2, as the
+      # quarantine check uses it) is the base branch tip it merged into, so this diff is what the PR brings in.
+      - name: List the PR's changed files for the unit-test scope
+        if: github.event_name == 'pull_request'
+        run: git diff --name-only HEAD^1 HEAD > .unit-changed.txt
+
+      # Unit tests scoped by the same rule as local `pnpm run verify` (scripts/unit-select.mjs, spec #375): a PR inside
+      # one sim's folder runs that sim's vitest project, a shared or config change runs every project, a docs-only PR
+      # runs none and passes. A push to main and a manual run test every project. The scope, the projects and one
+      # reason per path go to the log and the step summary. Lint and build above still cover the whole app.
       - name: Test
-        run: pnpm test
+        env:
+          EVENT: ${{ github.event_name }}
+        run: node scripts/unit-select.mjs --run --event "$EVENT" --files-from .unit-changed.txt --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Asset budgets (Terminal Twin GLBs + sidecars; no Blender needed)
         run: pnpm run tt:assets:check

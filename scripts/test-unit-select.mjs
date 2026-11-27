@@ -3,7 +3,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { selectUnitScope, projectsFor } from './unit-select.mjs'
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { selectUnitScope, projectsFor, selectForEvent, summaryMarkdown } from './unit-select.mjs'
 
 const why = (r, path) => r.reasons.find((x) => x.path === path)?.why
 
@@ -100,4 +103,54 @@ test('CLI --json: one JSON object with base, scope and projects', () => {
   const j = JSON.parse(r.stdout)
   assert.match(j.base, /^[0-9a-f]{40}$/)
   assert.ok('scope' in j && 'projects' in j && Array.isArray(j.reasons))
+})
+
+// CI (#380): the PR checks workflow runs `unit-select.mjs --run --event <name> --files-from <PR paths> --summary <file>`.
+test('selectForEvent: a pull request uses its changed paths', () => {
+  assert.deepEqual(selectForEvent('pull_request', ['src/sims/terminal-twin/a.ts']).scope, ['terminal-twin'])
+  assert.equal(selectForEvent('pull_request', ['src/stores/audio.ts']).scope, 'all')
+  assert.equal(selectForEvent('pull_request', ['README.md']).scope, 'none')
+})
+
+test('selectForEvent: a push to main and a manual run use scope all, whatever the paths', () => {
+  for (const ev of ['push', 'workflow_dispatch']) {
+    const r = selectForEvent(ev, [])
+    assert.equal(r.scope, 'all', ev)
+    assert.match(r.reasons[0].why, new RegExp(ev))
+  }
+})
+
+test('summaryMarkdown: scope, projects and one line per reason', () => {
+  const md = summaryMarkdown({ scope: ['terminal-twin'], projects: ['terminal-twin'], skipped: [], reasons: [{ path: 'src/sims/terminal-twin/a.ts', why: 'sim terminal-twin' }] })
+  assert.match(md, /Unit-test scope: terminal-twin/)
+  assert.match(md, /Projects: terminal-twin/)
+  assert.match(md, /`src\/sims\/terminal-twin\/a.ts`: sim terminal-twin/)
+  assert.match(summaryMarkdown({ scope: 'none', projects: [], skipped: [], reasons: [] }), /no unit tests to run/)
+})
+
+const tmp = () => mkdtempSync(join(tmpdir(), 'unit-select-'))
+
+test('CLI --event push --summary: scope all without reading changed paths', () => {
+  const d = tmp()
+  const r = run('--event', 'push', '--files-from', join(d, 'missing.txt'), '--summary', join(d, 'sum.md'), '--json')
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(JSON.parse(r.stdout).projects, 'all')
+  assert.match(readFileSync(join(d, 'sum.md'), 'utf8'), /Unit-test scope: all/)
+})
+
+test('CLI docs-only PR with --run: a passing no-op, written to the summary', () => {
+  const d = tmp()
+  writeFileSync(join(d, 'files.txt'), 'README.md\ndocs/agents/tooling.md\n')
+  const r = run('--run', '--event', 'pull_request', '--files-from', join(d, 'files.txt'), '--summary', join(d, 'sum.md'))
+  assert.equal(r.status, 0, r.stderr)
+  assert.match(r.stdout, /no unit tests to run for this change: OK/)
+  assert.match(readFileSync(join(d, 'sum.md'), 'utf8'), /Unit-test scope: none/)
+})
+
+test("CLI one-sim PR: only that sim's project", () => {
+  const d = tmp()
+  writeFileSync(join(d, 'files.txt'), 'src/sims/terminal-twin/modules/x.ts\n')
+  const r = run('--json', '--event', 'pull_request', '--files-from', join(d, 'files.txt'))
+  assert.equal(r.status, 0, r.stderr)
+  assert.deepEqual(JSON.parse(r.stdout).projects, ['terminal-twin'])
 })
