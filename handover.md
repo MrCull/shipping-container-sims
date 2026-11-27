@@ -15,7 +15,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #382 | Y2 13 levels, heavy rule, solver | #381 | merged in branch (99f4614) | |
 | #383 | Y3 clocks, overtime, crane animation | #381 | merged in branch (b8c8648) | |
 | #384 | Y4 incoming trucks and receipts | #382, #383 | in progress | session 1 |
-| #385 | Y5 score, combo, queue colours, bonus | #383 | in progress | session 1 |
+| #385 | Y5 score, combo, queue colours, bonus | #383 | merged in branch (3436249) | |
 | #386 | Y6 progress, picker, results, undo | #384, #385 | open | |
 | #387 | Y7 drag, keyboard, urgency, coaching | #384 | open | |
 | #388 | Y8 audio cues and crane sounds | #384, #385 | open | |
