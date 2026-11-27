@@ -118,7 +118,7 @@ describe('Yardshift present', () => {
   it('hitTest resolves each region centre to itself, and the two bays never to each other', () => {
     const regions = present(state, NONE, PHONE).hitRegions
     for (const r of regions) {
-      const { rect: _rect, ...target } = r
+      const target = r.kind === 'stack' ? { kind: 'stack', index: r.index } : { kind: r.kind }
       expect(hitTest(regions, ...centre(r))).toEqual(target)
     }
     const collection = regions.find((r) => r.kind === 'collection')!
