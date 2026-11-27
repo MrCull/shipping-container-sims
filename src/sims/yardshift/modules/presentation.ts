@@ -3,13 +3,14 @@
  * draw; `input` turns a UI event into the next UI state and at most one engine action. Hit regions come from the
  * layout alone (never from animated positions), so a tap target never moves.
  */
-import { exposedNextStack, rejectionFor } from './engine'
+import { exposedNextStack, rejectionFor, waitingArrival } from './engine'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type {
   ClocksView,
   ContainerView,
   HitRegion,
   HitTarget,
+  IncomingView,
   Layout,
   Rect,
   UiEvent,
@@ -70,10 +71,30 @@ export function legalDestinations(state: ShiftState, from: number): number[] {
     .filter((to) => rejectionFor(state, { type: 'rehandle', from, to }) === null)
 }
 
+/** Stacks the waiting truck's cargo may be received onto. */
+export function receiptDestinations(state: ShiftState): number[] {
+  return state.stacks.map((_, to) => to).filter((to) => rejectionFor(state, { type: 'receive', to }) === null)
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 'S'}`
+
+/** The incoming band and receipt bay status: orange optional signal, red mandatory signal at deadline 0. */
+export function incomingView(state: ShiftState): IncomingView {
+  const id = waitingArrival(state)
+  if (id === undefined || state.deadline === null || state.status !== 'playing') {
+    return { status: 'none', text: '', bay: 'NO TRUCK' }
+  }
+  if (state.deadline === 0) return { status: 'mandatory', text: `↑ RECEIPT #${id} · MANDATORY`, bay: 'MANDATORY NOW' }
+  const left = `${plural(state.deadline, 'MOVE')} LEFT`
+  return { status: 'optional', text: `↑ RECEIPT #${id} · ${left}`, bay: left }
+}
+
 function hintFor(state: ShiftState, ui: UiState): string {
   if (state.status === 'complete') return 'Yard cleared!'
   if (state.failure) return state.failure.message
+  if (ui.selection === 'receipt') return `Choose a highlighted stack for #${waitingArrival(state)}.`
   if (ui.selection !== null) return `Choose a destination for #${topOf(state, ui.selection)}`
+  if (state.deadline === 0) return 'Deadline reached. Tap the receipt truck, then a stack.'
   if (exposedNextStack(state) >= 0) return `Tap #${state.next} to load the truck.`
   return `Uncover #${state.next}: tap a top container, then a stack.`
 }
@@ -125,11 +146,15 @@ export function moveSpan(layout: Layout, action: ShiftAction, state: ShiftState)
     return { fromX: centre(layout.columns[from]), toX: centre(layout.collection) }
   }
   if (action.type === 'rehandle') return { fromX: centre(layout.columns[action.from]), toX: centre(layout.columns[action.to]) }
+  if (action.type === 'receive') return { fromX: centre(layout.receipt), toX: centre(layout.columns[action.to]) }
   return null
 }
 
 export function present(state: ShiftState, ui: UiState, viewport: Viewport): ViewModel {
   const layout = layoutFor(state.stacks.length, viewport)
+  const receiptSelected = ui.selection === 'receipt'
+  const cargo = waitingArrival(state)
+  const attention = state.status === 'playing' && state.deadline === 0 && !receiptSelected
   const containers: ContainerView[] = []
   state.stacks.forEach((stack, si) =>
     stack.forEach((id, tier) =>
@@ -147,7 +172,16 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
     layout,
     capacity: state.level.capacity,
     containers,
-    destinations: ui.selection === null ? [] : legalDestinations(state, ui.selection),
+    destinations:
+      ui.selection === 'receipt'
+        ? receiptDestinations(state)
+        : ui.selection === null
+          ? []
+          : legalDestinations(state, ui.selection),
+    receiptCargo: cargo === undefined ? null : { id: cargo, label: String(cargo), selected: receiptSelected },
+    incoming: incomingView(state),
+    dimYard: attention,
+    arrow: attention ? 'receipt' : null,
     hitRegions: regionsFor(layout),
     hud: {
       title: `Shift ${state.level.number} · ${state.level.name}`,
@@ -175,13 +209,20 @@ export function input(ui: UiState, event: UiEvent, state: ShiftState): InputResu
   // A tap while the crane animates is dropped, not queued: it can never turn into a second move.
   if (state.pauses.includes('animation')) return { ui }
   if (state.status !== 'playing' || target === null) return { ui: CLEAR }
-  if (target.kind === 'receipt') return { ui }
+  if (target.kind === 'receipt') {
+    if (ui.selection === 'receipt' || waitingArrival(state) === undefined) return { ui: CLEAR }
+    return { ui: { selection: 'receipt' } }
+  }
   if (target.kind === 'collection') {
+    if (ui.selection === 'receipt') return { ui: CLEAR }
     return { ui: CLEAR, action: ui.selection === null ? { type: 'collect' } : { type: 'collect', from: ui.selection } }
   }
   const j = target.index
+  if (ui.selection === 'receipt') return { ui: CLEAR, action: { type: 'receive', to: j } }
   if (ui.selection === j) return { ui: CLEAR }
   if (ui.selection !== null) return { ui: CLEAR, action: { type: 'rehandle', from: ui.selection, to: j } }
+  // At deadline 0 only the receipt is legal: a stack tap selects nothing (the hint names the receipt truck).
+  if (state.deadline === 0) return { ui }
   const top = topOf(state, j)
   if (top === undefined) return { ui }
   if (top === state.next) return { ui, action: { type: 'collect', from: j } }

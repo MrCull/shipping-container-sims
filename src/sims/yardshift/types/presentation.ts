@@ -18,10 +18,10 @@ export type HitTarget = { kind: 'stack'; index: number } | { kind: 'collection' 
 
 export type HitRegion = HitTarget & { rect: Rect }
 
-/** UI-only state the engine never sees. #384 adds a receipt selection; #387 adds drag. */
+/** UI-only state the engine never sees. #387 adds drag. */
 export interface UiState {
-  /** Stack index whose top container is selected, or null. */
-  selection: number | null
+  /** Stack index whose top container is selected, `'receipt'` when the waiting receipt truck is selected, or null. */
+  selection: number | 'receipt' | null
 }
 
 export type UiEvent = { type: 'tap'; target: HitTarget | null }
@@ -45,12 +45,36 @@ export interface ContainerView {
   next: boolean
 }
 
+/** The incoming status band and the receipt bay status. The band always takes its space, truck or not. */
+export interface IncomingView {
+  /** `none`: no truck waits; `optional`: orange signal; `mandatory`: deadline 0, red signal. */
+  status: 'none' | 'optional' | 'mandatory'
+  /** Band text ("↑ RECEIPT #8 · 3 MOVES LEFT"), empty when no truck waits. */
+  text: string
+  /** Receipt bay status ("NO TRUCK", "3 MOVES LEFT", "MANDATORY NOW"). */
+  bay: string
+}
+
+/** The container waiting on the receipt truck. */
+export interface ReceiptCargoView {
+  id: number
+  label: string
+  selected: boolean
+}
+
 export interface ViewModel {
   layout: Layout
   capacity: number
   containers: ContainerView[]
-  /** Stacks a selected container may move to. */
+  /** Stacks the selected container (or the selected receipt truck's cargo) may move to. */
   destinations: number[]
+  /** The waiting receipt truck's cargo, or null when no truck waits. */
+  receiptCargo: ReceiptCargoView | null
+  incoming: IncomingView
+  /** Dim the yard: only at deadline 0 with the receipt truck not selected. */
+  dimYard: boolean
+  /** Where the bobbing red arrow points: the receipt truck at deadline 0 (until it is selected), else null. */
+  arrow: 'receipt' | null
   hitRegions: HitRegion[]
   hud: { title: string; loaded: string; rehandles: string }
   clocks: ClocksView

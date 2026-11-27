@@ -7,7 +7,7 @@
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import type { ViewModel } from '../types/presentation'
-import type { CraneMove } from '../store/yardshiftStore'
+import { RECEIPT_TRUCK, type CraneMove } from '../store/yardshiftStore'
 
 /** CSS pixels per world unit. */
 const PX_PER_UNIT = 40
@@ -22,8 +22,10 @@ const COLOURS = {
   next: 0x54ddb0,
   other: 0x84949c,
   selected: 0xffcb60,
+  arrival: 0xeda54e,
   collectionBay: 0x31595a,
   receiptBay: 0x85552e,
+  receiptBayUrgent: 0x85382e,
   collectionTruck: 0xd8e1e3,
   receiptTruck: 0xd99b40,
   cab: 0x2b3a44,
@@ -153,20 +155,40 @@ export function useYardScene(
     })
 
     const m = move.value
-    const moving = m ? vm.containers.find((c) => c.stack === m.from && c.tier === (vm.containers.filter((o) => o.stack === m.from).length - 1)) : undefined
     const stackTop = (stack: number) => vm.containers.filter((o) => o.stack === stack).length
+    const cargo = vm.receiptCargo
+    // A receipt lifts the cargo off the receipt truck; anything else lifts the top container of its source stack.
+    const moving =
+      m && m.from === RECEIPT_TRUCK
+        ? cargo && { id: cargo.id, label: cargo.label, next: false, tier: 0, receipt: true }
+        : m
+          ? vm.containers.find((c) => c.stack === m.from && c.tier === stackTop(m.from) - 1)
+          : undefined
+    const receiptBed = groundAt(layout.receipt.x + layout.receipt.w / 2, layout.receipt.y + layout.receipt.h * 0.55, width, height)
+    const bedY = ch * 0.5 + ch / 2
 
     for (const c of vm.containers) {
       if (c === moving) continue
       const col = layout.columns[c.stack]
       if (!col) continue
       const base = groundAt(col.x + col.w / 2, baseY, width, height)
-      const colour = c.selected ? COLOURS.selected : c.next ? COLOURS.next : COLOURS.other
+      const shade = vm.dimYard ? 0.4 : 1
+      const colour = new THREE.Color(c.selected ? COLOURS.selected : c.next ? COLOURS.next : COLOURS.other).multiplyScalar(shade)
       const body = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.7 })
       const label = new THREE.MeshStandardMaterial({ color: colour, map: labelTexture(c.label, textures), roughness: 0.7 })
       // BoxGeometry faces: +x, -x, +y (top), -y, +z (front, toward the camera), -z.
       const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
       mesh.position.set(base.x, ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * 0.25 : 0), base.z)
+      dynamic.add(mesh)
+    }
+
+    // The waiting truck's cargo sits on the receipt truck bed (raised when selected) until the crane lifts it.
+    if (cargo && !(m && m.from === RECEIPT_TRUCK)) {
+      const colour = cargo.selected ? COLOURS.selected : COLOURS.arrival
+      const body = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.7 })
+      const label = new THREE.MeshStandardMaterial({ color: colour, map: labelTexture(cargo.label, textures), roughness: 0.7 })
+      const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
+      mesh.position.set(receiptBed.x, bedY + (cargo.selected ? ch * 0.25 : 0), receiptBed.z)
       dynamic.add(mesh)
     }
 
@@ -182,9 +204,10 @@ export function useYardScene(
     rest ??= { x: left.x + (right.x - left.x) / 2, z: left.z }
     let hook = { x: rest.x, z: rest.z, y: topY }
     if (m && moving) {
-      const src = colBase(m.from)
+      const fromTruck = m.from === RECEIPT_TRUCK
+      const src = fromTruck ? receiptBed : colBase(m.from)
       const dst = m.to >= 0 ? colBase(m.to) : collect
-      const srcY = ch / 2 + moving.tier * ch * 1.04
+      const srcY = fromTruck ? bedY : ch / 2 + moving.tier * ch * 1.04
       const dstY = m.to >= 0 ? ch / 2 + stackTop(m.to) * ch * 1.04 : ch * 0.5 + ch / 2
       const p = cranePhase(m.progress)
       let boxPos: { x: number; y: number; z: number }
@@ -199,9 +222,9 @@ export function useYardScene(
         boxPos = p.leg === 'release' ? { x: dst.x, y: dstY, z: dst.z } : p.carrying ? { x, y: hook.y - ch / 2, z } : { x: src.x, y: srcY, z: src.z }
       }
       if (m.progress >= 0.999) rest = { x: dst.x, z: dst.z }
-      const colour = COLOURS.next
-      const mat = new THREE.MeshStandardMaterial({ color: moving.next ? colour : COLOURS.other, roughness: 0.7 })
-      const lab = new THREE.MeshStandardMaterial({ color: moving.next ? colour : COLOURS.other, map: labelTexture(moving.label, textures), roughness: 0.7 })
+      const colour = 'receipt' in moving ? COLOURS.arrival : moving.next ? COLOURS.next : COLOURS.other
+      const mat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.7 })
+      const lab = new THREE.MeshStandardMaterial({ color: colour, map: labelTexture(moving.label, textures), roughness: 0.7 })
       const boxMesh = box(cw, ch, cd, [mat, mat, lab, mat, lab, mat])
       boxMesh.position.set(boxPos.x, boxPos.y, boxPos.z)
       dynamic.add(boxMesh)
@@ -223,7 +246,7 @@ export function useYardScene(
 
     const bays: [typeof layout.collection, number, number, number][] = [
       [layout.collection, COLOURS.collectionBay, COLOURS.collectionTruck, -1],
-      [layout.receipt, COLOURS.receiptBay, COLOURS.receiptTruck, 1],
+      [layout.receipt, vm.incoming.status === 'mandatory' ? COLOURS.receiptBayUrgent : COLOURS.receiptBay, COLOURS.receiptTruck, 1],
     ]
     for (const [rect, bayColour, truckColour, facing] of bays) {
       const c = groundAt(rect.x + rect.w / 2, rect.y + rect.h * 0.55, width, height)
