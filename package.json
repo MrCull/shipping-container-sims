@@ -21,6 +21,7 @@
     "test:sim": "node scripts/test-sim.mjs",
     "test:related": "bash scripts/test-related.sh",
     "tt:card": "node scripts/tt-home-card.mjs",
+    "ys:solve": "tsx src/sims/yardshift/cli/solve.ts",
     "tt:run": "tsx src/sims/terminal-twin/cli/run.ts",
     "tt:fixtures": "tsx src/sims/terminal-twin/cli/build-fixtures.ts",
     "tt:bench": "tsx src/sims/terminal-twin/cli/bench.ts",

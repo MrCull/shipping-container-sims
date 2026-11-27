@@ -367,3 +367,10 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Look-ahead:** how far the engine runs ahead of the displayed time while playing (1.5 wall seconds of playback, `TwinController`), requested in slices that each cost the worker about 150 ms. A box in flight at the displayed time is posed from motion planned in the look-ahead.
 - **Achieved speed:** the sim seconds per wall second playback really runs at. Equal to the chosen speed unless the engine cannot supply it; then the engine's measured rate, shown in the top bar next to the chosen speed when more than 10 % below it. *Avoid:* "FPS" for it.
 - **Benchmark (#254):** the performance panel's one-click frame-rate tour on a production build: the TTI baseline run to 7,200 s, then 20 timed stages (five camera views at Low, Medium and High, then five speed steps), downloaded as one JSON with per-stage fps, frame-time p50/p95/p99/longest, pose time, draw calls, triangles, boxes posed and **achieved speed** (`modules/frameBenchmark.ts`, `composables/useFrameBenchmark.ts`). Not the engine benchmark `tt:bench`.
+
+## Yardshift (`src/sims/yardshift/`)
+
+- **Rehandle (Yardshift):** moving an exposed container from one yard stack to another. Costs a move against the level's rehandle cap; collections and receipts never do.
+- **Receipt:** unloading the waiting incoming truck's container onto a stack (`receive` action). Its **deadline** is the number of other successful moves left before receiving becomes mandatory (0 blocks every other action).
+- **Heavy cargo:** a container that may only be placed on an empty stack or on another heavy container (rejection reason `heavy`).
+- **Solver fixture:** `fixtures/level-NN.json`, written by `pnpm run ys:solve`: a level's proven minimum rehandles (the three-star target) and one optimal action list.

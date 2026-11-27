@@ -22,21 +22,39 @@ const MESSAGES: Record<RejectReason, string> = {
   'same-stack': 'Choose a different stack.',
   'stack-full': 'Stack full.',
   'rehandle-cap': 'Rehandle limit reached. Collections only.',
+  heavy: 'Heavy cargo goes only on an empty stack or another heavy container.',
+  'no-truck': 'No incoming truck is waiting.',
+  'receive-first': 'Deadline reached. Receive the incoming truck first.',
 }
 
 function reject(reason: RejectReason): Rejection {
   return { reason, message: MESSAGES[reason] }
 }
 
+/** Activates the next incoming truck when none waits and enough containers have been collected. */
+function activate(state: ShiftState): ShiftState {
+  if (state.deadline !== null) return state
+  const arrival = state.level.arrivals[state.receipts]
+  if (!arrival || state.collected < arrival.after) return state
+  return { ...state, deadline: arrival.moves }
+}
+
 export function initialState(level: LevelDef): ShiftState {
-  return {
+  return activate({
     level,
     stacks: level.stacks.map((s) => [...s]),
     next: 1,
     collected: 0,
     rehandles: 0,
+    receipts: 0,
+    deadline: null,
     status: 'playing',
-  }
+  })
+}
+
+/** The container the waiting incoming truck carries, or undefined when no truck waits. */
+export function waitingArrival(state: ShiftState): number | undefined {
+  return state.deadline === null ? undefined : state.level.arrivals[state.receipts]?.id
 }
 
 /** The stack whose top container is the next required one, or -1. */
@@ -49,8 +67,23 @@ function hasStack(state: ShiftState, i: number): boolean {
 }
 
 /** Why `action` is illegal in `state`, or null when it is legal. The single legality rule set. */
+function placeRejection(state: ShiftState, id: number, to: number): Rejection | null {
+  const dest = state.stacks[to]!
+  if (dest.length >= state.level.capacity) return reject('stack-full')
+  const heavy = state.level.heavy
+  if (heavy.includes(id) && dest.length > 0 && !heavy.includes(dest[dest.length - 1]!)) return reject('heavy')
+  return null
+}
+
 export function rejectionFor(state: ShiftState, action: ShiftAction): Rejection | null {
   if (state.status !== 'playing') return reject('shift-over')
+  if (action.type === 'receive') {
+    const id = waitingArrival(state)
+    if (id === undefined) return reject('no-truck')
+    if (!hasStack(state, action.to)) return reject('no-such-stack')
+    return placeRejection(state, id, action.to)
+  }
+  if (state.deadline === 0) return reject('receive-first')
   if (action.type === 'collect') {
     if (action.from === undefined) return exposedNextStack(state) < 0 ? reject('not-exposed') : null
     if (!hasStack(state, action.from)) return reject('no-such-stack')
@@ -64,29 +97,56 @@ export function rejectionFor(state: ShiftState, action: ShiftAction): Rejection 
   if (state.stacks[from]!.length === 0) return reject('empty-stack')
   if (state.stacks[to]!.length >= state.level.capacity) return reject('stack-full')
   if (state.rehandles >= state.level.maxRehandles) return reject('rehandle-cap')
-  return null
+  const stack = state.stacks[from]!
+  return placeRejection(state, stack[stack.length - 1]!, to)
 }
 
-function apply(state: ShiftState, action: ShiftAction): { state: ShiftState; events: ShiftEvent[] } {
+function isComplete(state: ShiftState): boolean {
+  return (
+    state.collected >= state.level.count &&
+    state.receipts >= state.level.arrivals.length &&
+    state.stacks.every((s) => s.length === 0)
+  )
+}
+
+/** Counts down the waiting truck's deadline, then activates the next truck (so a triggering move never counts). */
+function afterMove(state: ShiftState, events: ShiftEvent[]): ShiftState {
+  const counted = state.deadline === null ? state : { ...state, deadline: Math.max(0, state.deadline - 1) }
+  return arrive(counted, events)
+}
+
+function arrive(state: ShiftState, events: ShiftEvent[]): ShiftState {
+  const next = activate(state)
+  if (next !== state) events.push({ type: 'arrival', id: waitingArrival(next)!, moves: next.deadline! })
+  if (isComplete(next)) {
+    events.push({ type: 'completed' })
+    return { ...next, status: 'complete' }
+  }
+  return next
+}
+
+/**
+ * Applies a legal action (no legality check: call `rejectionFor` first). Pure; the solver and `createShift` share it.
+ */
+export function applyAction(state: ShiftState, action: ShiftAction): { state: ShiftState; events: ShiftEvent[] } {
   const stacks = state.stacks.map((s) => [...s])
+  if (action.type === 'receive') {
+    const id = waitingArrival(state)!
+    stacks[action.to]!.push(id)
+    const events: ShiftEvent[] = [{ type: 'received', id, to: action.to }]
+    return { state: arrive({ ...state, stacks, receipts: state.receipts + 1, deadline: null }, events), events }
+  }
   if (action.type === 'collect') {
     const from = action.from ?? exposedNextStack(state)
     const id = stacks[from]!.pop()!
-    const collected = state.collected + 1
     const events: ShiftEvent[] = [{ type: 'collected', id, from }]
-    const done = collected >= state.level.count && stacks.every((s) => s.length === 0)
-    if (done) events.push({ type: 'completed' })
-    return {
-      state: { ...state, stacks, next: id + 1, collected, status: done ? 'complete' : 'playing' },
-      events,
-    }
+    const next = { ...state, stacks, next: id + 1, collected: state.collected + 1 }
+    return { state: afterMove(next, events), events }
   }
   const id = stacks[action.from]!.pop()!
   stacks[action.to]!.push(id)
-  return {
-    state: { ...state, stacks, rehandles: state.rehandles + 1 },
-    events: [{ type: 'rehandled', id, from: action.from, to: action.to }],
-  }
+  const events: ShiftEvent[] = [{ type: 'rehandled', id, from: action.from, to: action.to }]
+  return { state: afterMove({ ...state, stacks, rehandles: state.rehandles + 1 }, events), events }
 }
 
 export function createShift(level: LevelDef): Shift {
@@ -104,7 +164,7 @@ export function createShift(level: LevelDef): Shift {
     dispatch(action: ShiftAction): DispatchResult {
       const rejection = rejectionFor(state, action)
       if (rejection) return { ok: false, state, rejection }
-      const next = apply(state, action)
+      const next = applyAction(state, action)
       state = next.state
       events.push(...next.events)
       for (const e of next.events) for (const l of listeners) l(e)

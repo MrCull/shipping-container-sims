@@ -1,0 +1,11 @@
+{
+  "level": 1,
+  "minRehandles": 1,
+  "actions": [
+    {"type":"rehandle","from":1,"to":3},
+    {"type":"collect","from":0},
+    {"type":"collect","from":1},
+    {"type":"collect","from":2},
+    {"type":"collect","from":3}
+  ]
+}
