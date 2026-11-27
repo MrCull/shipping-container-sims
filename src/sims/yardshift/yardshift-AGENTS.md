@@ -54,6 +54,27 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   and dispatches the action. Reduced motion dispatches at once. The dev hook's `applyActions` skips the animation.
   No intro or pause modal yet (#386): the engine supports `intro` and `player`, the host does not send them.
 
+## Score, combo, colours and bonuses (#385)
+
+- Engine (`withScore` in `modules/engine.ts`, judged against the state before the move): state `score` (can go
+  negative), `combo`, `bestCombo`, `golds`, `bonusMs`. Receipt +100; collection `collectPoints(combo)`
+  (100 + 50 x (min(combo, 5) - 1)); rehandle `rehandlePoints(from, to)` (-25 - 5 x stack distance); rehandles and
+  receipts reset the combo. Shift time: +0.35 s (`QUICK_SERVICE_MS`) for a collect or receive started outside
+  overtime, plus `comboShiftMs(combo)` (min(2 s, combo x 0.4 s) from the second collection in a chain). No shift cap.
+- Bonus window: `state.bonusMs` is the window left for the next required container (0 = not eligible). It opens
+  (`bonus-window` event) when a collect makes a `level.bonusIds` container next, with `level.bonusWindowSeconds`;
+  `tick` counts it down except while a pause is held or the deadline is 0 (forced receipt); receipts and rehandles
+  leave it alone. Collecting with `bonusMs > 0` adds +250 and +5 s and a gold (`bonus-awarded`); reaching 0 emits
+  `bonus-missed` once. Undo (#386) restores `bonusMs` from its snapshot (V20 takes the min, so no farming).
+  Stars never read score or golds.
+- Presentation: `ContainerView.slot` (0..5 or null), `colour` (`SEQUENCE_COLOURS` or `GREY`), `bonus` (medallion:
+  a later bonus id, or the current one while its window is open, so it shows buried or grey and vanishes on a miss),
+  `border` (selection only, never the current container). `view.queue` is the six HUD positions (empty slot `–`
+  past the last container), `view.bonus` the open window (`{ id, text }`), `hud.score` and `hud.combo` (`×n`).
+- Renderers: the scene paints each face texture in the container colour with the number and, on bonus containers,
+  a gold star medallion; `components/ui/YardQueue.vue` shows queue, bonus countdown, score and combo; the store's
+  `bonusPulse` replays a gold burst and "+250 · +5s" float over the collection bay. Sounds are #388's.
+
 ## Levels
 
 `modules/levels.ts` holds all 13 V20 levels exactly (`levels.test.ts` checks them against the V20 array). V20's code
@@ -84,7 +105,7 @@ coordinates so smoke tests tap real points.
 ## Tests and budget
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
-  `modules/levels.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
+  `modules/levels.test.ts`, `modules/scoring.test.ts`, `modules/presentationScore.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
