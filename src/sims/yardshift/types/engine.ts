@@ -162,9 +162,15 @@ export type ShiftEvent =
   | { type: 'rehandled'; id: number; from: number; to: number }
   | { type: 'received'; id: number; to: number }
   | { type: 'arrival'; id: number; moves: number }
+  /** The waiting truck has one move left before receiving is mandatory. */
+  | { type: 'deadline-one'; id: number }
   /** The waiting truck's deadline reached 0: receiving is now mandatory. */
   | { type: 'deadline-zero'; id: number }
   | { type: 'completed' }
+  /** The shift clock crossed one of `SHIFT_LOW_SECONDS` (9, 5, 3, 2, 1 s) going down; once per crossing. */
+  | { type: 'shift-low'; seconds: number }
+  /** The next-truck clock crossed `TRUCK_LOW_SHARE` of its allowance going down; once per crossing. */
+  | { type: 'truck-low' }
   /** The next-truck clock hit 0. */
   | { type: 'overtime-start' }
   /** The next-truck clock left 0 (a truck operation reset it, or a rehandle credited +1 s). */

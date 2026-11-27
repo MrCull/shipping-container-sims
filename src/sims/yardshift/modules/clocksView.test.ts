@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
 import { TUTORIAL, truckSecondsFrom } from './levels'
-import { clocksView, craneDurationMs, input, layoutFor, moveSpan, present } from './presentation'
+import { CRANE_MAX_MS, clocksView, craneDurationMs, input, layoutFor, moveSpan, present } from './presentation'
 import type { LevelDef, Shift } from '../types/engine'
 
 const level: LevelDef = { ...TUTORIAL, number: 97, shiftSeconds: 20, truckSeconds: truckSecondsFrom(4), overtimeMultiplier: 3 }
@@ -65,6 +65,16 @@ describe('Yardshift crane move input', () => {
     expect(craneDurationMs(span.toX - span.fromX)).toBeCloseTo(330 + (span.toX - span.fromX) * 0.38)
     expect(craneDurationMs(0)).toBe(330)
     expect(craneDurationMs(-100)).toBe(368)
+  })
+
+  it('a move stays within 330 to 460 ms at desktop width (story 20)', () => {
+    const layout = layoutFor(5, { width: 880, height: 620 })
+    const state = createShift(TUTORIAL).state
+    const span = moveSpan(layout, { type: 'rehandle', from: 0, to: 4 }, state)!
+    expect(Math.abs(span.toX - span.fromX)).toBeGreaterThan(400)
+    expect(craneDurationMs(span.toX - span.fromX)).toBe(CRANE_MAX_MS)
+    expect(CRANE_MAX_MS).toBe(460)
+    expect(craneDurationMs(10_000)).toBe(460)
   })
 
   it('taps during the animation produce no action and keep the selection', () => {

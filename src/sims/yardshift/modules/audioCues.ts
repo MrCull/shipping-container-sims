@@ -1,9 +1,10 @@
 /**
  * Yardshift audio cues (#388): a pure mapping from engine steps to sounds, so every outcome fires its sound exactly
- * once (an event or a clock crossing between two states), never per frame. Tones are V20's synth cues
+ * once (one engine event, clock thresholds included), never per frame. Tones are V20's synth cues
  * (`tone(f0, f1, dur, vol, delay, type)`); `vol` is the sound's own gain at full volume, scaled by the shared `sfx`
  * channel through `gainFor` when played (composables/useYardAudio.ts). Samples are short clips in assets/audio/.
  */
+import { SHIFT_LOW_SECONDS } from './engine'
 import type { ShiftEvent, ShiftState } from '../types/engine'
 
 export type ToneType = 'sine' | 'triangle' | 'square' | 'sawtooth'
@@ -54,10 +55,8 @@ export interface Cue {
   detail?: number
 }
 
-/** Shift seconds left at which a tick sounds, each once per crossing. */
-export const SHIFT_TICK_SECONDS = [9, 5, 3, 2, 1] as const
-/** The next-truck clock is low below this share of its allowance (V20: the truck text turns red). */
-export const TRUCK_LOW_SHARE = 0.35
+/** Shift seconds left at which a tick sounds: the engine's `shift-low` thresholds. */
+export const SHIFT_TICK_SECONDS = SHIFT_LOW_SECONDS
 /** The combo ladder stops rising here. */
 export const COMBO_LADDER_TOP = 8
 
@@ -110,6 +109,12 @@ function eventCues(e: ShiftEvent, after: ShiftState): Cue[] {
       return [{ name: 'rehandle', tones: [tone(550, 740, 0.09, 0.025)] }]
     case 'arrival':
       return [{ name: 'arrival', tones: [tone(420, 420, 0.12, 0.05), tone(420, 420, 0.12, 0.05, 0.16)], sample: 'truck', sampleGain: 0.5 }]
+    case 'deadline-one':
+      return [{ name: 'deadline-one', tones: [tone(510, 390, 0.14, 0.05)] }]
+    case 'truck-low':
+      return [{ name: 'truck-low', tones: [tone(700, 540, 0.09, 0.03)] }]
+    case 'shift-low':
+      return [{ name: 'shift-tick', tones: [tone(850, 850, 0.1, 0.055)], detail: e.seconds }]
     case 'deadline-zero':
       return [
         {
@@ -174,33 +179,11 @@ function eventCues(e: ShiftEvent, after: ShiftState): Cue[] {
   }
 }
 
-/** Clock and deadline crossings between two states (warnings the engine has no event for). */
-function crossingCues(before: ShiftState, after: ShiftState): Cue[] {
-  const cues: Cue[] = []
-  if (before.deadline !== null && before.deadline > 1 && after.deadline === 1) {
-    cues.push({ name: 'deadline-one', tones: [tone(510, 390, 0.14, 0.05)] })
-  }
-  const low = after.truckAllowanceMs * TRUCK_LOW_SHARE
-  if (
-    before.truckAllowanceMs === after.truckAllowanceMs &&
-    before.truckMs > low &&
-    after.truckMs <= low &&
-    after.truckMs > 0
-  ) {
-    cues.push({ name: 'truck-low', tones: [tone(700, 540, 0.09, 0.03)] })
-  }
-  for (const s of SHIFT_TICK_SECONDS) {
-    if (before.shiftMs > s * 1000 && after.shiftMs <= s * 1000 && after.shiftMs > 0) {
-      cues.push({ name: 'shift-tick', tones: [tone(850, 850, 0.1, 0.055)], detail: s })
-    }
-  }
-  return cues
-}
-
 /**
- * The cues one engine step fires: `before` and `after` are the states around one `dispatch` or `tick`, `events`
- * what that step emitted. Event cues first (in event order), then clock crossings.
+ * The cues one engine step fires: `after` is the state after one `dispatch` or `tick`, `events` what that step
+ * emitted, in event order. Clock and deadline warnings are engine events too (`shift-low`, `truck-low`,
+ * `deadline-one`), so nothing here diffs states.
  */
-export function cuesForStep(before: ShiftState, after: ShiftState, events: readonly ShiftEvent[]): Cue[] {
-  return [...events.flatMap((e) => eventCues(e, after)), ...crossingCues(before, after)]
+export function cuesForStep(after: ShiftState, events: readonly ShiftEvent[]): Cue[] {
+  return events.flatMap((e) => eventCues(e, after))
 }

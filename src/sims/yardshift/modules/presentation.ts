@@ -238,9 +238,12 @@ function urgencyFor(state: ShiftState, ui: UiState, current: boolean): { shake: 
   return ui.reducedMotion ? { shake: 0, urgent: risk >= URGENT_RISK } : { shake: risk, urgent: false }
 }
 
-/** Crane move length in ms for a horizontal travel of `dxPx` CSS pixels: 330 + |dx| x 0.38 (V20, about 330 to 460). */
+/** The longest crane move (story 20: about 330 to 460 ms), so a wide desktop yard never drags. */
+export const CRANE_MAX_MS = 460
+
+/** Crane move length in ms for a horizontal travel of `dxPx` CSS pixels: 330 + |dx| x 0.38 (V20), at most 460. */
 export function craneDurationMs(dxPx: number): number {
-  return 330 + Math.abs(dxPx) * 0.38
+  return Math.min(CRANE_MAX_MS, 330 + Math.abs(dxPx) * 0.38)
 }
 
 /** Screen x (CSS px) of where a move starts and ends: a stack column centre or the collection bay centre. */

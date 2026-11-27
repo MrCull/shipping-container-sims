@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LEVELS, levelByNumber } from './levels'
+import levelsSource from './levels.ts?raw'
 
 /**
  * V20 `L` array (yardshift-v20.html, levels as `[name, stacks, count, capacity, min, max, shiftSec, firstTruckSec,
@@ -50,5 +51,10 @@ describe('Yardshift levels', () => {
     expect(LEVELS[9]!.bonusIds).toEqual([3, 6, 9, 12, 15])
     expect(LEVELS.filter((l) => l.heavyHints).map((l) => l.number)).toEqual([11, 12])
     expect(LEVELS.filter((l) => l.tutorialCoaching).map((l) => l.number)).toEqual([1])
+  })
+
+  it('chooses no level value from the level number (each row states it)', () => {
+    expect(levelsSource).not.toMatch(/\bn\s*(===|<=|>=|<|>)\s*\d/)
+    expect(levelsSource).not.toMatch(/TIPS\[/)
   })
 })
