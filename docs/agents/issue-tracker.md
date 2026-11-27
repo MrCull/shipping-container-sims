@@ -38,6 +38,14 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 Create a GitHub issue.
 
+## When `/to-tickets` splits a spec
+
+An implementer reads its ticket, not the spec, so a ticket body carries everything from the spec that binds it:
+
+- **Spec-wide limits become acceptance criteria.** Copy every test budget, smoke spec count and similar cap into each ticket it binds, as a checkbox. Spec #374 allowed exactly three Yardshift smoke specs; #390's ticket did not say so, its implementer added a fourth, and #391 had to fold it back.
+- **Shared interfaces get one owner.** When two tickets that can run in parallel meet at one action, type or event, name one ticket its owner. Either the other ticket is blocked by it, or both state the contract (name, shape, behaviour) so each builds to it. #386 (the undo engine action) and #387 (the U key) ran in parallel with neither; #387 stubbed "Undo is not available yet" and #386 needed an extra round to wire the stub up.
+- **The last ticket** is "Run the browser smoke suite and fix regressions", blocked by all the others (template: issue #133).
+
 ## When a skill says "fetch the relevant ticket"
 
 Read it as in **Read an issue** above.
@@ -54,6 +62,8 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 
 ## Large tool results
+
+To get a spec and its tickets into scratchpad files, prefer `node scripts/fetch-issues.mjs <scratchpad-dir> <spec> [<ticket>...]`: it searches with `gh api -X GET search/issues` (allowed in cloud sessions), writes `spec-<n>.md` and `ticket-<n>.md`, and prints only one summary line per ticket with its `## Blocked by` issues; with only the spec number it finds the tickets whose `## Parent` section names the spec (`node --test scripts/test-fetch-issues.mjs`).
 
 `list_issues` and `issue_read` with `get_sub_issues` can return more than fits in context. `issue_read` has no `minimal_output` option, so `get_sub_issues` always returns every body and is saved to a file: split it with `node scripts/tickets-from-sub-issues.mjs <saved-result.json> <scratchpad-dir>` (one `ticket-<n>.md` per ticket, one summary line each with its `## Blocked by` issues) rather than calling the tool again. For `list_issues`, pass `fields` and a small page size.
 

@@ -120,7 +120,7 @@ The default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent
 
 ### Implementing a spec
 
-For `/implement-spec`, the orchestrator steps and the implementer brief are in `docs/agents/implementing.md`. When `/to-tickets` splits a spec, its last ticket is "Run the browser smoke suite and fix regressions", blocked by all the others (template: issue #133).
+For `/implement-spec`, the orchestrator steps and the implementer brief are in `docs/agents/implementing.md`. When `/to-tickets` splits a spec, each ticket carries the spec-wide limits that bind it and names the owner of any shared interface, and the last ticket is "Run the browser smoke suite and fix regressions", blocked by all the others: `docs/agents/issue-tracker.md`, **When `/to-tickets` splits a spec**.
 
 ### Domain docs
 
