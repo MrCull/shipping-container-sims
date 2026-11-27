@@ -75,7 +75,7 @@ jobs:
         run: node scripts/check-smoke-groups.mjs
 
       - name: Smoke reporter, timing, shards, server, merge, group check, selection and CI script tests
-        run: node --test scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs scripts/test-smoke-ci.mjs scripts/test-unit-select.mjs
+        run: node --test scripts/test-smoke-budget.mjs scripts/test-smoke-summary-reporter.mjs scripts/test-smoke-jsonl-reporter.mjs scripts/test-smoke-shards.mjs scripts/test-smoke-timing.mjs scripts/test-smoke-server.mjs scripts/test-smoke-merge.mjs scripts/test-check-smoke-groups.mjs scripts/test-smoke-select.mjs scripts/test-smoke-ci.mjs scripts/test-unit-select.mjs
 
       - name: Lint
         run: pnpm run lint
