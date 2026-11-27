@@ -372,5 +372,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 
 - **Rehandle (Yardshift):** moving an exposed container from one yard stack to another. Costs a move against the level's rehandle cap; collections and receipts never do.
 - **Receipt:** unloading the waiting incoming truck's container onto a stack (`receive` action). Its **deadline** is the number of other successful moves left before receiving becomes mandatory (0 blocks every other action).
+- **Mandatory receipt:** a waiting truck at deadline 0. The yard dims and a red arrow points at the receipt truck until the player selects it; with no legal space for its cargo the shift fails as **blocked**.
+- **Blocked (Yardshift):** the failure when no legal move exists after a move or at the start (`failure.reason` `blocked`), including a mandatory receipt with no legal space.
 - **Heavy cargo:** a container that may only be placed on an empty stack or on another heavy container (rejection reason `heavy`).
 - **Solver fixture:** `fixtures/level-NN.json`, written by `pnpm run ys:solve`: a level's proven minimum rehandles (the three-star target) and one optimal action list.
