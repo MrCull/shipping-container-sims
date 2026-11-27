@@ -64,15 +64,26 @@ export function layoutFor(stackCount: number, vp: Viewport): Layout {
   const bayTop = Math.round(vp.height * 0.72)
   const bayBottom = Math.max(bayTop, vp.height - 12)
   const yard: Rect = { x: SIDE, y: yardTop, w: innerW, h: yardBottom - yardTop }
-  const colW = stackCount > 0 ? innerW / stackCount : innerW
-  const columns = Array.from({ length: stackCount }, (_, i) => ({ x: SIDE + i * colW, y: yardTop, w: colW, h: yard.h }))
-  const bayW = (innerW - BAY_GAP) / 2
+  // Whole-pixel column edges, so neighbouring columns share an edge exactly and never overlap by a rounding error.
+  const edge = (i: number) => SIDE + Math.round((i * innerW) / Math.max(1, stackCount))
+  const columns = Array.from({ length: stackCount }, (_, i) => ({ x: edge(i), y: yardTop, w: edge(i + 1) - edge(i), h: yard.h }))
+  const bayW = Math.floor((innerW - BAY_GAP) / 2)
   return {
     yard,
     columns,
     collection: { x: SIDE, y: bayTop, w: bayW, h: bayBottom - bayTop },
     receipt: { x: SIDE + bayW + BAY_GAP, y: bayTop, w: bayW, h: bayBottom - bayTop },
   }
+}
+
+/** Bay label rows (title and status) at the top of a truck bay; the arrow goes under them. */
+const BAY_LABEL_PX = 32
+const ARROW_PX = 28
+
+/** The bobbing arrow's box: centred in the receipt bay, under its label, pointing down at the truck. */
+export function arrowBox(bay: Rect): Rect {
+  const h = Math.min(ARROW_PX, Math.max(0, bay.h - BAY_LABEL_PX) / 2)
+  return { x: bay.x + bay.w / 2 - ARROW_PX / 2, y: bay.y + Math.min(BAY_LABEL_PX, bay.h / 3), w: ARROW_PX, h }
 }
 
 function regionsFor(layout: Layout): HitRegion[] {
@@ -291,6 +302,7 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
     incoming: incomingView(state),
     dimYard: attention,
     arrow: attention ? 'receipt' : null,
+    arrowAt: attention ? arrowBox(layout.receipt) : null,
     hitRegions: regionsFor(layout),
     hud: {
       title: `Shift ${state.level.number} · ${state.level.name}`,

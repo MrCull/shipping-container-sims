@@ -167,6 +167,8 @@ onUnmounted(() => {
 <style scoped>
 .sim-page {
   min-height: 100vh;
+  /* The dynamic viewport height where supported: 100vh on a phone includes the browser toolbar and scrolls. */
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -265,6 +267,14 @@ onUnmounted(() => {
   font-family: var(--font-retro);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
+}
+
+/* On a phone the centred title has no room between the menu button and the audio controls (it was clipped or
+   sat under the menu button, #389); the sim shows its own name, so the header drops it. */
+@media (max-width: 479px) {
+  .sim-name {
+    display: none;
+  }
 }
 
 .sim-name-logo {
