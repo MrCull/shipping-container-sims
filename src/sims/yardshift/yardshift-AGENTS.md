@@ -30,12 +30,34 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
    (it takes the state too, to tell a collect tap from a select tap). `hitTest(regions, x, y)` maps a point to a
    target; regions never overlap, so the collection and receipt bays never resolve to each other.
 3. **Renderers** (thin): `composables/useYardScene.ts` (Three.js, fixed orthographic camera pitched down and
-   turned a little sideways, plain boxes with canvas number textures, two truck bays; every object is placed by
-   projecting a layout point onto the ground, so it sits inside its hit region; renders only on change),
+   turned a little sideways, two truck bays; every object is placed by projecting a layout point onto the ground, so
+   it sits inside its hit region; renders only when the view-model, the crane move or the size changes; see Scene),
    `Yardshift.vue` and `components/ui/YardHud.vue` (Vue HUD). Pointer and key events go to the store
    (`pointerDown`/`pointerMove`/`pointerUp`, `key`, `tapAt`) and from there to `input`; nothing else interprets them.
 
 `store/yardshiftStore.ts` (Pinia) is glue: it holds the `Shift`, UI state and viewport.
+
+## Scene (review of #374)
+
+- Scene adapter: `build` makes the meshes once per layout key (surface width and height, stack count, capacity; a
+  new key also puts the trolley back over the yard centre) and `update` only sets transforms, colours, label maps and
+  visibility each render. `disposeTree` disposes each geometry and material once even when meshes share them (the
+  gantry legs, the label meshes). Never create geometry or materials in `update`.
+- Containers: bodies are one `InstancedMesh` (instance colour: sequence colour, grey, selected gold, arrival orange,
+  darkened when `dimYard`, mixed 35 % toward red when `urgent`) with one shared canvas corrugation normal map.
+  `containerMesh(built, slot, draw, now)` draws yard containers, the receipt cargo and the container on the hook
+  alike. Each container's label is one mesh (its top and front faces merged) with a transparent texture of the
+  number, the gold medallion (`bonus`) and the "H" tile (`heavy`); the cache key is the label and badges only, so it
+  holds at most one texture per id and badge pair of a level.
+- `ContainerView.heavy` (and `ReceiptCargoView.heavy`) draw the H badge, also buried or grey. `ContainerView.glint`
+  (a bonus container on top of its stack, false under reduced motion) rocks the container a few degrees and sweeps a
+  gold flash over its label; render only, hit regions unchanged.
+- Cheap extras: baked contact-shadow quads (one `InstancedMesh`: the two trucks, each non-empty stack, a lifted
+  container) and a harbour backdrop behind the yard (apron, water, quay edge, three ship-to-shore crane and two ship
+  silhouettes merged into one mesh). About 30 draw calls on a level of 16 containers.
+- Smoke frame cost: the tutorial spec went from 8.1 s to 4.6 s and the receipt spec from 4.2 and 5.5 s to 1.4 and
+  2.0 s (`--repeat-each=2`, dev project) once the scene stopped rebuilding every frame.
+- Screenshot: `docs/prototypes/review-374/level-11-heavy-harbour.png` (level 11 at 390 px).
 
 ## Clocks and the crane (#383)
 
@@ -50,7 +72,7 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   `animation` is held every move is rejected as `crane-busy`, and `input` drops taps (no queued double move).
 - `clocksView(state)` (presentation) gives both HUD clocks: text, bar fraction (truck: value over
   max(allowance, value), never above 1), red, shake (overtime on both). `craneDurationMs(dx)` is
-  330 + |dx| x 0.38 ms, with `moveSpan(layout, action, state)` giving the screen x travel.
+  330 + |dx| x 0.38 ms, capped at `CRANE_MAX_MS` 460 (story 20; a desktop yard would otherwise reach 600 ms), with `moveSpan(layout, action, state)` giving the screen x travel.
 - Host: `Yardshift.vue` runs a requestAnimationFrame loop calling `store.frame(now)` and forwards
   `visibilitychange` to `store.setHidden`. `store.startMove` holds `animation`, animates `store.move.progress`
   0..1 (the scene draws the gantry phases: travel, lower, lift, travel, lower, release), then releases the pause
@@ -166,11 +188,14 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 
 ## Audio cues (#388)
 
-- `modules/audioCues.ts` (pure): `cuesForStep(before, after, events)` maps one engine step (a `dispatch` or a `tick`)
-  to cues: event cues in event order (collect, combo, receive, rehandle, arrival, deadline-zero, overtime start and
-  end, bonus window, jackpot, bonus missed, win, timeout, blocked, undo), then crossings the engine has no event for:
-  `deadline-one` (moves left drops to 1), `truck-low` (next-truck clock crosses `TRUCK_LOW_SHARE` 35% of its
-  allowance) and `shift-tick` at `SHIFT_TICK_SECONDS` 9, 5, 3, 2, 1 s. Each fires once per crossing, never per frame.
+- Engine threshold events: `shift-low` (`seconds`, at each of `SHIFT_LOW_SECONDS` 9, 5, 3, 2, 1 s crossed going down),
+  `truck-low` (the next-truck clock crosses `TRUCK_LOW_SHARE` 35 % of the same allowance) and `deadline-one` (moves
+  left drops to 1). Each fires once per crossing, from `tick` and from `dispatch` (undo can cross a shift threshold),
+  never per frame (`modules/clocks.test.ts`).
+- `modules/audioCues.ts` (pure): `cuesForStep(after, events)` maps one engine step's events (a `dispatch` or a
+  `tick`) to cues in event order (collect, combo, receive, rehandle, arrival, deadline-one, deadline-zero, overtime
+  start and end, bonus window, jackpot, bonus missed, truck-low, `shift-tick` from `shift-low`, win, timeout,
+  blocked, undo). It never diffs states.
   `rejectionCue()` (invalid), `craneStartCue()`, `comboCue(c)` (pitch 660 + min(c, 8) x 65 Hz, ascending) and
   `craneCues(before, after)` (pick at progress `PICK_AT` 0.30, land at `LAND_AT` 0.88). Tones are V20's
   `tone(f0, f1, dur, vol, delay, type)` with `vol` a relative sound gain.
@@ -178,7 +203,8 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   crane start, `frame` the pick and land crossings; reduced motion sends only the landing.
 - `composables/useYardAudio.ts` (mounted by `Yardshift.vue`): one Web Audio bus `GainNode` set from
   `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live; the context starts on the
-  first pointer or key press. No fixed volumes.
+  first pointer or key press. No fixed volumes. Every oscillator or buffer source and its envelope gain disconnect on
+  `onended` (`releaseOnEnded`, `composables/useYardAudio.test.ts`).
 - Samples in `assets/audio/` (mono 64 kbit/s, trimmed with a fade out from `available-media/sound-samples`):
   `crane-pick.mp3` (first 0.6 s of `container-loaded-to-ship.mp3`), `crane-land.mp3` (first 0.7 s of
   `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and
@@ -198,8 +224,9 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 ## Levels
 
 `modules/levels.ts` holds all 13 V20 levels exactly (`levels.test.ts` checks them against the V20 array). V20's code
-rules keyed on the level index are explicit data: `truckSeconds` (tutorial 30/20/15, else first, x0.5, x0.28),
-`bonusIds` (multiples of 3 from level 2), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
+rules keyed on the level index are explicit fields on each row, never chosen from the level number (a test scans the
+source): `truckSeconds` (tutorial `[30, 20, 15]`, else `truck(first)`: first, x0.5, x0.28), `bonusEvery` (3 from
+level 2, giving `bonusIds`), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
 `tutorialCoaching`, `heavyHints` (11 and 12) and `tip`. There is no hand-entered minimum: the star target comes from
 the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no intro) or the level picker. Arrival levels
 (4, 6, 8, 9, 10, 13) start with a truck waiting.
@@ -216,6 +243,14 @@ the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no int
   minimum, two at minimum + 1, one otherwise. Proven minima (#382) equal the V20 targets for all 13 levels:
   1, 3, 5, 3, 3, 6, 9, 6, 7, 11, 1, 4, 7.
 
+## Colours
+
+`styles/palette.css` (loaded by `Yardshift.vue`, scoped to `.yardshift`) holds the sim's own palette as `--ys-*`
+properties: the six sequence colours, grey, gold, arrival orange, red and the panel shades. Background, text and muted
+text use the shared tokens of `src/assets/main.css`. Components use those or `--ys-*`, never hex
+(`modules/palette.test.ts`, which also keeps `--ys-seq-*` and `--ys-grey` equal to `SEQUENCE_COLOURS` and `GREY`). The
+WebGL scene keeps its colours in TS.
+
 ## Dev hook
 
 `window.__ys` (`dev/devApi.ts`), installed only when `import.meta.env.DEV || import.meta.env.MODE === 'smoke'` (as
@@ -229,7 +264,8 @@ coordinates so smoke tests tap real points.
   `modules/receiptsView.test.ts`, `modules/screenLayout.test.ts`, `modules/clocks.test.ts`, `modules/clocksView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
   `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
   `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/audioCues.test.ts`, `store/yardshiftStoreAudio.test.ts`,
-  `modules/music.test.ts`, `composables/useYardMusic.test.ts` (happy-dom),
+  `modules/music.test.ts`, `composables/useYardMusic.test.ts` (happy-dom), `composables/useYardAudio.test.ts`,
+  `modules/palette.test.ts`,
   `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 2.1 s wall time (#391) through
   `pnpm test:sim yardshift` (#389); no test over 15 ms.
@@ -240,8 +276,8 @@ coordinates so smoke tests tap real points.
   and dimming, both cleared by a real tap on the receipt truck); spec 3 `yardshift-progress.smoke.ts` (desktop
   viewport: level 1's fixture through `window.__ys` gives the result screen, the reload opens on level 2 and the
   picker shows level 1's stars and level 2 unlocked). Each spec under 10 s. Spec 1 taps "Start shift" first.
-  Timings (#391, `--repeat-each=2`, dev project): tutorial 7.9 to 8.1 s, receipt 4.0 to 4.3 s, progress 2.0 to
-  2.1 s. A software-GL frame is about 140 ms there and a touch tap costs about 5 frames, so spec 1 reads the tap
+  Timings (review of #374, `--repeat-each=2`, dev project): tutorial 4.6 to 4.7 s, receipt 1.4 to 2.0 s, progress
+  2.8 to 3.0 s (before the scene rework: 8.1, 4.2 to 5.5 and 2.3 to 2.9 s). A software-GL frame was about 140 ms there and a touch tap costs about 5 frames, so spec 1 reads the tap
   points once and waits for each crane move with a `raf`-polled `waitForFunction`, not `expect` retries.
 - Music has no smoke spec (spec #374 allows three): `composables/useYardMusic.test.ts` (happy-dom, a fake `Audio`)
   covers the loop, the music channel, the sliders and mute, pause and unmount.

@@ -167,8 +167,8 @@ function shadowTexture(): THREE.CanvasTexture {
   canvas.height = 64
   const g = canvas.getContext('2d')!
   const fill = g.createRadialGradient(32, 32, 4, 32, 32, 32)
-  fill.addColorStop(0, 'rgba(0,0,0,0.55)')
-  fill.addColorStop(0.6, 'rgba(0,0,0,0.3)')
+  fill.addColorStop(0, 'rgba(0,0,0,0.75)')
+  fill.addColorStop(0.6, 'rgba(0,0,0,0.45)')
   fill.addColorStop(1, 'rgba(0,0,0,0)')
   g.fillStyle = fill
   g.fillRect(0, 0, 64, 64)
@@ -317,20 +317,24 @@ export function useYardScene(
     const parts: THREE.BufferGeometry[] = []
     const part = (w: number, h: number, d: number, x: number, y: number, z: number) =>
       parts.push(new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z))
-    for (const [x, z] of [[-9, -5], [4, -6], [16, -5]] as const) {
+    // Close enough to the quay that a phone's short strip of water above the yard still shows them.
+    for (const [x, z] of [[-9, -3.4], [1, -3.8], [11, -3.4]] as const) {
       // A ship-to-shore crane: two legs, a portal beam and a boom reaching out over the water.
-      part(0.25, 3.2, 0.25, x - 1, 0, z)
-      part(0.25, 3.2, 0.25, x + 1, 0, z)
-      part(2.5, 0.3, 0.3, x, 3.2, z)
-      part(0.3, 0.25, 5, x, 3.5, z - 1.5)
+      part(0.18, 2.2, 0.18, x - 0.7, 0, z)
+      part(0.18, 2.2, 0.18, x + 0.7, 0, z)
+      part(1.7, 0.22, 0.22, x, 2.2, z)
+      part(0.2, 0.18, 3.4, x, 2.4, z - 0.9)
     }
-    for (const [x, z, w] of [[-3, -9, 11], [13, -10, 9]] as const) {
+    for (const [x, z, w] of [[-4, -7.5, 10], [7, -8.5, 8]] as const) {
       // A ship: hull, a few container rows and a bridge.
-      part(w, 0.8, 2.2, x, -0.3, z)
-      part(w * 0.7, 0.6, 1.8, x - w * 0.08, 0.5, z)
-      part(0.8, 1.4, 1.4, x + w * 0.4, 0.5, z)
+      part(w, 0.6, 1.6, x, -0.3, z)
+      part(w * 0.7, 0.45, 1.3, x - w * 0.08, 0.3, z)
+      part(0.6, 1, 1, x + w * 0.4, 0.3, z)
     }
-    back.add(new THREE.Mesh(mergeGeometries(parts)!, new THREE.MeshBasicMaterial({ color: COLOURS.silhouette })))
+    const silhouettes = new THREE.Mesh(mergeGeometries(parts)!, new THREE.MeshBasicMaterial({ color: COLOURS.silhouette }))
+    // Distant and small: the strip of water above the yard is only a few world units deep on a phone.
+    silhouettes.scale.setScalar(0.45)
+    back.add(silhouettes)
     for (const g of parts) g.dispose()
     group.add(back)
   }

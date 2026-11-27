@@ -374,7 +374,7 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Receipt:** unloading the waiting incoming truck's container onto a stack (`receive` action). Its **deadline** is the number of other successful moves left before receiving becomes mandatory (0 blocks every other action).
 - **Mandatory receipt:** a waiting truck at deadline 0. The yard dims and a red arrow points at the receipt truck until the player selects it; with no legal space for its cargo the shift fails as **blocked**.
 - **Blocked (Yardshift):** the failure when no legal move exists after a move or at the start (`failure.reason` `blocked`), including a mandatory receipt with no legal space.
-- **Heavy cargo:** a container that may only be placed on an empty stack or on another heavy container (rejection reason `heavy`).
+- **Heavy cargo:** a container that may only be placed on an empty stack or on another heavy container (rejection reason `heavy`). Yardshift draws it with an "H" badge, also when buried or grey.
 - **Solver fixture:** `fixtures/level-NN.json`, written by `pnpm run ys:solve`: a level's proven minimum rehandles (the three-star target) and one optimal action list.
 - **Combo (Yardshift):** consecutive collections; a rehandle or receipt resets it to 0. Collection score is 100 + 50 x (min(combo, 5) - 1).
 - **Bonus container / bonus window:** a level's `bonusIds` container carries a gold star medallion; when it becomes the next required container a window of `bonusWindowSeconds` opens (`state.bonusMs`). Collecting it inside the window gives +250 points and +5 s shift; a miss makes it ordinary cargo. Stars never depend on it.
