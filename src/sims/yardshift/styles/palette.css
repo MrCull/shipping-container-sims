@@ -2,8 +2,9 @@
  * Yardshift palette: the sim's own colours as `--ys-*` custom properties, scoped to `.yardshift` (the root in
  * Yardshift.vue; the HUD, queue and screens render inside it). Background, text and accent use the shared tokens of
  * src/assets/main.css; components use those or `--ys-*`, never a hex colour (modules/palette.test.ts).
- * The sequence colours and grey are mirrored in TS for the view-model and the WebGL scene
- * (modules/presentation.ts `SEQUENCE_COLOURS`, `GREY`); the test keeps them equal.
+ * The sequence colours and grey are mirrored in TS for the view-model and the canvas yard
+ * (modules/presentation.ts `SEQUENCE_COLOURS`, `GREY`), as are the yard drawing colours (modules/yardPalette.ts);
+ * the tests keep them equal.
  */
 .yardshift {
   /* Sequence colours: the next six containers in order. */
@@ -40,4 +41,42 @@
   --ys-track: #26404f;
   --ys-scrim: rgb(8 19 29 / 45%);
   --ys-scrim-strong: rgb(8 19 29 / 78%);
+
+  /* The 2D yard drawing (canvas), mirrored in modules/yardPalette.ts. */
+  --ys-yard-sky-top: #a9c3cf;
+  --ys-yard-sky-low: #dbe6e9;
+  --ys-yard-water: #3e6e89;
+  --ys-yard-water-deep: #2a5570;
+  --ys-yard-distant: #6d8a9c;
+  --ys-yard-hull: #24394b;
+  --ys-yard-hull-stripe: #b5443b;
+  --ys-yard-quay: #e3ddcf;
+  --ys-yard-concrete: #d2cdc0;
+  --ys-yard-concrete-dark: #bdb7a8;
+  --ys-yard-slot-line: #c9a14a;
+  --ys-yard-yard-text: #2c3a44;
+  --ys-yard-gantry: #2f68a3;
+  --ys-yard-gantry-dark: #1c4675;
+  --ys-yard-trolley: #f2b632;
+  --ys-yard-cable: #1a1f24;
+  --ys-yard-outline: #1b2630;
+  --ys-yard-number-ink: #13212b;
+  --ys-yard-ghost: #5ff0b0;
+  --ys-yard-rim: #ffffff;
+  --ys-yard-urgent: #e9483d;
+  --ys-yard-collection-bay: #2c5759;
+  --ys-yard-collection-line: #8fd1c6;
+  --ys-yard-receipt-bay: #8a5a2c;
+  --ys-yard-receipt-line: #f2b36c;
+  --ys-yard-receipt-urgent: #8f3a2e;
+  --ys-yard-chassis: #2a3138;
+  --ys-yard-wheel: #14181c;
+  --ys-yard-cab-white: #eef2f3;
+  --ys-yard-cab-orange: #eda54e;
+  --ys-yard-glass: #6f97ad;
+  --ys-yard-medal-light: #fff2bd;
+  --ys-yard-medal-dark: #d39b31;
+  --ys-yard-medal-rim: #87531d;
+  --ys-yard-medal-star: #634016;
+  --ys-yard-heavy-tile: #1d232a;
 }

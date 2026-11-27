@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Yardshift root: a Vue HUD around a Three.js yard. Pointer and key events are forwarded to the store (which runs
+ * Yardshift root: a Vue HUD around a 2D canvas yard (`useYardCanvas`). Pointer and key events are forwarded to the store (which runs
  * the presentation `input`); nothing here interprets them beyond the drag threshold.
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -12,7 +12,7 @@ import { unlockAllRequested } from './modules/progress'
 import { undoView } from './modules/screens'
 import { useYardAudio } from './composables/useYardAudio'
 import { useYardMusic } from './composables/useYardMusic'
-import { useYardScene } from './composables/useYardScene'
+import { useYardCanvas } from './composables/useYardCanvas'
 import { useYardshiftStore } from './store/yardshiftStore'
 import { NO_INSETS, screenLayout, type Insets } from './modules/screenLayout'
 import type { Rect } from './types/presentation'
@@ -39,7 +39,9 @@ const surface = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const view = computed(() => store.view)
 const move = computed(() => store.move)
-const { webglFailed } = useYardScene(canvas, view, move)
+useYardCanvas(canvas, view, move)
+/** The collection bay's caption: the load the next collection fills. */
+const loadNo = computed(() => Math.min(store.state.level.count, store.state.collected + 1))
 useYardAudio(store.onCue)
 useYardMusic(() => store.state)
 
@@ -206,22 +208,23 @@ onBeforeUnmount(() => {
         :key="`n${i}`"
         class="stack-no"
         data-testid="ys-stack-no"
-        :style="{ left: `${col.x}px`, top: `${view.layout.yard.y + view.layout.yard.h - 16}px`, width: `${col.w}px` }"
+        :style="{ left: `${col.x}px`, top: `${view.layout.yard.y + view.layout.yard.h - 17}px`, width: `${col.w}px` }"
       >{{ view.stackLabels[i] }}</span>
-      <span
+      <template
         v-for="region in view.hitRegions.filter((r) => r.kind !== 'stack')"
         :key="region.kind"
-        class="bay-label"
-        :style="{ left: `${region.rect.x + 6}px`, top: `${region.rect.y + 4}px` }"
       >
-        {{ region.kind === 'collection' ? '▼ COLLECTION' : '▲ RECEIPT' }}
-        <small
-          v-if="region.kind === 'receipt'"
+        <span
+          class="bay-label"
+          :style="{ left: `${region.rect.x + 10}px`, top: `${region.rect.y + 7}px` }"
+        >{{ region.kind === 'collection' ? '▼ COLLECTION' : '▲ RECEIPT' }}</span>
+        <span
           class="bay-status"
-          :class="view.incoming.status"
-          data-testid="ys-receipt-status"
-        >{{ view.incoming.bay }}</small>
-      </span>
+          :class="region.kind === 'receipt' ? view.incoming.status : ''"
+          :data-testid="region.kind === 'receipt' ? 'ys-receipt-status' : 'ys-load-no'"
+          :style="{ left: `${region.rect.x + 10}px`, top: `${region.rect.y + region.rect.h - 21}px` }"
+        >{{ region.kind === 'collection' ? `LOAD #${loadNo}` : view.incoming.bay }}</span>
+      </template>
       <div
         v-if="view.arrow === 'receipt' && view.arrowAt"
         class="arrow"
@@ -250,12 +253,6 @@ onBeforeUnmount(() => {
         <span class="ring" />
         <span class="float">+250 · +5s</span>
       </div>
-      <p
-        v-if="webglFailed"
-        class="fallback"
-      >
-        3D view unavailable on this device.
-      </p>
     </div>
     <footer
       class="hint band"
@@ -393,13 +390,16 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 .bay-status {
-  display: block;
-  font-size: 0.65rem;
-  opacity: 0.9;
+  position: absolute;
+  pointer-events: none;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--color-text);
 }
 .bay-status.mandatory {
-  color: var(--ys-red-light);
-  font-weight: 700;
+  color: var(--ys-gold-light);
 }
 @media (prefers-reduced-motion: reduce) {
   .arrow {
@@ -410,20 +410,19 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 1;
   pointer-events: none;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--ys-scrim);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 800;
   letter-spacing: 0.1em;
+  color: var(--color-text);
 }
 .stack-no {
   position: absolute;
   pointer-events: none;
   text-align: center;
-  font-size: 0.65rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  opacity: 0.6;
+  color: var(--ys-yard-yard-text);
 }
 .burst {
   position: absolute;
@@ -483,11 +482,6 @@ onBeforeUnmount(() => {
       opacity: 0;
     }
   }
-}
-.fallback {
-  position: absolute;
-  inset: 40% 0 auto;
-  text-align: center;
 }
 .hint {
   display: flex;
