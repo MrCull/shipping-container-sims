@@ -32,8 +32,8 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 3. **Renderers** (thin): `composables/useYardScene.ts` (Three.js, fixed orthographic camera pitched down and
    turned a little sideways, plain boxes with canvas number textures, two truck bays; every object is placed by
    projecting a layout point onto the ground, so it sits inside its hit region; renders only on change),
-   `Yardshift.vue` and `components/ui/YardHud.vue` (Vue HUD). Pointer events go to the store's `tapAt` and from
-   there to `input`; nothing else interprets them.
+   `Yardshift.vue` and `components/ui/YardHud.vue` (Vue HUD). Pointer and key events go to the store
+   (`pointerDown`/`pointerMove`/`pointerUp`, `key`, `tapAt`) and from there to `input`; nothing else interprets them.
 
 `store/yardshiftStore.ts` (Pinia) is glue: it holds the `Shift`, UI state and viewport.
 
@@ -116,7 +116,30 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   `pickerRows` (best stars, best score, locks), `undoView` (enabled, label, reason). Store `overlay`: `intro`, `pause`
   or `levels`; result and fail follow the shift status. The route opens on the intro of the highest unlocked level;
   `store.loadLevel(n, { intro: true })` holds the `intro` pause until `startShift`. The control bar under the hint has
-  Pause, Undo (reason shown at 3 s or less) and Restart (restart skips the intro). Keyboard for undo and pause is #387's.
+  Pause, Undo (reason shown at 3 s or less) and Restart (restart skips the intro). U calls `store.undo()`; Esc opens the pause menu, and closes it (or the level
+  picker) again.
+
+## Input, urgency and coaching (#387)
+
+- `UiEvent`: `tap`, `drag-start` (from), `drag-move` (over), `drag-end` (target) and `key` (`KeyboardEvent.key`).
+  One resolution for all three: a key is a tap on its target (1 to 9 stacks, C collection, R receipt); a drag start
+  selects its source (the waiting truck, or a non-empty stack unless the deadline is 0) and a drop is a tap on the
+  target with that selection, except that a drop on the source, on nothing or on the receipt bay only clears. So the
+  receipt and collection bays never resolve to each other by any input. U emits the engine's `{ type: 'undo' }`
+  (`UiAction` is `ShiftAction`); Esc clears a selection or drag first, then
+  sends `pause`/`resume` with reason `player`. Input is dropped while the crane animates.
+- Store: a pointer moving more than `DRAG_THRESHOLD_PX` (6) from where it went down starts a drag; otherwise
+  pointer up is a tap. `Yardshift.vue` listens for game keys on `window` (not while typing in a field).
+- Urgency (`urgencyRisk(state, current)`, V20): every container takes the shift-end risk (0 above 9 s, 1 at 3 s);
+  the current container (the next one, or the receipt cargo at deadline 0) also takes 0.08 from the start of its
+  turn, rising to 1 as the next-truck clock falls from 35% of its allowance to 0. `ContainerView` and
+  `ReceiptCargoView` carry `shake` (risk; 0 under reduced motion) and `urgent` (reduced motion and risk at least
+  `URGENT_RISK` 0.5). `UiState.reducedMotion` comes from `setReducedMotion`. The scene offsets the mesh only
+  (amplitude 0.65 + 3.35 x risk px) or adds a static red glow; hit regions never move.
+- Coaching (hint): `tutorialCoaching` levels coach collect #1, move the blocker to an empty stack, then collect in
+  order; `heavyHints` levels (11, 12) say "Heavy #n · Choose a highlighted stack: heavy on heavy or empty." or
+  "... No valid stack. Make space first." while heavy cargo is selected; 13 has none. Rejection messages (the store's
+  `message`, shown over the hint) stay on every level.
 
 ## Levels
 
@@ -150,8 +173,9 @@ coordinates so smoke tests tap real points.
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
   `modules/receiptsView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
-  `modules/presentationScore.test.ts`, `modules/undo.test.ts`, `modules/progress.test.ts`, `modules/screens.test.ts`,
-  `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
+  `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
+  `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/solver.test.ts` (every fixture replayed through the
+  engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1

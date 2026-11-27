@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Yardshift root: a Vue HUD around a Three.js yard. Pointer events are forwarded to the store's `tapAt` (which runs
- * the presentation `input`); nothing here interprets them.
+ * Yardshift root: a Vue HUD around a Three.js yard. Pointer and key events are forwarded to the store (which runs
+ * the presentation `input`); nothing here interprets them beyond the drag threshold.
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import YardHud from './components/ui/YardHud.vue'
@@ -52,16 +52,45 @@ function measure(): void {
   if (el) store.setViewport(el.clientWidth, el.clientHeight)
 }
 
-function onPointerUp(e: PointerEvent): void {
+/** Play-surface coordinates (CSS px) of a pointer event, or null before layout. */
+function local(e: PointerEvent): { x: number; y: number } | null {
   const box = surface.value?.getBoundingClientRect()
-  if (!box) return
-  store.tapAt(e.clientX - box.left, e.clientY - box.top)
+  return box ? { x: e.clientX - box.left, y: e.clientY - box.top } : null
+}
+
+function onPointerDown(e: PointerEvent): void {
+  const p = local(e)
+  if (!p) return
+  surface.value?.setPointerCapture?.(e.pointerId)
+  store.pointerDown(p.x, p.y)
+}
+
+function onPointerMove(e: PointerEvent): void {
+  const p = local(e)
+  if (p) store.pointerMove(p.x, p.y)
+}
+
+function onPointerUp(e: PointerEvent): void {
+  const p = local(e)
+  if (p) store.pointerUp(p.x, p.y)
+}
+
+const GAME_KEYS = /^([1-9]|[cruCRU]|Escape|Esc)$/
+
+/** Keys go to the presentation `input` as they are; only game keys are claimed from the page. */
+function onKey(e: KeyboardEvent): void {
+  if (e.ctrlKey || e.metaKey || e.altKey || !GAME_KEYS.test(e.key)) return
+  const el = e.target as HTMLElement | null
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+  e.preventDefault()
+  store.key(e.key)
 }
 
 onMounted(async () => {
   store.setReducedMotion(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
   store.setHidden(document.hidden)
   document.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('keydown', onKey)
   raf = requestAnimationFrame(loop)
   measure()
   observer = new ResizeObserver(measure)
@@ -76,6 +105,7 @@ onBeforeUnmount(() => {
   unmounted = true
   cancelAnimationFrame(raf)
   document.removeEventListener('visibilitychange', onVisibility)
+  window.removeEventListener('keydown', onKey)
   observer?.disconnect()
   uninstallDevApi?.()
 })
@@ -108,7 +138,10 @@ onBeforeUnmount(() => {
       ref="surface"
       class="surface"
       data-testid="ys-surface"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
       @pointerup="onPointerUp"
+      @pointercancel="store.pointerCancel()"
     >
       <canvas
         ref="canvas"

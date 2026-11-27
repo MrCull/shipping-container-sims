@@ -1,4 +1,5 @@
 /** Yardshift presentation types: the view-model `present` returns and the UI events `input` reads. Pure data. */
+import type { ShiftAction } from './engine'
 
 export interface Viewport {
   /** CSS pixels of the play surface (the canvas). */
@@ -18,13 +19,30 @@ export type HitTarget = { kind: 'stack'; index: number } | { kind: 'collection' 
 
 export type HitRegion = HitTarget & { rect: Rect }
 
-/** UI-only state the engine never sees. #387 adds drag. */
+/** UI-only state the engine never sees. */
 export interface UiState {
   /** Stack index whose top container is selected, `'receipt'` when the waiting receipt truck is selected, or null. */
   selection: number | 'receipt' | null
+  /** A drag in progress: its source (also the selection) and the target under the pointer. */
+  drag?: { from: HitTarget; over: HitTarget | null } | null
+  /** Prefers reduced motion: `present` swaps shake for the static `urgent` flag. */
+  reducedMotion?: boolean
 }
 
-export type UiEvent = { type: 'tap'; target: HitTarget | null }
+/**
+ * Raw input for `input`. Tap, drag and key all resolve to the same engine actions for the same intent. A drag starts
+ * after the host sees the pointer move past its threshold; a pointer that never moves that far is a tap.
+ */
+export type UiEvent =
+  | { type: 'tap'; target: HitTarget | null }
+  | { type: 'drag-start'; from: HitTarget }
+  | { type: 'drag-move'; over: HitTarget | null }
+  | { type: 'drag-end'; target: HitTarget | null }
+  /** `KeyboardEvent.key`: 1 to 9 (stack), C (collection truck), R (receipt truck), U (undo), Escape. */
+  | { type: 'key'; key: string }
+
+/** What `input` can ask of the engine: an engine action (undo included, #386). */
+export type UiAction = ShiftAction
 
 export interface Layout {
   yard: Rect
@@ -51,6 +69,10 @@ export interface ContainerView {
   bonus: boolean
   /** Outlined: only the selection. The current container never has a border. */
   border: boolean
+  /** Shake risk 0..1 (amplitude and frequency grow with it); always 0 under reduced motion. */
+  shake: number
+  /** Static urgency treatment under reduced motion (risk at or above `URGENT_RISK`); always false otherwise. */
+  urgent: boolean
 }
 
 /** One of the six HUD queue positions; `id` null is an empty slot past the last container. */
@@ -78,6 +100,9 @@ export interface ReceiptCargoView {
   selected: boolean
   /** A bonus container (gold star medallion). */
   bonus: boolean
+  /** As `ContainerView.shake` and `urgent`: the cargo is the current container at deadline 0. */
+  shake: number
+  urgent: boolean
 }
 
 export interface ViewModel {

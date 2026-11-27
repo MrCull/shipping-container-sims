@@ -14,6 +14,7 @@ import type {
   Layout,
   QueueItem,
   Rect,
+  UiAction,
   UiEvent,
   UiState,
   ViewModel,
@@ -122,9 +123,39 @@ export function incomingView(state: ShiftState): IncomingView {
   return { status: 'optional', text: `↑ RECEIPT #${id} · ${left}`, bay: left }
 }
 
+/** The selected container's id (a stack top, or the receipt truck's cargo), or undefined. */
+function selectedId(state: ShiftState, ui: UiState): number | undefined {
+  if (ui.selection === 'receipt') return waitingArrival(state)
+  return ui.selection === null ? undefined : topOf(state, ui.selection)
+}
+
+/** Live heavy coaching (levels with `heavyHints`: 11 and 12) when heavy cargo is selected, else null. */
+function heavyHint(state: ShiftState, ui: UiState): string | null {
+  if (!state.level.heavyHints) return null
+  const id = selectedId(state, ui)
+  if (id === undefined || !state.level.heavy.includes(id)) return null
+  const legal = ui.selection === 'receipt' ? receiptDestinations(state) : legalDestinations(state, ui.selection as number)
+  return legal.length > 0
+    ? `Heavy #${id} · Choose a highlighted stack: heavy on heavy or empty.`
+    : `Heavy #${id} · No valid stack. Make space first.`
+}
+
+/** Live tutorial coaching (levels with `tutorialCoaching`): collect #1, move the blocker aside, then collect in order. */
+function tutorialHint(state: ShiftState, ui: UiState): string | null {
+  if (!state.level.tutorialCoaching) return null
+  if (ui.selection !== null) return null
+  if (state.collected === 0) return `Tap container #${state.next} to load the first truck.`
+  if (exposedNextStack(state) >= 0) return `Tap #${state.next} to load the next truck.`
+  const holder = state.stacks.find((s) => s.includes(state.next))
+  const blocker = holder?.[holder.length - 1]
+  return blocker === undefined ? null : `Move #${blocker} to an empty stack to uncover #${state.next}.`
+}
+
 function hintFor(state: ShiftState, ui: UiState): string {
   if (state.status === 'complete') return 'Yard cleared!'
   if (state.failure) return state.failure.message
+  const coached = heavyHint(state, ui) ?? tutorialHint(state, ui)
+  if (coached) return coached
   if (ui.selection === 'receipt') return `Choose a highlighted stack for #${waitingArrival(state)}.`
   if (ui.selection !== null) return `Choose a destination for #${topOf(state, ui.selection)}`
   if (state.deadline === 0) return 'Deadline reached. Tap the receipt truck, then a stack.'
@@ -166,6 +197,36 @@ export function clocksView(state: ShiftState): ClocksView {
   }
 }
 
+/** Shift time below which every container shakes, growing to full over `SHIFT_SHAKE_RAMP_MS` (V20: last 9 s). */
+export const SHIFT_SHAKE_MS = 9_000
+const SHIFT_SHAKE_RAMP_MS = 6_000
+/** Resting shake of the current container from the start of its turn (V20). */
+export const FOCUS_BASE_RISK = 0.08
+/** Under reduced motion, risk at or above this shows the static urgency treatment. */
+export const URGENT_RISK = 0.5
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+
+/**
+ * Shake risk 0..1 (V20): every container takes the shift-end risk (0 above 9 s, 1 at 3 s and below); the current
+ * container also takes the focus risk, 0.08 from the start of its turn rising to 1 as the next-truck clock falls
+ * from 35% of its allowance to 0. The renderer turns risk into amplitude (0.65 + 3.35 x risk px) and frequency.
+ */
+export function urgencyRisk(state: ShiftState, current: boolean): number {
+  if (state.status !== 'playing') return 0
+  const shiftRisk = state.shiftMs < SHIFT_SHAKE_MS ? clamp01((SHIFT_SHAKE_MS - state.shiftMs) / SHIFT_SHAKE_RAMP_MS) : 0
+  if (!current) return shiftRisk
+  const low = Math.max(1, state.truckAllowanceMs * TRUCK_LOW)
+  const focusRisk = FOCUS_BASE_RISK + (1 - FOCUS_BASE_RISK) * (1 - clamp01(Math.max(0, state.truckMs) / low))
+  return Math.max(shiftRisk, focusRisk)
+}
+
+/** Shake and static flag for one container: shake under normal motion, the `urgent` flag under reduced motion. */
+function urgencyFor(state: ShiftState, ui: UiState, current: boolean): { shake: number; urgent: boolean } {
+  const risk = urgencyRisk(state, current)
+  return ui.reducedMotion ? { shake: 0, urgent: risk >= URGENT_RISK } : { shake: risk, urgent: false }
+}
+
 /** Crane move length in ms for a horizontal travel of `dxPx` CSS pixels: 330 + |dx| x 0.38 (V20, about 330 to 460). */
 export function craneDurationMs(dxPx: number): number {
   return 330 + Math.abs(dxPx) * 0.38
@@ -202,6 +263,8 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
         colour: colourOf(state, id),
         bonus: showsBonus(state, id),
         border: ui.selection === si && tier === stack.length - 1,
+        // At deadline 0 the receipt cargo is the current container, not the next one in the yard.
+        ...urgencyFor(state, ui, id === state.next && state.deadline !== 0),
       }),
     ),
   )
@@ -218,7 +281,13 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
     receiptCargo:
       cargo === undefined
         ? null
-        : { id: cargo, label: String(cargo), selected: receiptSelected, bonus: state.level.bonusIds.includes(cargo) },
+        : {
+            id: cargo,
+            label: String(cargo),
+            selected: receiptSelected,
+            bonus: state.level.bonusIds.includes(cargo),
+            ...urgencyFor(state, ui, state.deadline === 0),
+          },
     incoming: incomingView(state),
     dimYard: attention,
     arrow: attention ? 'receipt' : null,
@@ -242,33 +311,93 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
 
 export interface InputResult {
   ui: UiState
-  action?: ShiftAction
+  action?: UiAction
 }
 
-const CLEAR: UiState = { selection: null }
+/** Clear the selection and any drag; keep the UI preferences. */
+function cleared(ui: UiState): UiState {
+  return ui.reducedMotion === undefined ? { selection: null } : { selection: null, reducedMotion: ui.reducedMotion }
+}
 
-/** Resolve a UI event to the next UI state and at most one engine action. The engine still judges legality. */
+/** Key to target: 1 to 9 pick stacks, C the collection truck, R the receipt truck. */
+function keyTarget(key: string, state: ShiftState): HitTarget | null | undefined {
+  if (/^[1-9]$/.test(key)) {
+    const index = Number(key) - 1
+    return index < state.stacks.length ? { kind: 'stack', index } : undefined
+  }
+  const k = key.toLowerCase()
+  if (k === 'c') return { kind: 'collection' }
+  if (k === 'r') return { kind: 'receipt' }
+  return undefined
+}
+
+/** A drag may start from the waiting receipt truck, or from a non-empty stack unless the receipt is mandatory. */
+function dragSource(from: HitTarget, state: ShiftState): UiState['selection'] | undefined {
+  if (from.kind === 'receipt') return waitingArrival(state) === undefined ? undefined : 'receipt'
+  if (from.kind === 'stack') return state.deadline !== 0 && topOf(state, from.index) !== undefined ? from.index : undefined
+  return undefined
+}
+
+/**
+ * Resolve a UI event to the next UI state and at most one action. The engine still judges legality. Tap, drag and
+ * key share one resolution: a key is a tap on its target; a drop is a tap on the target with the source selected.
+ */
 export function input(ui: UiState, event: UiEvent, state: ShiftState): InputResult {
-  const { target } = event
-  // A tap while the crane animates is dropped, not queued: it can never turn into a second move.
+  // Input while the crane animates is dropped, not queued: it can never turn into a second move.
   if (state.pauses.includes('animation')) return { ui }
-  if (state.status !== 'playing' || target === null) return { ui: CLEAR }
+  if (event.type === 'key') {
+    const k = event.key.toLowerCase()
+    if (k === 'escape' || k === 'esc') {
+      if (ui.selection !== null || ui.drag) return { ui: cleared(ui) }
+      if (state.status !== 'playing') return { ui }
+      const paused = state.pauses.includes('player')
+      return { ui, action: { type: paused ? 'resume' : 'pause', reason: 'player' } }
+    }
+    if (k === 'u') return state.status === 'playing' ? { ui: cleared(ui), action: { type: 'undo' } } : { ui }
+    const target = keyTarget(event.key, state)
+    return target === undefined ? { ui } : tap(ui, target, state)
+  }
+  if (event.type === 'drag-start') {
+    const selection = state.status === 'playing' ? dragSource(event.from, state) : undefined
+    if (selection === undefined) return { ui: cleared(ui) }
+    return { ui: { ...ui, selection, drag: { from: event.from, over: null } } }
+  }
+  if (event.type === 'drag-move') {
+    return ui.drag ? { ui: { ...ui, drag: { ...ui.drag, over: event.over } } } : { ui }
+  }
+  if (event.type === 'drag-end') {
+    const { target } = event
+    if (!ui.drag || target === null || sameTarget(ui.drag.from, target) || target.kind === 'receipt') {
+      return { ui: cleared(ui) }
+    }
+    return tap({ ...cleared(ui), selection: ui.selection }, target, state)
+  }
+  return tap(ui, event.target, state)
+}
+
+function sameTarget(a: HitTarget, b: HitTarget): boolean {
+  return a.kind === b.kind && (a.kind !== 'stack' || (b.kind === 'stack' && a.index === b.index))
+}
+
+function tap(ui: UiState, target: HitTarget | null, state: ShiftState): InputResult {
+  const clear = cleared(ui)
+  if (state.status !== 'playing' || target === null) return { ui: clear }
   if (target.kind === 'receipt') {
-    if (ui.selection === 'receipt' || waitingArrival(state) === undefined) return { ui: CLEAR }
-    return { ui: { selection: 'receipt' } }
+    if (ui.selection === 'receipt' || waitingArrival(state) === undefined) return { ui: clear }
+    return { ui: { ...clear, selection: 'receipt' } }
   }
   if (target.kind === 'collection') {
-    if (ui.selection === 'receipt') return { ui: CLEAR }
-    return { ui: CLEAR, action: ui.selection === null ? { type: 'collect' } : { type: 'collect', from: ui.selection } }
+    if (ui.selection === 'receipt') return { ui: clear }
+    return { ui: clear, action: ui.selection === null ? { type: 'collect' } : { type: 'collect', from: ui.selection } }
   }
   const j = target.index
-  if (ui.selection === 'receipt') return { ui: CLEAR, action: { type: 'receive', to: j } }
-  if (ui.selection === j) return { ui: CLEAR }
-  if (ui.selection !== null) return { ui: CLEAR, action: { type: 'rehandle', from: ui.selection, to: j } }
+  if (ui.selection === 'receipt') return { ui: clear, action: { type: 'receive', to: j } }
+  if (ui.selection === j) return { ui: clear }
+  if (ui.selection !== null) return { ui: clear, action: { type: 'rehandle', from: ui.selection, to: j } }
   // At deadline 0 only the receipt is legal: a stack tap selects nothing (the hint names the receipt truck).
   if (state.deadline === 0) return { ui }
   const top = topOf(state, j)
   if (top === undefined) return { ui }
   if (top === state.next) return { ui, action: { type: 'collect', from: j } }
-  return { ui: { selection: j } }
+  return { ui: { ...clear, selection: j } }
 }
