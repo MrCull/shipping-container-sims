@@ -77,6 +77,7 @@ check "the #182 row reads '$expected'" "$(git -C "$repo" show HEAD:handover.md |
 check "exactly one line of handover.md changed ($(diff "$scratch/green-before.md" <(git -C "$repo" show HEAD:handover.md) | grep -c '^[<>]') diff lines)" "$([ "$(diff "$scratch/green-before.md" <(git -C "$repo" show HEAD:handover.md) | grep -c '^[<>]')" -eq 2 ]; echo $?)"
 check "handover update is its own commit touching only handover.md" "$([ "$(git -C "$repo" log -1 --format=%s)" = "handover: #182 merged in branch ($merge_sha)" ] && [ "$(git -C "$repo" show --name-only --format= HEAD)" = "handover.md" ]; echo $?)"
 check "--push pushed the handover commit" "$([ "$(git -C "$repo" rev-parse integ)" = "$(git -C "$repo" rev-parse HEAD)" ] && [ "$(git -C "$repo.git" rev-parse integ)" = "$(git -C "$repo" rev-parse HEAD)" ]; echo $?)"
+check "verify ran against the pre-merge tip" "$(grep -qxF "fake pnpm run verify $(git -C "$repo" rev-parse HEAD^^1)" "$repo/.merge-ticket.log"; echo $?)"
 check "tracked tree is clean after the run" "$([ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ]; echo $?)"
 
 # Case 2: a failed check (verify) stops before the handover update: the row stays as it was.

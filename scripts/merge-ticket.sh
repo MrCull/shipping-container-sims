@@ -83,6 +83,9 @@ resolve_engine_version() {
 current="$(git rev-parse --abbrev-ref HEAD)"
 git fetch -q origin "$current"
 git merge --ff-only "origin/$current" >/dev/null 2>&1 || true
+# The pre-merge tip is verify's base: when the ticket branch already holds it, the merge fast-forwards onto the
+# implementer's own merge commit, whose first parent (verify's default base) would hide the ticket's changes.
+before="$(git rev-parse HEAD)"
 if ! git merge --no-edit "$branch" && ! resolve_engine_version; then
   echo "CONFLICT merging $branch into $current. Unmerged files:" >&2
   git diff --name-only --diff-filter=U >&2
@@ -94,7 +97,7 @@ if ! git merge --no-edit "$branch" && ! resolve_engine_version; then
 fi
 merged="$(git rev-parse --short HEAD)"
 scripts/check-engine-version.sh
-pnpm run verify
+pnpm run verify "$before"
 if [ "$smoke" = "all" ]; then
   pnpm run test:smoke --project dev --grep-invert @load
 elif [ -n "$smoke" ]; then
