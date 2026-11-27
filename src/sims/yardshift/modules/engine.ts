@@ -34,6 +34,8 @@ export const MAX_STEP_MS = 100
 /** Next-truck time a valid rehandle adds (never to the shift clock). */
 export const REHANDLE_CREDIT_MS = 1000
 const TIMEOUT_MESSAGE = 'Time ran out.'
+const BLOCKED_MESSAGE = 'No legal move left: the yard is blocked.'
+const BLOCKED_RECEIPT_MESSAGE = 'The mandatory receipt has no legal space: the yard is blocked.'
 
 /** Score for a receipt. */
 export const RECEIPT_POINTS = 100
@@ -76,7 +78,7 @@ function activate(state: ShiftState): ShiftState {
 }
 
 export function initialState(level: LevelDef): ShiftState {
-  return activate({
+  return withBlocked(activate({
     level,
     stacks: level.stacks.map((s) => [...s]),
     next: 1,
@@ -97,7 +99,7 @@ export function initialState(level: LevelDef): ShiftState {
     golds: 0,
     bonusMs: bonusWindowMs(level, 1),
     failure: null,
-  })
+  }), [])
 }
 
 /** The window, ms, that opens when `id` becomes the next required container (0 when it is not a bonus). */
@@ -156,6 +158,28 @@ export function rejectionFor(state: ShiftState, action: ShiftAction): Rejection 
   return placeRejection(state, stack[stack.length - 1]!, to)
 }
 
+/** True when some collect, rehandle or receipt is legal (pauses ignored: a held pause is not a dead end). */
+export function hasLegalMove(state: ShiftState): boolean {
+  const free = state.pauses.length > 0 ? { ...state, pauses: [] } : state
+  const n = free.stacks.length
+  if (rejectionFor(free, { type: 'collect' }) === null) return true
+  for (let to = 0; to < n; to++) {
+    if (rejectionFor(free, { type: 'receive', to }) === null) return true
+    for (let from = 0; from < n; from++) {
+      if (from !== to && rejectionFor(free, { type: 'rehandle', from, to }) === null) return true
+    }
+  }
+  return false
+}
+
+/** Fails a playing shift that has no legal move left, with the reason the player needs. */
+function withBlocked(state: ShiftState, events: ShiftEvent[]): ShiftState {
+  if (state.status !== 'playing' || hasLegalMove(state)) return state
+  const message = state.deadline === 0 ? BLOCKED_RECEIPT_MESSAGE : BLOCKED_MESSAGE
+  events.push({ type: 'failed', reason: 'blocked' })
+  return { ...state, status: 'failed', failure: { reason: 'blocked', message } }
+}
+
 function isComplete(state: ShiftState): boolean {
   return (
     state.collected >= state.level.count &&
@@ -167,17 +191,24 @@ function isComplete(state: ShiftState): boolean {
 /** Counts down the waiting truck's deadline, then activates the next truck (so a triggering move never counts). */
 function afterMove(state: ShiftState, events: ShiftEvent[]): ShiftState {
   const counted = state.deadline === null ? state : { ...state, deadline: Math.max(0, state.deadline - 1) }
+  if (state.deadline !== null && state.deadline > 0 && counted.deadline === 0) {
+    events.push({ type: 'deadline-zero', id: waitingArrival(counted)! })
+  }
   return arrive(counted, events)
 }
 
 function arrive(state: ShiftState, events: ShiftEvent[]): ShiftState {
   const next = activate(state)
-  if (next !== state) events.push({ type: 'arrival', id: waitingArrival(next)!, moves: next.deadline! })
+  if (next !== state) {
+    const id = waitingArrival(next)!
+    events.push({ type: 'arrival', id, moves: next.deadline! })
+    if (next.deadline === 0) events.push({ type: 'deadline-zero', id })
+  }
   if (isComplete(next)) {
     events.push({ type: 'completed' })
     return { ...next, status: 'complete' }
   }
-  return next
+  return withBlocked(next, events)
 }
 
 /**

@@ -6,15 +6,20 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { LEVELS, levelByNumber } from '../modules/levels'
-import { createShift, exposedNextStack, MAX_STEP_MS, rejectionFor } from '../modules/engine'
+import { createShift, exposedNextStack, MAX_STEP_MS, rejectionFor, waitingArrival } from '../modules/engine'
 import { craneDurationMs, hitTest, input, moveSpan, present } from '../modules/presentation'
 import type { DispatchResult, Shift, ShiftAction, ShiftState } from '../types/engine'
 import type { HitTarget, UiState, Viewport } from '../types/presentation'
 
+/** `CraneMove.from` for a receipt: the crane lifts the cargo off the receipt truck. */
+export const RECEIPT_TRUCK = -2
+/** How long the arrival announcement shows, ms (brief; it does not pause the clocks or block input). */
+export const ANNOUNCE_MS = 1600
+
 /** A crane move in flight: the engine holds the `animation` pause until it ends, then the action is applied. */
 export interface CraneMove {
   action: ShiftAction
-  /** Source stack, and destination stack or -1 for the collection truck. */
+  /** Source stack or `RECEIPT_TRUCK`, and destination stack or -1 for the collection truck. */
   from: number
   to: number
   durationMs: number
@@ -31,6 +36,9 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   const move = shallowRef<CraneMove | null>(null)
   /** Bumped on every +1 s time credit, so the HUD can replay its feedback. */
   const creditPulse = ref(0)
+  /** The brief arrival announcement, or empty; `announceLeftMs` counts it down in `frame`. */
+  const announcement = ref('')
+  let announceLeftMs = 0
   /** Bumped on every bonus award, so the view can replay the gold burst and "+250 · +5s" float. */
   const bonusPulse = ref(0)
   let lastFrame: number | null = null
@@ -40,9 +48,16 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     state.value = shift.state
   }
 
+  function announce(id: number, moves: number): void {
+    announcement.value =
+      moves === 0 ? `Incoming truck #${id}: receive it now.` : `Incoming truck #${id}: receive within ${moves} ${moves === 1 ? 'move' : 'moves'}.`
+    announceLeftMs = ANNOUNCE_MS
+  }
+
   function watchEvents(): void {
     shift.onEvent((e) => {
       if (e.type === 'time-credit') creditPulse.value++
+      if (e.type === 'arrival') announce(e.id, e.moves)
       if (e.type === 'bonus-awarded') bonusPulse.value++
     })
   }
@@ -62,6 +77,10 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     sync()
     ui.value = { selection: null }
     message.value = ''
+    announcement.value = ''
+    announceLeftMs = 0
+    const waiting = waitingArrival(shift.state)
+    if (waiting !== undefined) announce(waiting, shift.state.deadline ?? 0)
   }
 
   function dispatch(action: ShiftAction): DispatchResult {
@@ -81,8 +100,13 @@ export const useYardshiftStore = defineStore('yardshift', () => {
       return
     }
     const span = moveSpan(view.value.layout, action, shift.state)
-    const from = action.type === 'rehandle' ? action.from : action.type === 'collect' ? (action.from ?? exposedNextStack(shift.state)) : -1
-    const to = action.type === 'rehandle' ? action.to : -1
+    const from =
+      action.type === 'rehandle'
+        ? action.from
+        : action.type === 'collect'
+          ? (action.from ?? exposedNextStack(shift.state))
+          : RECEIPT_TRUCK
+    const to = action.type === 'rehandle' || action.type === 'receive' ? action.to : -1
     shift.dispatch({ type: 'pause', reason: 'animation' })
     sync()
     move.value = { action, from, to, durationMs: craneDurationMs(span ? span.toX - span.fromX : 0), progress: 0 }
@@ -100,6 +124,10 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   function frame(nowMs: number): void {
     const dt = lastFrame === null ? 0 : Math.min(MAX_STEP_MS, Math.max(0, nowMs - lastFrame))
     lastFrame = nowMs
+    if (announceLeftMs > 0) {
+      announceLeftMs -= dt
+      if (announceLeftMs <= 0) announcement.value = ''
+    }
     const m = move.value
     if (m) {
       const progress = Math.min(1, m.progress + dt / m.durationMs)
@@ -151,6 +179,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     view,
     move,
     creditPulse,
+    announcement,
     bonusPulse,
     loadLevel,
     dispatch,

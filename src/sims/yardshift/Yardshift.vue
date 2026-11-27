@@ -8,6 +8,11 @@ import YardHud from './components/ui/YardHud.vue'
 import YardQueue from './components/ui/YardQueue.vue'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
+import type { Rect } from './types/presentation'
+
+function rectStyle(r: Rect): Record<string, string> {
+  return { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` }
+}
 
 const devApiEnabled = import.meta.env.DEV || import.meta.env.MODE === 'smoke'
 
@@ -85,6 +90,14 @@ onBeforeUnmount(() => {
       :bonus="view.bonus"
     />
     <div
+      class="incoming"
+      :class="view.incoming.status"
+      data-testid="ys-incoming"
+      :data-status="view.incoming.status"
+    >
+      {{ view.incoming.text }}
+    </div>
+    <div
       ref="surface"
       class="surface"
       data-testid="ys-surface"
@@ -94,6 +107,12 @@ onBeforeUnmount(() => {
         ref="canvas"
         class="canvas"
       />
+      <div
+        v-if="view.dimYard"
+        class="dim"
+        data-testid="ys-dim"
+        :style="rectStyle(view.layout.yard)"
+      />
       <span
         v-for="region in view.hitRegions.filter((r) => r.kind !== 'stack')"
         :key="region.kind"
@@ -101,7 +120,28 @@ onBeforeUnmount(() => {
         :style="{ left: `${region.rect.x}px`, top: `${region.rect.y}px`, width: `${region.rect.w}px` }"
       >
         {{ region.kind === 'collection' ? '▼ COLLECTION' : '▲ RECEIPT' }}
+        <small
+          v-if="region.kind === 'receipt'"
+          class="bay-status"
+          :class="view.incoming.status"
+          data-testid="ys-receipt-status"
+        >{{ view.incoming.bay }}</small>
       </span>
+      <div
+        v-if="view.arrow === 'receipt'"
+        class="arrow"
+        data-testid="ys-arrow"
+        :style="{ left: `${view.layout.receipt.x + view.layout.receipt.w / 2}px`, top: `${view.layout.receipt.y}px` }"
+      >
+        ▼
+      </div>
+      <p
+        v-if="store.announcement"
+        class="announce"
+        data-testid="ys-announce"
+      >
+        {{ store.announcement }}
+      </p>
       <div
         v-if="store.bonusPulse > 0"
         :key="store.bonusPulse"
@@ -182,6 +222,74 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   height: 100%;
+}
+.incoming {
+  /* Reserved space: the band keeps its height with or without a truck, so the layout never jumps on arrival. */
+  height: 26px;
+  line-height: 26px;
+  padding: 0 16px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: #26443e;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.incoming.optional {
+  background: #72451d;
+}
+.incoming.mandatory {
+  background: #a83229;
+}
+.dim {
+  position: absolute;
+  pointer-events: none;
+  background: rgb(8 19 29 / 45%);
+}
+.arrow {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  color: #e9483d;
+  font-size: 1.8rem;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 50%);
+  animation: bob 0.7s ease-in-out infinite alternate;
+}
+@keyframes bob {
+  from {
+    margin-top: -7px;
+  }
+  to {
+    margin-top: 7px;
+  }
+}
+.announce {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #72451d;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.bay-status {
+  display: block;
+  font-size: 0.65rem;
+  opacity: 0.9;
+}
+.bay-status.mandatory {
+  color: #ff8776;
+  font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+  .arrow {
+    animation: none;
+  }
 }
 .bay-label {
   position: absolute;

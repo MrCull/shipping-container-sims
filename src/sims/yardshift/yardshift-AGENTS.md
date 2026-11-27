@@ -18,8 +18,11 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
      left on the waiting truck, null when none). A truck activates when none waits and `collected >= arrival.after`,
      at the start and after every move; collections and rehandles count the deadline down before activation, so the
      triggering move never counts; receipts do not count; deadline 0 rejects everything but `receive`
-     (`receive-first`); completion needs every truck served. Events `received` and `arrival`. #384 adds the
-     presentation (truck bay selection, arrow, dimming, announcements) and the no-legal-move failure.
+     (`receive-first`); completion needs every truck served. Events `received`, `arrival` and `deadline-zero` (once,
+     when the waiting truck becomes mandatory, including an arrival with 0 moves).
+   - **Blocked failure (#384):** after every move and at the start, a playing shift with no legal collect, rehandle
+     or receive (`hasLegalMove`, pauses ignored) fails with `failure.reason` `blocked` and a `failed` event; the
+     message names the mandatory receipt when the deadline is 0 (no legal space for its cargo).
 2. **Presentation** (`modules/presentation.ts`, types in `types/presentation.ts`): pure TS.
    `present(state, ui, viewport)` returns the view-model (containers with labels, selection, legal destinations,
    HUD strings, hint, hit regions). Hit regions come from `layoutFor(stackCount, viewport)` only, never from
@@ -54,6 +57,23 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   and dispatches the action. Reduced motion dispatches at once. The dev hook's `applyActions` skips the animation.
   No intro or pause modal yet (#386): the engine supports `intro` and `player`, the host does not send them.
 
+## Receipts in the UI (#384)
+
+- `UiState.selection` is a stack index, `'receipt'` (the waiting truck is selected) or null. `input`: a receipt bay tap
+  selects the waiting truck (again, or with no truck, clears); truck then stack sends `receive(to)`; truck then
+  collection only clears; at deadline 0 a stack tap with nothing selected does nothing (the hint names the truck).
+- `present` adds `receiptCargo` (the waiting container, drawn on the receipt truck bed in arrival orange),
+  `incoming` (`status` none, optional or mandatory; band text "↑ RECEIPT #8 · 3 MOVES LEFT" or "· MANDATORY"; bay
+  status "NO TRUCK", "n MOVE(S) LEFT", "MANDATORY NOW"), and `dimYard` and `arrow` (`'receipt'`), both set only at
+  deadline 0 while the truck is not selected. With the truck selected, `destinations` are the stacks `receive` accepts.
+- `Yardshift.vue` draws the incoming band (fixed 26 px height, always present, so an arrival never moves the layout;
+  `layoutFor` never depends on receipts), the dim overlay over `layout.yard`, the bobbing arrow over the receipt bay
+  (static under reduced motion) and the arrival announcement (`store.announcement`, 1.6 s, set on every `arrival` event
+  and on level load with a truck waiting; it neither pauses the clocks nor blocks input). The scene darkens yard boxes
+  when dimmed and tints the receipt bay red when mandatory.
+- The receipt crane move: `CraneMove.from` is `RECEIPT_TRUCK` (-2); the crane lifts the cargo off the truck bed and
+  lowers it onto the stack. `moveSpan` runs from the receipt bay centre to the column.
+
 ## Score, combo, colours and bonuses (#385)
 
 - Engine (`withScore` in `modules/engine.ts`, judged against the state before the move): state `score` (can go
@@ -82,7 +102,7 @@ rules keyed on the level index are explicit data: `truckSeconds` (tutorial 30/20
 `bonusIds` (multiples of 3 from level 2), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
 `tutorialCoaching`, `heavyHints` (11 and 12) and `tip`. There is no hand-entered minimum: the star target comes from
 the solver fixture. No level picker yet (#386); start a level in dev with `window.__ys.loadLevel(n)`. Arrival levels
-(4, 6, 8, 9, 10, 13) start with a truck waiting that the UI cannot receive until #384.
+(4, 6, 8, 9, 10, 13) start with a truck waiting.
 
 ## Solver and stars
 
@@ -105,8 +125,11 @@ coordinates so smoke tests tap real points.
 ## Tests and budget
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
-  `modules/levels.test.ts`, `modules/scoring.test.ts`, `modules/presentationScore.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
+  `modules/receiptsView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
+  `modules/presentationScore.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
-  `yardshift-tutorial.smoke.ts` (phone viewport, home tile to route, tutorial won by touch taps). Each spec under 10 s.
+  `yardshift-tutorial.smoke.ts` (phone viewport, home tile to route, tutorial won by touch taps); spec 2
+  `yardshift-receipt.smoke.ts` (level 4 driven to a mandatory receipt through `window.__ys`: arrow over the receipt bay
+  and dimming, both cleared by a real tap on the receipt truck). Each spec under 10 s.

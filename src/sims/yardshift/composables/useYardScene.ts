@@ -7,7 +7,7 @@
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import type { ViewModel } from '../types/presentation'
-import type { CraneMove } from '../store/yardshiftStore'
+import { RECEIPT_TRUCK, type CraneMove } from '../store/yardshiftStore'
 
 /** CSS pixels per world unit. */
 const PX_PER_UNIT = 40
@@ -16,6 +16,13 @@ const YAW = THREE.MathUtils.degToRad(-14)
 
 /** The selected container (sequence colours and grey come from the view-model). */
 const SELECTED = '#ffcb60'
+/** A receipt container while it waits on the receipt truck or rides the crane (V20 arrival orange). */
+const ARRIVAL = '#eda54e'
+
+/** A hex colour darkened for the dimmed yard (mandatory receipt). */
+function dimmed(hex: string): string {
+  return `#${new THREE.Color(hex).multiplyScalar(0.45).getHexString()}`
+}
 
 const COLOURS = {
   background: 0x101c27,
@@ -24,6 +31,7 @@ const COLOURS = {
   destination: 0x2f8f6a,
   collectionBay: 0x31595a,
   receiptBay: 0x85552e,
+  receiptBayUrgent: 0x85382e,
   collectionTruck: 0xd8e1e3,
   receiptTruck: 0xd99b40,
   cab: 0x2b3a44,
@@ -179,20 +187,40 @@ export function useYardScene(
     })
 
     const m = move.value
-    const moving = m ? vm.containers.find((c) => c.stack === m.from && c.tier === (vm.containers.filter((o) => o.stack === m.from).length - 1)) : undefined
     const stackTop = (stack: number) => vm.containers.filter((o) => o.stack === stack).length
+    const cargo = vm.receiptCargo
+    // A receipt lifts the cargo off the receipt truck; anything else lifts the top container of its source stack.
+    const moving =
+      m && m.from === RECEIPT_TRUCK
+        ? cargo && { id: cargo.id, label: cargo.label, tier: 0, colour: ARRIVAL, bonus: cargo.bonus }
+        : m
+          ? vm.containers.find((c) => c.stack === m.from && c.tier === stackTop(m.from) - 1)
+          : undefined
+    const receiptBed = groundAt(layout.receipt.x + layout.receipt.w / 2, layout.receipt.y + layout.receipt.h * 0.55, width, height)
+    const bedY = ch * 0.5 + ch / 2
 
     for (const c of vm.containers) {
       if (c === moving) continue
       const col = layout.columns[c.stack]
       if (!col) continue
       const base = groundAt(col.x + col.w / 2, baseY, width, height)
-      const colour = c.selected ? SELECTED : c.colour
+      const base0 = c.selected ? SELECTED : c.colour
+      const colour = vm.dimYard ? dimmed(base0) : base0
       const body = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.7 })
       const label = new THREE.MeshStandardMaterial({ map: labelTexture(c.label, colour, c.bonus, textures), roughness: 0.7 })
       // BoxGeometry faces: +x, -x, +y (top), -y, +z (front, toward the camera), -z.
       const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
       mesh.position.set(base.x, ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * 0.25 : 0), base.z)
+      dynamic.add(mesh)
+    }
+
+    // The waiting truck's cargo sits on the receipt truck bed (raised when selected) until the crane lifts it.
+    if (cargo && !(m && m.from === RECEIPT_TRUCK)) {
+      const colour = cargo.selected ? SELECTED : ARRIVAL
+      const body = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.7 })
+      const label = new THREE.MeshStandardMaterial({ map: labelTexture(cargo.label, colour, cargo.bonus, textures), roughness: 0.7 })
+      const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
+      mesh.position.set(receiptBed.x, bedY + (cargo.selected ? ch * 0.25 : 0), receiptBed.z)
       dynamic.add(mesh)
     }
 
@@ -208,9 +236,10 @@ export function useYardScene(
     rest ??= { x: left.x + (right.x - left.x) / 2, z: left.z }
     let hook = { x: rest.x, z: rest.z, y: topY }
     if (m && moving) {
-      const src = colBase(m.from)
+      const fromTruck = m.from === RECEIPT_TRUCK
+      const src = fromTruck ? receiptBed : colBase(m.from)
       const dst = m.to >= 0 ? colBase(m.to) : collect
-      const srcY = ch / 2 + moving.tier * ch * 1.04
+      const srcY = fromTruck ? bedY : ch / 2 + moving.tier * ch * 1.04
       const dstY = m.to >= 0 ? ch / 2 + stackTop(m.to) * ch * 1.04 : ch * 0.5 + ch / 2
       const p = cranePhase(m.progress)
       let boxPos: { x: number; y: number; z: number }
@@ -248,7 +277,7 @@ export function useYardScene(
 
     const bays: [typeof layout.collection, number, number, number][] = [
       [layout.collection, COLOURS.collectionBay, COLOURS.collectionTruck, -1],
-      [layout.receipt, COLOURS.receiptBay, COLOURS.receiptTruck, 1],
+      [layout.receipt, vm.incoming.status === 'mandatory' ? COLOURS.receiptBayUrgent : COLOURS.receiptBay, COLOURS.receiptTruck, 1],
     ]
     for (const [rect, bayColour, truckColour, facing] of bays) {
       const c = groundAt(rect.x + rect.w / 2, rect.y + rect.h * 0.55, width, height)
