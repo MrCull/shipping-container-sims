@@ -48,14 +48,16 @@ export interface YardGeometry {
 
 /** Room under the ground line for the stack numbers. */
 export const LABEL_PX = 18
-/** Share of the column a container front face takes; the side face takes `DEPTH` more. */
-const FRONT = 0.64
-const DEPTH = 0.16
-const RISE = 0.12
+/** Share of the column a container front face takes; the side face takes `DEPTH` more (0.92 of the column in all). */
+const FRONT = 0.74
+const DEPTH = 0.18
+const RISE = 0.13
+/** Tallest container front for its width (a container's end is about square). */
+const ASPECT = 1
 /** Lift of the selected container, as a share of its height. */
 export const LIFT = 0.3
-/** Least share of the yard height the harbour backdrop keeps. */
-const MIN_BACKDROP = 0.3
+/** Share of the play surface (yard top to bay bottom) the harbour backdrop band takes: the target's quarter. */
+export const BACKDROP = 0.25
 
 export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const { yard } = layout
@@ -64,17 +66,17 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const dx = colW * DEPTH
   const dy = colW * RISE
   const groundY = Math.round(yard.y + yard.h - LABEL_PX)
+  const surfaceH = Math.max(layout.collection.y + layout.collection.h, yard.y + yard.h) - yard.y
+  const backdropBottom = Math.round(yard.y + Math.min(yard.h * 0.45, surfaceH * BACKDROP))
   const beamH = Math.max(10, Math.min(18, yard.h * 0.045))
-  const beamY = yard.y + 4
+  // The gantry beam runs across the backdrop band, so the band sits behind it.
+  const beamY = Math.round(yard.y + (backdropBottom - yard.y) * 0.3)
   const hookRoom = beamH + 10
   const cap = Math.max(1, capacity)
-  // The harbour backdrop keeps at least a third of the yard; the stacks (top face and lift included) fit under it.
-  const room = groundY - Math.max(beamY + hookRoom, yard.y + yard.h * MIN_BACKDROP) - dy
+  // The stacks (top face and lift included) rise from the ground to the backdrop band, under the beam and hook.
+  const room = groundY - Math.max(beamY + hookRoom, backdropBottom) - dy
   // Whole pixels, so neighbouring tiers share an edge exactly.
-  const boxH = Math.floor(Math.max(8, Math.min(boxW * 0.72, room / (cap + LIFT + 0.3))))
-  const stackTop = groundY - cap * boxH - dy - boxH * LIFT
-  // The backdrop fills what the stacks leave, between a third and a half of the yard.
-  const backdropBottom = Math.min(yard.y + yard.h * 0.5, Math.max(yard.y + yard.h * MIN_BACKDROP, stackTop - boxH * 0.3))
+  const boxH = Math.floor(Math.max(8, Math.min(boxW * ASPECT, room / (cap + LIFT))))
   const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: backdropBottom - yard.y }
   const floor = { x: yard.x, y: backdropBottom, w: yard.w, h: yard.y + yard.h - backdropBottom }
   const legW = Math.max(6, Math.min(12, yard.x - 4))

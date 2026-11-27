@@ -43,9 +43,11 @@ with Canvas 2D. Canvas rather than SVG: one paint pass per change with no DOM no
 and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3) for crisp lines.
 
 - `modules/yardGeometry.ts` (pure) places every shape from `layoutFor`'s layout and the capacity: the harbour
-  backdrop (at least 30 % of the yard, up to 50 % when the stacks are short), the concrete floor, the ground line,
-  the container size (front 0.64 of the column, side face 0.16, top rise 0.12; height from the room at full
-  capacity plus the selection lift), the gantry (legs in the 16 px side margins, outside every column), the crane
+  backdrop (a band of `BACKDROP`, a quarter of the play surface as in the target, at most 45 % of the yard, with
+  the gantry beam across it at 30 % of its height), the concrete floor, the ground line, the container size (front
+  0.74 of the column, side face 0.18, top rise 0.13, so a box is about a fifth of a phone canvas wide; height from
+  the floor at full capacity plus the selection lift, at most square, so a full stack nearly reaches the band), the
+  gantry (legs in the 16 px side margins, outside every column), the crane
   carry height and each bay's truck (`truckIn`: cab at the bay's right end under `arrowBox`, flatbed at most 4.2
   cabs long, cargo sized like a yard box where the bed allows). `boxAt(geo, layout, stack, tier, lift)` is a
   container's oblique box; `boxBounds` its whole drawn area. `modules/yardGeometry.test.ts` proves, for every level

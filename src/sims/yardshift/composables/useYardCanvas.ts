@@ -217,7 +217,7 @@ function shadow(g: CanvasRenderingContext2D, b: Box, groundY: number, strength =
 }
 
 function backdrop(g: CanvasRenderingContext2D, r: Rect, seed: number): void {
-  const horizon = r.y + r.h * 0.5
+  const horizon = r.y + r.h * 0.42
   const sky = g.createLinearGradient(0, r.y, 0, horizon)
   sky.addColorStop(0, C['sky-top'])
   sky.addColorStop(1, C['sky-low'])
@@ -231,7 +231,7 @@ function backdrop(g: CanvasRenderingContext2D, r: Rect, seed: number): void {
   // Distant ship-to-shore cranes: an A-frame with a boom reaching over the water.
   g.strokeStyle = C.distant
   g.lineWidth = 2
-  const craneH = (horizon - r.y) * 0.8
+  const craneH = (horizon - r.y) * 0.92
   for (let i = 0; i < 4; i++) {
     const cx = r.x + r.w * (0.12 + i * 0.26) + ((seed * 7 + i * 13) % 9)
     const top = horizon - craneH
@@ -249,8 +249,8 @@ function backdrop(g: CanvasRenderingContext2D, r: Rect, seed: number): void {
   // A ship at the berth, deck loaded with a row of small boxes.
   const shipW = r.w * 0.62
   const sx = r.x + r.w * 0.2
-  const deck = horizon + (r.y + r.h - horizon) * 0.35
-  const hullH = Math.max(6, (r.y + r.h - horizon) * 0.3)
+  const deck = horizon + (r.y + r.h - horizon) * 0.42
+  const hullH = Math.max(6, (r.y + r.h - horizon) * 0.32)
   g.fillStyle = C.hull
   g.beginPath()
   g.moveTo(sx, deck)

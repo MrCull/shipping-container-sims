@@ -25,6 +25,8 @@ describe('Yardshift 2D yard geometry', () => {
           layout.columns.forEach((col, i) => {
             const slots = slotsFor(g, layout, i, level.capacity)
             for (const b of slots) expect(contains(col, boxBounds(b)), `level ${level.number} stack ${i}`).toBe(true)
+            // Even the top slot stays on the concrete, below the backdrop band.
+            expect(boxBounds(slots[slots.length - 1]!).y).toBeGreaterThanOrEqual(g.floor.y)
             const lifted = boxAt(g, layout, i, level.capacity - 1, g.lift)
             expect(contains(col, boxBounds(lifted))).toBe(true)
             expect(boxBounds(lifted).y).toBeGreaterThan(g.gantry.beamY + g.gantry.beamH)
@@ -53,6 +55,11 @@ describe('Yardshift 2D yard geometry', () => {
           expect(g.backdrop.y + g.backdrop.h).toBe(g.floor.y)
           expect(g.groundY).toBeGreaterThan(g.floor.y)
           expect(g.groundY).toBeLessThan(layout.yard.y + layout.yard.h)
+          // The target's proportions: the backdrop is a band of about a quarter, the containers nearly fill a column.
+          const canvasH = layout.collection.y + layout.collection.h - layout.yard.y
+          expect(g.backdrop.h / canvasH).toBeGreaterThan(0.2)
+          expect(g.backdrop.h / canvasH).toBeLessThanOrEqual(0.26)
+          expect((g.boxW + g.dx) / layout.columns[0]!.w).toBeGreaterThan(0.85)
         }
       })
 
