@@ -25,6 +25,26 @@ export function releaseOnEnded(src: AudioScheduledSourceNode, ...nodes: AudioNod
   }
 }
 
+/**
+ * Plays one tone into `out` (the sfx bus): an oscillator ramping f0 to f1 through its own envelope gain (8 ms attack
+ * to `vol`, exponential decay over `dur`). Both nodes disconnect when the oscillator ends.
+ */
+export function playTone(ac: BaseAudioContext, out: AudioNode, t: Tone): void {
+  const start = ac.currentTime + t.delay
+  const osc = ac.createOscillator()
+  const env = ac.createGain()
+  osc.type = t.type
+  osc.frequency.setValueAtTime(t.f0, start)
+  osc.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
+  env.gain.setValueAtTime(SILENT, start)
+  env.gain.exponentialRampToValueAtTime(t.vol, start + 0.008)
+  env.gain.exponentialRampToValueAtTime(SILENT, start + t.dur)
+  osc.connect(env).connect(out)
+  releaseOnEnded(osc, env)
+  osc.start(start)
+  osc.stop(start + t.dur + 0.01)
+}
+
 export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void): void {
   const audio = useAudioStore()
   let ctx: AudioContext | null = null
@@ -55,22 +75,6 @@ export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void
       if (ctx && bus) bus.gain.setTargetAtTime(gain, ctx.currentTime, 0.015)
     },
   )
-
-  function playTone(ac: AudioContext, out: GainNode, t: Tone): void {
-    const start = ac.currentTime + t.delay
-    const osc = ac.createOscillator()
-    const env = ac.createGain()
-    osc.type = t.type
-    osc.frequency.setValueAtTime(t.f0, start)
-    osc.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
-    env.gain.setValueAtTime(SILENT, start)
-    env.gain.exponentialRampToValueAtTime(t.vol, start + 0.008)
-    env.gain.exponentialRampToValueAtTime(SILENT, start + t.dur)
-    osc.connect(env).connect(out)
-    releaseOnEnded(osc, env)
-    osc.start(start)
-    osc.stop(start + t.dur + 0.01)
-  }
 
   function playSample(ac: AudioContext, out: GainNode, name: SampleName, soundGain: number): void {
     const buffer = buffers.get(name)
