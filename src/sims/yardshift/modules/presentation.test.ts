@@ -92,7 +92,7 @@ describe('Yardshift present', () => {
   it('hit regions come from layout only, not from containers', () => {
     const empty: ShiftState = { ...state, stacks: [[], [], [], []] }
     expect(present(empty, { selection: 2 }, PHONE).hitRegions).toEqual(present(state, NONE, PHONE).hitRegions)
-    expect(present(state, NONE, PHONE).layout).toEqual(layoutFor(4, PHONE))
+    expect(present(state, NONE, PHONE).layout).toEqual(layoutFor(4, PHONE, state.level.capacity))
   })
 
   it.each([PHONE, DESKTOP])('regions never overlap and stay inside the viewport (%o)', (vp) => {

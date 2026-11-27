@@ -5,11 +5,7 @@
 export const YARD_COLOURS = {
   'sky-top': '#a9c3cf',
   'sky-low': '#dbe6e9',
-  water: '#3e6e89',
-  'water-deep': '#2a5570',
   distant: '#6d8a9c',
-  hull: '#24394b',
-  'hull-stripe': '#b5443b',
   quay: '#e3ddcf',
   concrete: '#d2cdc0',
   'concrete-dark': '#bdb7a8',
@@ -39,6 +35,15 @@ export const YARD_COLOURS = {
   'medal-rim': '#87531d',
   'medal-star': '#634016',
   'heavy-tile': '#1d232a',
+  'sky-haze': '#c3d4da',
+  'cab-teal': '#2f9e93',
+  'hub': '#c9d3d8',
+  'headlight': '#ffe9a8',
+  'casting': '#20282f',
+  'dust': '#efe7d6',
+  'gold-shine': '#fffbe8',
+  'gold-body': '#f5c542',
+  'gold-deep': '#b9821f',
 } as const
 
 export type YardColour = keyof typeof YARD_COLOURS

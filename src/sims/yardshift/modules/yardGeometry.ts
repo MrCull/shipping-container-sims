@@ -1,8 +1,8 @@
 /**
  * Geometry of the 2D yard drawing (owner decision on spec #374: a flat illustrated yard, not 3D). Pure: every shape
  * the canvas renderer draws is placed here from the layout (`layoutFor`) and the capacity, so the tests can prove that
- * what is drawn lines up with the hit regions. Containers are oblique boxes: a front face plus a top face and a right
- * side face offset up and to the right by (`dx`, `dy`).
+ * what is drawn lines up with the hit regions. Containers are side-on 20 ft boxes (art pass 2): a long side face about
+ * 2.1 to 2.4 times as wide as it is tall, with a thin top face and door end offset up and to the right by (`dx`, `dy`).
  */
 import type { Layout, Rect } from '../types/presentation'
 
@@ -28,7 +28,7 @@ export interface Gantry {
 }
 
 export interface YardGeometry {
-  /** Harbour backdrop (sky, water, ship, distant cranes) across the top of the yard. */
+  /** Quiet harbour backdrop (sky, faint distant cranes, quay band) across the top of the yard. */
   backdrop: Rect
   /** The concrete yard floor below the backdrop. */
   floor: Rect
@@ -48,21 +48,32 @@ export interface YardGeometry {
 
 /** Room under the ground line for the stack numbers. */
 export const LABEL_PX = 18
-/** Share of the column a container front face takes; the side face takes `DEPTH` more (0.92 of the column in all). */
-const FRONT = 0.74
-const DEPTH = 0.18
-const RISE = 0.13
-/** Tallest container front for its width (a container's end is about square). */
-const ASPECT = 1
+/** Share of the column a container side takes; the door end takes `DEPTH` more (0.92 of the column in all). */
+const FRONT = 0.86
+const DEPTH = 0.06
+const RISE = 0.08
+/** Length to height of a container side on screen: a 20 ft box, about 2.25:1, kept within 2.1 to 2.4. */
+export const ASPECT = 2.25
+export const ASPECT_MIN = 2.1
+export const ASPECT_MAX = 2.4
 /** Lift of the selected container, as a share of its height. */
 export const LIFT = 0.3
 /** Share of the play surface (yard top to bay bottom) the harbour backdrop band takes: the target's quarter. */
 export const BACKDROP = 0.25
 
+/**
+ * The yard height full stacks of `capacity` side-on containers need in a column `colW` wide, on a play surface
+ * `surfaceH` tall: the backdrop band, the stacks with the lift, the stack labels and some air under the hook.
+ */
+export function yardHeightFor(colW: number, surfaceH: number, capacity: number): number {
+  const boxH = (colW * FRONT) / ASPECT
+  return Math.ceil(surfaceH * BACKDROP + colW * RISE + (Math.max(1, capacity) + LIFT + 0.9) * boxH + LABEL_PX + 12)
+}
+
 export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const { yard } = layout
   const colW = layout.columns[0]?.w ?? yard.w
-  const boxW = colW * FRONT
+  const fullW = colW * FRONT
   const dx = colW * DEPTH
   const dy = colW * RISE
   const groundY = Math.round(yard.y + yard.h - LABEL_PX)
@@ -76,7 +87,9 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   // The stacks (top face and lift included) rise from the ground to the backdrop band, under the beam and hook.
   const room = groundY - Math.max(beamY + hookRoom, backdropBottom) - dy
   // Whole pixels, so neighbouring tiers share an edge exactly.
-  const boxH = Math.floor(Math.max(8, Math.min(boxW * ASPECT, room / (cap + LIFT))))
+  const boxH = Math.floor(Math.max(6, Math.min(fullW / ASPECT, room / (cap + LIFT))))
+  // A short room keeps the box container shaped: it narrows instead of flattening.
+  const boxW = Math.min(fullW, boxH * ASPECT_MAX)
   const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: backdropBottom - yard.y }
   const floor = { x: yard.x, y: backdropBottom, w: yard.w, h: yard.y + yard.h - backdropBottom }
   const legW = Math.max(6, Math.min(12, yard.x - 4))
@@ -109,46 +122,63 @@ export function slotsFor(g: YardGeometry, layout: Layout, stack: number, capacit
 }
 
 export interface Truck {
-  /** Flatbed (chassis) and cab, wheel centres and radius. */
-  bed: Rect
+  /** Which way the cab faces: the collection truck faces left, the receipt truck right. */
+  facing: 'left' | 'right'
+  /** Cab body (roof, windscreen, grille end), and the skeletal trailer chassis beam it pulls. */
   cab: Rect
+  trailer: Rect
+  /** Wheel centres: the cab axle first, then the two trailer axles. */
   wheels: { x: number; y: number }[]
   wheelR: number
-  /** Where a container rides on the bed. */
+  /** The road under the wheels (the soft shadow sits on it). */
+  groundY: number
+  /** Where a container rides on the trailer: the same 20 ft shape as a yard container. */
   cargo: Box
 }
 
 /** Rows kept clear at the top (bay title) and bottom (bay status) of a truck bay. */
 export const BAY_TITLE_PX = 24
 export const BAY_STATUS_PX = 20
+/** A truck's container may be drawn up to this much larger than a yard container. */
+export const MAX_CARGO_SCALE = 1.35
 
 /**
- * The truck drawn in a bay: a flatbed with its cab at the bay's right end (the arrow box, `arrowBox`, sits over the
- * cab), and the container slot on the bed, sized like a yard container but never wider than the bed.
+ * The truck drawn in a bay: a tractor cab at one end (the right end when facing right, where the receipt arrow,
+ * `arrowBox`, sits over it) pulling a skeletal trailer, and the container slot on the trailer, sized like a yard
+ * container but never longer than the trailer.
  */
-export function truckIn(bay: Rect, g: YardGeometry): Truck {
-  const pad = 10
+export function truckIn(bay: Rect, g: YardGeometry, facing: 'left' | 'right' = 'right'): Truck {
+  const pad = 8
   const top = bay.y + BAY_TITLE_PX
   const bottom = bay.y + bay.h - BAY_STATUS_PX
-  const h = Math.max(10, bottom - top)
-  const wheelR = Math.max(3, Math.min(7, h * 0.09))
-  const bedH = Math.max(3, wheelR * 0.9)
-  const bedY = bottom - wheelR * 1.6 - bedH
-  const cabW = Math.max(18, Math.min(46, bay.w * 0.2))
-  const cabH = Math.max(12, Math.min(h * 0.55, cabW * 1.05))
-  const cab: Rect = { x: bay.x + bay.w - pad - cabW, y: bedY + bedH - cabH, w: cabW, h: cabH }
-  // The flatbed runs left from the cab, at most about four cabs long on a wide desktop bay.
-  const bedW = Math.min(cab.x - 2 - (bay.x + pad), cabW * 4.2)
-  const bed: Rect = { x: cab.x - 2 - bedW, y: bedY, w: bedW, h: bedH }
-  const wheels = [bed.x + wheelR * 2, bed.x + bed.w * 0.62, cab.x + cabW * 0.55].map((x) => ({ x, y: bedY + bedH + wheelR * 0.6 }))
-  // The cargo: as wide as a yard container where the bed allows, as tall as the room above the bed allows.
-  const scale = Math.min(1, (bed.w - 6) / (g.boxW + g.dx), (bedY - top - 2) / (g.boxH + g.dy))
+  const h = Math.max(12, bottom - top)
+  const groundY = bottom - 1
+  // The truck grows with a tall bay (art pass 2 gives the bays the yard's spare height), led by the cab.
+  const cabW = Math.max(20, Math.min(70, bay.w * 0.26, h * 0.45))
+  const cabH = Math.max(14, Math.min(h * 0.7, cabW * 1.15))
+  const wheelR = Math.max(3.5, Math.min(12, cabW * 0.17))
+  const axleY = groundY - wheelR
+  const beamH = Math.max(3, wheelR * 0.7)
+  const deckY = axleY - wheelR * 0.55 - beamH
+  const cabBottom = axleY + wheelR * 0.2
+  const cabX = facing === 'right' ? bay.x + bay.w - pad - cabW : bay.x + pad
+  const cab: Rect = { x: cabX, y: cabBottom - cabH, w: cabW, h: cabH }
+  // The trailer runs back from the cab, at most about four cabs long on a wide desktop bay.
+  const trailerW = Math.min(bay.w - 2 * pad - cabW - 3, cabW * 4.2)
+  const trailerX = facing === 'right' ? cab.x - 3 - trailerW : cab.x + cabW + 3
+  const trailer: Rect = { x: trailerX, y: deckY, w: trailerW, h: beamH }
+  const rear = facing === 'right' ? trailer.x + wheelR * 1.4 : trailer.x + trailer.w - wheelR * 1.4
+  const forward = facing === 'right' ? 1 : -1
+  const cabAxle = cab.x + cabW * (facing === 'right' ? 0.62 : 0.38)
+  const wheels = [cabAxle, rear, rear + forward * wheelR * 2.3].map((x) => ({ x, y: axleY }))
+  // The cargo: as long as a yard container where the trailer allows, as tall as the room above the deck allows.
+  const scale = Math.min(MAX_CARGO_SCALE, (trailer.w - 4) / (g.boxW + g.dx), (deckY - top - 2) / (g.boxH + g.dy))
   const w = g.boxW * scale
   const ch = g.boxH * scale
   const cdx = g.dx * scale
   const cdy = g.dy * scale
-  const cargo: Box = { x: bed.x + (bed.w - w - cdx) / 2, y: bedY - ch, w, h: ch, dx: cdx, dy: cdy }
-  return { bed, cab, wheels, wheelR, cargo }
+  const cargo: Box = { x: trailer.x + (trailer.w - w - cdx) / 2, y: deckY - ch, w, h: ch, dx: cdx, dy: cdy }
+  return { facing, cab, trailer, wheels, wheelR, groundY, cargo }
 }
 
 /** Free slots in the yard: capacity times stacks, less the containers in it. */

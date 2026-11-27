@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { createShift } from './engine'
 import { levelByNumber, TUTORIAL } from './levels'
-import { arrowBox, input, layoutFor, present } from './presentation'
+import { arrowBox, input, layoutFor, MAX_BAY_SHARE, present } from './presentation'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type { UiState, Viewport } from '../types/presentation'
 
@@ -70,6 +70,11 @@ describe('Yardshift playtest fixes', () => {
       expect(l.collection.y - (l.yard.y + l.yard.h)).toBeLessThanOrEqual(8)
       expect(l.collection.h).toBeLessThanOrEqual(vp.height * 0.25)
       expect(l.yard.h / vp.height).toBeGreaterThan(0.68)
+      // Art pass 2: with the capacity, a yard taller than its full stacks need gives the spare height to the bays.
+      const fit = layoutFor(4, vp, 3)
+      expect(fit.collection.y - (fit.yard.y + fit.yard.h)).toBeLessThanOrEqual(8)
+      expect(fit.collection.h).toBeGreaterThanOrEqual(l.collection.h)
+      expect(fit.collection.h).toBeLessThanOrEqual(vp.height * MAX_BAY_SHARE + 1)
     }
   })
 })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LEVELS } from './levels'
 import { arrowBox, layoutFor } from './presentation'
 import { contains, overlaps, screenLayout } from './screenLayout'
-import { boxAt, boxBounds, freeSlots, slotsFor, truckIn, yardGeometry } from './yardGeometry'
+import { ASPECT_MAX, ASPECT_MIN, boxAt, boxBounds, freeSlots, slotsFor, truckIn, yardGeometry } from './yardGeometry'
 
 /** Play surfaces of a phone (with and without notch insets), a tablet and two desktops. */
 const SURFACES = [
@@ -20,7 +20,7 @@ describe('Yardshift 2D yard geometry', () => {
 
       it('every slot, also the top one lifted, is drawn inside its own column and below the crane beam', () => {
         for (const level of LEVELS) {
-          const layout = layoutFor(level.stacks.length, vp)
+          const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
           layout.columns.forEach((col, i) => {
             const slots = slotsFor(g, layout, i, level.capacity)
@@ -32,6 +32,15 @@ describe('Yardshift 2D yard geometry', () => {
             expect(boxBounds(lifted).y).toBeGreaterThan(g.gantry.beamY + g.gantry.beamH)
             for (let t = 1; t < slots.length; t++) expect(overlaps(slots[t]!, slots[t - 1]!)).toBe(false)
           })
+        }
+      })
+
+      it('full stacks fill the yard: little bare concrete above the top slot on a phone', () => {
+        for (const level of LEVELS) {
+          const layout = layoutFor(level.stacks.length, vp, level.capacity)
+          const g = yardGeometry(layout, level.capacity)
+          const stacksH = level.capacity * g.boxH
+          if (s.w < 600 && level.capacity >= 3) expect(stacksH / (g.groundY - g.floor.y), `level ${level.number}`).toBeGreaterThan(0.45)
         }
       })
 
@@ -50,7 +59,7 @@ describe('Yardshift 2D yard geometry', () => {
 
       it('the backdrop sits above the floor, and the stacks start on the floor', () => {
         for (const level of LEVELS) {
-          const layout = layoutFor(level.stacks.length, vp)
+          const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
           expect(g.backdrop.y + g.backdrop.h).toBe(g.floor.y)
           expect(g.groundY).toBeGreaterThan(g.floor.y)
@@ -59,20 +68,42 @@ describe('Yardshift 2D yard geometry', () => {
           const canvasH = layout.collection.y + layout.collection.h - layout.yard.y
           expect(g.backdrop.h / canvasH).toBeGreaterThan(0.2)
           expect(g.backdrop.h / canvasH).toBeLessThanOrEqual(0.26)
-          expect((g.boxW + g.dx) / layout.columns[0]!.w).toBeGreaterThan(0.85)
+          // Container shaped (art pass 2): a side-on 20 ft box, about 2.1 to 2.4 times as long as tall, that fills its
+          // column unless the room is short, when it narrows to keep its shape instead of flattening.
+          const aspect = g.boxW / g.boxH
+          expect(aspect, `level ${level.number}`).toBeGreaterThanOrEqual(ASPECT_MIN - 0.01)
+          expect(aspect, `level ${level.number}`).toBeLessThanOrEqual(ASPECT_MAX + 0.01)
+          if (aspect < ASPECT_MAX - 0.01) expect((g.boxW + g.dx) / layout.columns[0]!.w).toBeGreaterThan(0.85)
+          expect(g.dy).toBeLessThan(g.boxH * 0.5)
         }
       })
 
-      it('each truck is drawn inside its bay; the receipt arrow points at the cab, never at the cargo number', () => {
+      it('each truck is drawn inside its bay, cab ahead of the trailer; the receipt arrow points at the cab', () => {
         const layout = layoutFor(5, vp)
         const g = yardGeometry(layout, 3)
-        for (const bay of [layout.collection, layout.receipt]) {
-          const t = truckIn(bay, g)
-          for (const r of [t.bed, t.cab, boxBounds(t.cargo)]) expect(contains(bay, r)).toBe(true)
-          expect(overlaps(t.bed, t.cab)).toBe(false)
+        for (const [bay, facing] of [
+          [layout.collection, 'left'],
+          [layout.receipt, 'right'],
+        ] as const) {
+          const t = truckIn(bay, g, facing)
+          for (const r of [t.trailer, t.cab, boxBounds(t.cargo)]) expect(contains(bay, r)).toBe(true)
+          expect(overlaps(t.trailer, t.cab)).toBe(false)
+          // The cab is at the end the truck faces.
+          if (facing === 'left') expect(t.cab.x).toBeLessThan(t.trailer.x)
+          else expect(t.cab.x).toBeGreaterThan(t.trailer.x)
+          // Three axles, every wheel on the road and inside the bay; the cargo sits on the trailer, container shaped.
+          expect(t.wheels).toHaveLength(3)
+          for (const w of t.wheels) {
+            expect(w.y + t.wheelR).toBeLessThanOrEqual(t.groundY + 0.01)
+            expect(contains(bay, { x: w.x - t.wheelR, y: w.y - t.wheelR, w: 2 * t.wheelR, h: 2 * t.wheelR })).toBe(true)
+          }
+          expect(t.cargo.y + t.cargo.h).toBeCloseTo(t.trailer.y)
+          expect(t.cargo.x).toBeGreaterThanOrEqual(t.trailer.x)
+          expect(t.cargo.x + t.cargo.w + t.cargo.dx).toBeLessThanOrEqual(t.trailer.x + t.trailer.w)
+          expect(t.cargo.w / t.cargo.h).toBeGreaterThanOrEqual(ASPECT_MIN - 0.01)
           expect(t.cargo.w).toBeGreaterThan(10)
         }
-        const t = truckIn(layout.receipt, g)
+        const t = truckIn(layout.receipt, g, 'right')
         const arrow = arrowBox(layout.receipt)
         expect(arrow.x + arrow.w / 2).toBeGreaterThan(t.cab.x)
         expect(arrow.x + arrow.w / 2).toBeLessThan(t.cab.x + t.cab.w)

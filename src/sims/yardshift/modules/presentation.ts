@@ -4,6 +4,7 @@
  * layout alone (never from animated positions), so a tap target never moves.
  */
 import { exposedNextStack, rejectionFor, waitingArrival } from './engine'
+import { yardHeightFor } from './yardGeometry'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type {
   ClocksView,
@@ -56,13 +57,25 @@ function queueFor(state: ShiftState): QueueItem[] {
 const SIDE = 16
 const BAY_GAP = 12
 
-/** Screen layout of the play surface: the yard band with one column per stack, and the two truck bays below. */
-export function layoutFor(stackCount: number, vp: Viewport): Layout {
+/** Most of the surface height the truck bays take when the yard needs less (art pass 2). */
+export const MAX_BAY_SHARE = 0.34
+
+/**
+ * Screen layout of the play surface: the yard band with one column per stack, and the two truck bays below. With the
+ * `capacity`, a yard taller than its full stacks need (side-on containers are short on a narrow phone) gives the spare
+ * height to the bays, up to `MAX_BAY_SHARE` of the surface (art pass 2); without it the bays take their usual share.
+ */
+export function layoutFor(stackCount: number, vp: Viewport, capacity?: number): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
   // The yard is the hero (playtest fix 8): the bays take a fixed share under it, with a small gap.
-  const bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
+  let bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
   const yardTop = Math.round(vp.height * 0.02)
   const bayBottom = Math.max(yardTop, vp.height - 8)
+  if (capacity !== undefined && stackCount > 0) {
+    const need = yardHeightFor(innerW / stackCount, bayBottom - yardTop, capacity)
+    const spare = bayBottom - yardTop - 6 - bayH - need
+    if (spare > 0) bayH = Math.round(Math.min(vp.height * MAX_BAY_SHARE, bayH + spare))
+  }
   const bayTop = Math.max(yardTop, bayBottom - bayH)
   const yardBottom = Math.max(yardTop, bayTop - 6)
   const yard: Rect = { x: SIDE, y: yardTop, w: innerW, h: yardBottom - yardTop }
@@ -265,7 +278,7 @@ export function moveSpan(layout: Layout, action: ShiftAction, state: ShiftState)
 }
 
 export function present(state: ShiftState, ui: UiState, viewport: Viewport): ViewModel {
-  const layout = layoutFor(state.stacks.length, viewport)
+  const layout = layoutFor(state.stacks.length, viewport, state.level.capacity)
   const receiptSelected = ui.selection === 'receipt'
   const cargo = waitingArrival(state)
   const attention = state.status === 'playing' && state.deadline === 0 && !receiptSelected

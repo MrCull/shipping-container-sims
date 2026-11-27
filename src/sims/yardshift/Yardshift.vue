@@ -39,7 +39,7 @@ const surface = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const view = computed(() => store.view)
 const move = computed(() => store.move)
-useYardCanvas(canvas, view, move)
+useYardCanvas(canvas, view, move, { reducedMotion: () => store.ui.reducedMotion ?? false, subscribe: store.onYardEvent })
 /** The collection bay's caption: the load the next collection fills. */
 const loadNo = computed(() => Math.min(store.state.level.count, store.state.collected + 1))
 useYardAudio(store.onCue)

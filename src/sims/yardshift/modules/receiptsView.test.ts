@@ -67,7 +67,7 @@ describe('Yardshift receipt presentation', () => {
     const shift = createShift({ ...TUTORIAL, count: 5, arrivals: [{ after: 1, id: 5, moves: 2 }] })
     const before = present(shift.state, NONE, PHONE)
     expect(before.incoming.status).toBe('none')
-    expect(before.layout).toEqual(layoutFor(shift.state.stacks.length, PHONE))
+    expect(before.layout).toEqual(layoutFor(shift.state.stacks.length, PHONE, shift.state.level.capacity))
     const r = shift.dispatch({ type: 'collect' })
     expect(r.ok && r.events.some((e) => e.type === 'arrival')).toBe(true)
     const after = present(shift.state, NONE, PHONE)
@@ -109,7 +109,7 @@ describe('Yardshift receipt input', () => {
 
   it('a receipt crane move runs from the receipt bay to the stack', () => {
     const state = level4()
-    const layout = layoutFor(state.stacks.length, PHONE)
+    const layout = layoutFor(state.stacks.length, PHONE, state.level.capacity)
     const span = moveSpan(layout, { type: 'receive', to: 0 }, state)!
     expect(span.fromX).toBeCloseTo(layout.receipt.x + layout.receipt.w / 2)
     expect(span.toX).toBeCloseTo(layout.columns[0]!.x + layout.columns[0]!.w / 2)

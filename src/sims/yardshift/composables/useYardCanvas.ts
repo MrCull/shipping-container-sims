@@ -1,14 +1,30 @@
 /**
  * Thin Canvas 2D renderer for the Yardshift yard (owner decision on spec #374: a flat illustrated look like the
- * reference prototype, not 3D). Every shape comes from `modules/yardGeometry.ts`, which places it from the
- * view-model's layout, so what is drawn lines up with the hit regions; this file only paints. The canvas backing store
- * follows `devicePixelRatio` for crisp lines. It renders when the view-model or the crane move changes, and keeps
- * drawing frame by frame only while a container shakes or glints.
+ * reference prototype, not 3D; art pass 2: side-on 20 ft containers, illustrated trucks, a quiet backdrop and phone game
+ * juice). Every shape comes from `modules/yardGeometry.ts`, which places it from the view-model's layout, so what is
+ * drawn lines up with the hit regions; every effect comes from `modules/yardEffects.ts`, pure in time. This file only
+ * paints: effects offset what is painted, never a hit region. The canvas backing store follows `devicePixelRatio` for
+ * crisp lines. It renders when the view-model or the crane move changes, and keeps drawing frame by frame only while
+ * something animates (vibration, glow, gold shine, an effect in flight).
  */
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
-import type { ContainerView, Rect, ViewModel } from '../types/presentation'
-import { RECEIPT_TRUCK, type CraneMove } from '../store/yardshiftStore'
+import type { ContainerView, HitTarget, Rect, ViewModel } from '../types/presentation'
+import { RECEIPT_TRUCK, type CraneMove, type YardFxEvent } from '../store/yardshiftStore'
 import { boxAt, freeSlots, slotsFor, truckIn, type Box, type Truck, type YardGeometry, yardGeometry } from '../modules/yardGeometry'
+import {
+  burst,
+  collectMotion,
+  type Fx,
+  fxProgress,
+  liveFx,
+  pulse,
+  rejectX,
+  shineAt,
+  sparkles,
+  squash,
+  urgencyStyle,
+  vibrateX,
+} from '../modules/yardEffects'
 import { shade, YARD_COLOURS as C } from '../modules/yardPalette'
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t))
@@ -24,14 +40,6 @@ export function cranePhase(u: number): { leg: 'toSource' | 'carry' | 'release'; 
   if (u < 0.72) return { leg: 'carry', t: (u - 0.46) / 0.26, lift: 1, carrying: true }
   if (u < 0.88) return { leg: 'carry', t: 1, lift: 1 - (u - 0.72) / 0.16, carrying: true }
   return { leg: 'release', t: 1, lift: (u - 0.88) / 0.12, carrying: false }
-}
-
-/** Shake offset (V20): amplitude 0.65 + 3.35 x risk px, frequency rising with risk. */
-function shakeOffset(risk: number, now: number, seed: number): { x: number; y: number } {
-  if (risk <= 0) return { x: 0, y: 0 }
-  const amp = 0.65 + 3.35 * risk
-  const f = 0.009 + 0.041 * risk
-  return { x: amp * Math.sin(now * f + seed), y: amp * 0.2 * Math.cos(now * f * 1.3 + seed) }
 }
 
 const moveBox = (b: Box, x: number, y: number): Box => ({ ...b, x: b.x + x, y: b.y + y })
@@ -51,12 +59,26 @@ interface Paint {
   bonus: boolean
   heavy: boolean
   selected?: boolean
-  urgent?: boolean
+  /** Red outline (pulsing unless `still`). */
+  red?: boolean
+  /** Soft glow of the calm current container (pulsing unless `still`). */
+  glow?: boolean
+  /** Exposed bonus: shine sweep, sparkles and bouncing star (never under reduced motion). */
   glint?: boolean
+  /** The open bonus window on this container: its remaining fraction 0..1. */
+  window?: number | null
+  /** A missed bonus fading from gold, 0..1. */
+  miss?: number | null
+  /** On top of its stack (or on the truck): the star badge sits over the corner, else inside the side. */
+  exposed?: boolean
+  /** Squash on landing. */
+  squash?: { sx: number; sy: number }
+  /** Reduced motion: every cue static. */
+  still?: boolean
   seed: number
 }
 
-/** The outline of a whole box (front, top and side), for the rim and the shadow. */
+/** The outline of a whole box (side, top and end), for the rim and the shadow. */
 function outline(g: CanvasRenderingContext2D, b: Box): void {
   g.beginPath()
   g.moveTo(b.x, b.y + b.h)
@@ -65,6 +87,16 @@ function outline(g: CanvasRenderingContext2D, b: Box): void {
   g.lineTo(b.x + b.w + b.dx, b.y - b.dy)
   g.lineTo(b.x + b.w + b.dx, b.y + b.h - b.dy)
   g.lineTo(b.x + b.w, b.y + b.h)
+  g.closePath()
+}
+
+function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, points = 5, inner = 0.45): void {
+  g.beginPath()
+  for (let i = 0; i < points * 2; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / points
+    const rr = i % 2 === 0 ? r : r * inner
+    g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr)
+  }
   g.closePath()
 }
 
@@ -79,13 +111,7 @@ function medallion(g: CanvasRenderingContext2D, cx: number, cy: number, r: numbe
   g.lineWidth = Math.max(1, r * 0.16)
   g.strokeStyle = C['medal-rim']
   g.stroke()
-  g.beginPath()
-  for (let i = 0; i < 10; i++) {
-    const a = -Math.PI / 2 + (i * Math.PI) / 5
-    const rr = i % 2 === 0 ? r * 0.66 : r * 0.28
-    g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr)
-  }
-  g.closePath()
+  star(g, cx, cy, r * 0.66, 5, 0.42)
   g.fillStyle = C['medal-star']
   g.fill()
 }
@@ -95,7 +121,7 @@ function heavyTile(g: CanvasRenderingContext2D, x: number, y: number, s: number)
   g.beginPath()
   g.roundRect(x, y, s, s, s * 0.2)
   g.fill()
-  g.lineWidth = 1.5
+  g.lineWidth = 1.2
   g.strokeStyle = C.rim
   g.stroke()
   g.fillStyle = C.rim
@@ -105,25 +131,19 @@ function heavyTile(g: CanvasRenderingContext2D, x: number, y: number, s: number)
   g.fillText('H', x + s / 2, y + s / 2 + 1)
 }
 
-/** One container: a bold oblique box with corrugations, outline and its big number. */
-function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): void {
-  g.save()
-  if (p.glint) {
-    // The exposed bonus container rocks a little on its bottom edge.
-    const a = Math.sin(now * 0.006 + p.seed) * 0.035
-    g.translate(b.x + b.w / 2, b.y + b.h)
-    g.rotate(a)
-    g.translate(-(b.x + b.w / 2), -(b.y + b.h))
-  }
+/** The side of a container: base colour (gold for a bonus), corrugated ribs, rails, door end and corner castings. */
+function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold: boolean): void {
   const { x, y, w, h, dx, dy } = b
-  // Top face, then the right side face, then the front.
+  const rail = Math.max(1.5, h * 0.1)
+  const door = w * 0.17
+  // Top face and the end face, a thin sliver each.
   g.beginPath()
   g.moveTo(x, y)
   g.lineTo(x + dx, y - dy)
   g.lineTo(x + w + dx, y - dy)
   g.lineTo(x + w, y)
   g.closePath()
-  g.fillStyle = shade(p.colour, 0.38)
+  g.fillStyle = gold ? C['gold-shine'] : shade(colour, 0.4)
   g.fill()
   g.beginPath()
   g.moveTo(x + w, y)
@@ -131,71 +151,197 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
   g.lineTo(x + w + dx, y + h - dy)
   g.lineTo(x + w, y + h)
   g.closePath()
-  g.fillStyle = shade(p.colour, -0.28)
+  g.fillStyle = gold ? C['gold-deep'] : shade(colour, -0.3)
   g.fill()
-  g.fillStyle = p.colour
+  // The side: a vertical gradient so it reads as metal; gold gets a brighter, richer one.
+  const body = g.createLinearGradient(0, y, 0, y + h)
+  if (gold) {
+    // Metallic gold: a bright cream top edge, rich gold, a deep bronze foot, so it never reads as the yellow slot.
+    body.addColorStop(0, C['gold-shine'])
+    body.addColorStop(0.3, C['gold-body'])
+    body.addColorStop(0.75, C['gold-deep'])
+    body.addColorStop(1, C['medal-rim'])
+  } else {
+    body.addColorStop(0, shade(colour, 0.12))
+    body.addColorStop(1, shade(colour, -0.08))
+  }
+  g.fillStyle = body
   g.fillRect(x, y, w, h)
-  // Corrugations: vertical ribs on the front and the side, and a darker frame rail top and bottom.
+  // Corrugated ribs: light and dark pairs across the side, short of the door end.
+  const ribs = Math.max(6, Math.round((w - door) / 5))
+  const step = (w - door) / ribs
+  const lit = gold ? 'rgb(255 251 232 / 55%)' : shade(colour, 0.2)
+  const dark = gold ? 'rgb(120 76 18 / 35%)' : shade(colour, -0.16)
+  for (let i = 0; i < ribs; i++) {
+    const rx = x + i * step
+    g.fillStyle = lit
+    g.fillRect(rx + step * 0.15, y + rail, Math.max(0.8, step * 0.22), h - 2 * rail)
+    g.fillStyle = dark
+    g.fillRect(rx + step * 0.62, y + rail, Math.max(0.8, step * 0.22), h - 2 * rail)
+  }
+  // Door end: a panel with two vertical locking bars and their handles.
+  const dxp = x + w - door
+  g.fillStyle = gold ? 'rgb(120 76 18 / 18%)' : shade(colour, -0.06)
+  g.fillRect(dxp, y + rail, door, h - 2 * rail)
+  g.strokeStyle = gold ? C['gold-deep'] : shade(colour, -0.42)
   g.lineWidth = 1
-  g.strokeStyle = shade(p.colour, -0.14)
   g.beginPath()
-  const ribs = Math.max(5, Math.round(w / 7))
-  for (let i = 1; i < ribs; i++) {
-    const rx = Math.round(x + (i * w) / ribs) + 0.5
-    g.moveTo(rx, y + 3)
-    g.lineTo(rx, y + h - 3)
+  g.moveTo(Math.round(dxp) + 0.5, y + rail)
+  g.lineTo(Math.round(dxp) + 0.5, y + h - rail)
+  for (const f of [0.35, 0.72]) {
+    const bx = Math.round(dxp + door * f) + 0.5
+    g.moveTo(bx, y + rail)
+    g.lineTo(bx, y + h - rail)
   }
   g.stroke()
-  g.strokeStyle = shade(p.colour, -0.42)
-  g.beginPath()
-  for (let i = 1; i < 4; i++) {
-    const sx = x + w + (i * dx) / 4
-    const sy = y - (i * dy) / 4
-    g.moveTo(sx, sy + 2)
-    g.lineTo(sx, sy + h - 2)
+  g.fillStyle = g.strokeStyle
+  for (const f of [0.35, 0.72]) g.fillRect(dxp + door * f - 1.2, y + h * 0.52, 3, Math.max(1.5, h * 0.08))
+  // Top and bottom rails.
+  g.fillStyle = gold ? C['gold-deep'] : shade(colour, -0.28)
+  g.fillRect(x, y, w, rail)
+  g.fillRect(x, y + h - rail, w, rail)
+  // Four corner castings.
+  const cs = Math.max(2, Math.min(5, h * 0.17))
+  g.fillStyle = C.casting
+  for (const [cx, cy] of [
+    [x, y],
+    [x + w - cs, y],
+    [x, y + h - cs],
+    [x + w - cs, y + h - cs],
+  ] as const)
+    g.fillRect(cx, cy, cs, cs)
+}
+
+/** One container: a side-on 20 ft box with its big number, badges and urgency cues. */
+function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): void {
+  g.save()
+  if (p.squash && (p.squash.sx !== 1 || p.squash.sy !== 1)) {
+    // Squash about the bottom centre, so the box stays on what it landed on.
+    const cx = b.x + (b.w + b.dx) / 2
+    g.translate(cx, b.y + b.h)
+    g.scale(p.squash.sx, p.squash.sy)
+    g.translate(-cx, -(b.y + b.h))
   }
-  g.stroke()
-  g.fillStyle = shade(p.colour, -0.2)
-  g.fillRect(x, y, w, Math.max(2, h * 0.07))
-  g.fillRect(x, y + h - Math.max(2, h * 0.07), w, Math.max(2, h * 0.07))
-  if (p.glint) {
-    const flash = Math.pow(0.5 + 0.5 * Math.sin(now * 0.004 + p.seed), 6)
-    if (flash > 0.02) {
-      g.fillStyle = `rgb(255 244 200 / ${Math.round(flash * 55)}%)`
-      g.fillRect(x, y, w, h)
+  const { x, y, w, h } = b
+  // A soft halo under the box: gold for a bonus (stronger while its window is open), mint for the calm current box.
+  const glowPulse = p.still ? 0.6 : pulse(now, 1200, p.seed)
+  if (p.bonus || p.glow) {
+    g.save()
+    g.shadowColor = p.bonus ? `rgb(255 205 80 / ${p.window != null ? 95 : 60}%)` : `rgb(255 255 255 / ${Math.round(45 + 45 * glowPulse)}%)`
+    g.shadowBlur = p.bonus ? (p.window != null ? 16 + 8 * glowPulse : 9) : 8 + 8 * glowPulse
+    g.fillStyle = C.outline
+    outline(g, b)
+    g.fill()
+    g.restore()
+  }
+  const gold = p.bonus || (p.miss != null && p.miss < 1)
+  containerSide(g, b, p.colour, false)
+  if (gold) {
+    // Gold over the box's own colour; a missed bonus fades it out.
+    g.save()
+    g.globalAlpha = p.bonus ? 1 : 1 - (p.miss ?? 1)
+    containerSide(g, b, p.colour, true)
+    g.restore()
+    // The sequence colour runs along the bottom rail, so the order still reads on gold.
+    if (p.bonus) {
+      g.fillStyle = p.colour
+      g.fillRect(x + w * 0.08, y + h - Math.max(2.5, h * 0.12), w * 0.66, Math.max(2.5, h * 0.12))
+    }
+  }
+  if (p.bonus && p.glint && !p.still) {
+    // Shine sweep: a slanted light band crossing the box every 1.6 s.
+    const s = shineAt(now, p.seed)
+    if (s !== null) {
+      g.save()
+      g.beginPath()
+      g.rect(x, y, w, h)
+      g.clip()
+      const sx = x - h + (w + 2 * h) * s
+      const grad = g.createLinearGradient(sx - h * 0.6, 0, sx + h * 0.6, 0)
+      grad.addColorStop(0, 'rgb(255 255 255 / 0%)')
+      grad.addColorStop(0.5, 'rgb(255 255 255 / 75%)')
+      grad.addColorStop(1, 'rgb(255 255 255 / 0%)')
+      g.fillStyle = grad
+      g.beginPath()
+      g.moveTo(sx - h * 0.6, y + h)
+      g.lineTo(sx, y)
+      g.lineTo(sx + h * 0.6, y)
+      g.lineTo(sx, y + h)
+      g.closePath()
+      g.fill()
+      g.restore()
     }
   }
   // Outline over every face.
   g.lineJoin = 'round'
-  g.lineWidth = 1.6
+  g.lineWidth = 1.4
   g.strokeStyle = C.outline
   outline(g, b)
   g.stroke()
   g.beginPath()
   g.moveTo(x, y)
   g.lineTo(x + w, y)
-  g.lineTo(x + w + dx, y - dy)
+  g.lineTo(x + w + b.dx, y - b.dy)
   g.moveTo(x + w, y)
   g.lineTo(x + w, y + h)
   g.stroke()
-  // The big dark number on the front face.
-  const size = Math.round(Math.min(h * 0.64, w * 0.5))
-  g.fillStyle = C['number-ink']
+  // The big dark number on the side, with a light halo so it reads on every colour at phone size.
+  const size = Math.round(Math.min(h * 0.74, w * 0.36))
+  const nx = x + (w * 0.83) / 2
+  const ny = y + h / 2 + size * 0.04
   g.font = `900 ${size}px system-ui, sans-serif`
   g.textAlign = 'center'
   g.textBaseline = 'middle'
-  g.fillText(p.label, x + w / 2, y + h / 2 + size * 0.04)
-  if (p.bonus) {
-    const r = Math.max(5, Math.min(h * 0.22, w * 0.15))
-    medallion(g, x + r + 3, y + r + 3, r)
-  }
+  g.lineWidth = Math.max(2, size * 0.16)
+  g.strokeStyle = 'rgb(255 255 255 / 55%)'
+  g.strokeText(p.label, nx, ny)
+  g.fillStyle = C['number-ink']
+  g.fillText(p.label, nx, ny)
   if (p.heavy) {
-    const s = Math.max(9, Math.min(h * 0.36, w * 0.24))
-    heavyTile(g, x + w - s - 3, y + h - s - 3, s)
+    const s = Math.max(9, Math.min(h * 0.5, w * 0.18))
+    heavyTile(g, x + w * 0.83 - s - 2, y + (h - s) / 2, s)
   }
-  if (p.urgent) {
+  if (p.bonus) {
+    // Sparkles on the gold (faster while the bonus window is open).
+    if (p.glint && !p.still) {
+      g.fillStyle = C['gold-shine']
+      for (const sp of sparkles(now, p.seed, p.window != null)) {
+        if (sp.s < 0.05) continue
+        star(g, x + sp.u * w, y + sp.v * h, 1.5 + 3.5 * sp.s, 4, 0.3)
+        g.fill()
+      }
+    }
+    // The star badge bounces on the top-left corner.
+    const r = Math.max(6, Math.min(h * 0.36, 10))
+    const bounce = p.glint && !p.still ? -3 * Math.abs(Math.sin(now * 0.005 + p.seed)) : 0
+    const bx = p.exposed ? x + r * 0.7 : x + r + 2
+    const by = p.exposed ? y - r * 0.35 + bounce : y + h / 2
+    medallion(g, bx, by, r)
+    if (p.window != null) {
+      // The bonus window's countdown ring round the badge.
+      g.lineCap = 'round'
+      g.lineWidth = 3
+      g.strokeStyle = 'rgb(255 255 255 / 45%)'
+      g.beginPath()
+      g.arc(bx, by, r + 3.5, 0, Math.PI * 2)
+      g.stroke()
+      g.strokeStyle = C['gold-shine']
+      g.beginPath()
+      g.arc(bx, by, r + 3.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, Math.min(1, p.window)))
+      g.stroke()
+      g.lineCap = 'butt'
+    }
+  }
+  if (p.glow && !p.red && !p.selected) {
+    // The calm current container: a soft breathing white outline.
+    g.lineWidth = 2
+    g.strokeStyle = `rgb(255 255 255 / ${Math.round(45 + 50 * glowPulse)}%)`
+    outline(g, b)
+    g.stroke()
+  }
+  if (p.red) {
     g.lineWidth = 3
-    g.strokeStyle = C.urgent
+    g.strokeStyle = p.still ? C.urgent : `rgb(233 72 61 / ${Math.round(45 + 55 * pulse(now, 360, p.seed))}%)`
     outline(g, b)
     g.stroke()
   }
@@ -212,65 +358,66 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
 function shadow(g: CanvasRenderingContext2D, b: Box, groundY: number, strength = 0.22): void {
   g.fillStyle = `rgb(20 30 36 / ${Math.round(strength * 100)}%)`
   g.beginPath()
-  g.ellipse(b.x + (b.w + b.dx) / 2, groundY - b.dy * 0.4, (b.w + b.dx) * 0.55, Math.max(3, b.dy * 0.7), 0, 0, Math.PI * 2)
+  g.ellipse(b.x + (b.w + b.dx) / 2, groundY - 1, (b.w + b.dx) * 0.55, Math.max(2.5, b.h * 0.14), 0, 0, Math.PI * 2)
   g.fill()
 }
 
+/** A puff of dust at the feet of a landed box. */
+function dust(g: CanvasRenderingContext2D, b: Box, t: number): void {
+  g.fillStyle = `rgb(239 231 214 / ${Math.round((1 - t) * 80)}%)`
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const ox = side * (b.w * 0.45 + t * (10 + i * 6))
+      g.beginPath()
+      g.arc(b.x + b.w / 2 + ox, b.y + b.h - 2 - i * 2 - t * 4, 2 + t * (3 + i), 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+}
+
+/** A grey poof where a missed bonus lost its gold. */
+function poof(g: CanvasRenderingContext2D, b: Box, t: number): void {
+  g.fillStyle = `rgb(239 231 214 / ${Math.round((1 - t) * 85)}%)`
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2
+    g.beginPath()
+    g.arc(b.x + 8 + Math.cos(a) * t * 12, b.y - 2 + Math.sin(a) * t * 9, 3 + t * 5, 0, Math.PI * 2)
+    g.fill()
+  }
+}
+
+/** Quiet harbour backdrop: sky, faint distant crane silhouettes on a hazy horizon, and the quay band. */
 function backdrop(g: CanvasRenderingContext2D, r: Rect, seed: number): void {
-  const horizon = r.y + r.h * 0.42
-  const sky = g.createLinearGradient(0, r.y, 0, horizon)
+  const sky = g.createLinearGradient(0, r.y, 0, r.y + r.h)
   sky.addColorStop(0, C['sky-top'])
-  sky.addColorStop(1, C['sky-low'])
+  sky.addColorStop(0.75, C['sky-low'])
   g.fillStyle = sky
-  g.fillRect(r.x, r.y, r.w, horizon - r.y)
-  const water = g.createLinearGradient(0, horizon, 0, r.y + r.h)
-  water.addColorStop(0, C.water)
-  water.addColorStop(1, C['water-deep'])
-  g.fillStyle = water
+  g.fillRect(r.x, r.y, r.w, r.h)
+  const horizon = r.y + r.h * 0.78
+  g.fillStyle = C['sky-haze']
   g.fillRect(r.x, horizon, r.w, r.y + r.h - horizon)
-  // Distant ship-to-shore cranes: an A-frame with a boom reaching over the water.
+  // Distant ship-to-shore cranes, faint so nothing reads as a game object.
+  g.save()
+  g.globalAlpha = 0.28
   g.strokeStyle = C.distant
-  g.lineWidth = 2
-  const craneH = (horizon - r.y) * 0.92
+  g.lineWidth = 1.5
+  const craneH = (horizon - r.y) * 0.7
   for (let i = 0; i < 4; i++) {
-    const cx = r.x + r.w * (0.12 + i * 0.26) + ((seed * 7 + i * 13) % 9)
+    const cx = r.x + r.w * (0.1 + i * 0.26) + ((seed * 7 + i * 13) % 9)
     const top = horizon - craneH
     g.beginPath()
-    g.moveTo(cx - 6, horizon)
+    g.moveTo(cx - 5, horizon)
     g.lineTo(cx - 2, top)
-    g.moveTo(cx + 6, horizon)
+    g.moveTo(cx + 5, horizon)
     g.lineTo(cx + 2, top)
-    g.moveTo(cx - 14, top + craneH * 0.25)
-    g.lineTo(cx + 26, top + craneH * 0.25)
+    g.moveTo(cx - 12, top + craneH * 0.3)
+    g.lineTo(cx + 22, top + craneH * 0.3)
     g.moveTo(cx - 2, top)
-    g.lineTo(cx + 24, top + craneH * 0.25)
+    g.lineTo(cx + 20, top + craneH * 0.3)
     g.stroke()
   }
-  // A ship at the berth, deck loaded with a row of small boxes.
-  const shipW = r.w * 0.62
-  const sx = r.x + r.w * 0.2
-  const deck = horizon + (r.y + r.h - horizon) * 0.42
-  const hullH = Math.max(6, (r.y + r.h - horizon) * 0.32)
-  g.fillStyle = C.hull
-  g.beginPath()
-  g.moveTo(sx, deck)
-  g.lineTo(sx + shipW, deck)
-  g.lineTo(sx + shipW - hullH * 1.4, deck + hullH)
-  g.lineTo(sx + hullH * 0.4, deck + hullH)
-  g.closePath()
-  g.fill()
-  g.fillStyle = C['hull-stripe']
-  g.fillRect(sx + hullH * 0.5, deck + hullH * 0.62, shipW - hullH * 2, Math.max(1.5, hullH * 0.12))
-  const cw = Math.max(6, shipW / 14)
-  const ch = Math.max(4, hullH * 0.7)
-  const tones = [C['hull-stripe'], C['sky-low'], C.distant, C['cab-orange']]
-  for (let i = 0; i < 11; i++) {
-    g.fillStyle = tones[(i * 3 + seed) % tones.length]!
-    g.fillRect(sx + cw * 1.2 + i * cw * 1.05, deck - ch, cw, ch)
-  }
-  g.fillStyle = C['sky-low']
-  g.fillRect(sx + shipW * 0.06, deck - ch * 2.2, cw * 1.2, ch * 2.2)
-  // The quay edge between water and yard.
+  g.restore()
+  // The quay edge between the backdrop and the yard.
   g.fillStyle = C.quay
   g.fillRect(r.x, r.y + r.h - 4, r.w, 4)
 }
@@ -297,15 +444,10 @@ function floor(g: CanvasRenderingContext2D, geo: YardGeometry): void {
 function slots(g: CanvasRenderingContext2D, boxes: Box[]): void {
   g.save()
   g.setLineDash([4, 3])
-  g.lineWidth = 1.2
+  g.lineWidth = 1.1
   g.strokeStyle = C['slot-line']
   for (const b of boxes) {
     outline(g, b)
-    g.stroke()
-    g.beginPath()
-    g.moveTo(b.x, b.y)
-    g.lineTo(b.x + b.w, b.y)
-    g.lineTo(b.x + b.w + b.dx, b.y - b.dy)
     g.stroke()
   }
   g.restore()
@@ -325,7 +467,8 @@ function ghost(g: CanvasRenderingContext2D, b: Box): void {
   g.restore()
 }
 
-function bay(g: CanvasRenderingContext2D, r: Rect, fill: string, line: string): void {
+/** A truck bay: painted floor, dashed edge, a lane line and the painted parking stall where a truck stands. */
+function bay(g: CanvasRenderingContext2D, r: Rect, fill: string, line: string, stall: Rect): void {
   g.fillStyle = fill
   g.beginPath()
   g.roundRect(r.x, r.y, r.w, r.h, 6)
@@ -337,52 +480,136 @@ function bay(g: CanvasRenderingContext2D, r: Rect, fill: string, line: string): 
   g.beginPath()
   g.roundRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6, 4)
   g.stroke()
-  // Lane markings across the bay.
-  g.globalAlpha = 0.35
+  g.setLineDash([])
+  // The stall: painted corner marks and a stop line, so an empty bay still reads as a truck bay.
+  g.globalAlpha = 0.55
+  g.lineWidth = 2
+  const m = 8
   g.beginPath()
-  const ly = Math.round(r.y + r.h * 0.42) + 0.5
-  g.moveTo(r.x + 10, ly)
-  g.lineTo(r.x + r.w - 10, ly)
+  for (const [cx, cy, sx, sy] of [
+    [stall.x, stall.y, 1, 1],
+    [stall.x + stall.w, stall.y, -1, 1],
+    [stall.x, stall.y + stall.h, 1, -1],
+    [stall.x + stall.w, stall.y + stall.h, -1, -1],
+  ] as const) {
+    g.moveTo(cx + sx * m, cy)
+    g.lineTo(cx, cy)
+    g.lineTo(cx, cy + sy * m)
+  }
   g.stroke()
   g.restore()
 }
 
-function truck(g: CanvasRenderingContext2D, t: Truck, cabColour: string): void {
-  const { bed, cab, wheelR } = t
+function wheel(g: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  g.fillStyle = C.wheel
+  g.beginPath()
+  g.arc(x, y, r, 0, Math.PI * 2)
+  g.fill()
+  g.fillStyle = C.hub
+  g.beginPath()
+  g.arc(x, y, r * 0.5, 0, Math.PI * 2)
+  g.fill()
   g.fillStyle = C.chassis
-  g.fillRect(bed.x, bed.y, bed.w, bed.h)
-  g.fillRect(bed.x, bed.y + bed.h, cab.x - bed.x, Math.max(2, bed.h * 0.5))
-  // Cab: body with a sloped windscreen and a glass window.
+  g.beginPath()
+  g.arc(x, y, r * 0.18, 0, Math.PI * 2)
+  g.fill()
+}
+
+/**
+ * An illustrated side-view truck, drawn facing right (a left-facing truck is the same drawing mirrored about its bay):
+ * cab with a rounded roof, windscreen and side window, grille, headlight, bumper, exhaust stack and mudguards; a
+ * skeletal trailer with twist-lock posts; two trailer axles and the cab axle; a soft shadow on the road.
+ */
+function truck(g: CanvasRenderingContext2D, t: Truck, cabColour: string, stripe: string): void {
+  const { cab, trailer, wheelR } = t
+  // Shadow on the road.
+  g.fillStyle = 'rgb(10 16 20 / 28%)'
+  g.beginPath()
+  g.ellipse(trailer.x + (cab.x + cab.w - trailer.x) / 2, t.groundY, (cab.x + cab.w - trailer.x) / 2 + 4, Math.max(2.5, wheelR * 0.45), 0, 0, Math.PI * 2)
+  g.fill()
+  // Trailer: a beam with a gooseneck up to the fifth wheel, cross members and twist-lock posts at each end.
+  g.fillStyle = C.chassis
+  g.fillRect(trailer.x, trailer.y, trailer.w, trailer.h)
+  g.fillRect(trailer.x + trailer.w - 2, trailer.y + trailer.h * 0.3, cab.x - trailer.x - trailer.w + cab.w * 0.5, trailer.h * 0.9)
+  const post = Math.max(2, trailer.h * 0.7)
+  g.fillStyle = C['gantry-dark']
+  for (const px of [trailer.x + 2, trailer.x + trailer.w - 2 - post]) g.fillRect(px, trailer.y - post * 0.8, post, post * 0.8)
+  // Mudguards over the trailer wheels.
+  const rearWheels = t.wheels.slice(1)
+  g.fillStyle = C.chassis
+  const mx = Math.min(...rearWheels.map((w) => w.x)) - wheelR * 1.2
+  const mw = Math.max(...rearWheels.map((w) => w.x)) - mx + wheelR * 1.2
+  g.beginPath()
+  g.roundRect(mx, trailer.y + trailer.h, mw, wheelR * 0.5, [wheelR * 0.5, wheelR * 0.5, 0, 0])
+  g.fill()
+  // Cab body: square back, rounded roof over the front, a short bonnet line.
+  const { x, y, w, h } = cab
+  const roofR = Math.min(w * 0.35, h * 0.35)
+  // Exhaust stack behind the cab.
+  g.fillStyle = C.hub
+  g.fillRect(x - 3, y - h * 0.12, 2.5, h * 0.7)
   g.fillStyle = cabColour
   g.strokeStyle = C.outline
-  g.lineWidth = 1.5
+  g.lineWidth = 1.4
   g.beginPath()
-  g.moveTo(cab.x, cab.y + cab.h)
-  g.lineTo(cab.x, cab.y)
-  g.lineTo(cab.x + cab.w * 0.55, cab.y)
-  g.lineTo(cab.x + cab.w, cab.y + cab.h * 0.5)
-  g.lineTo(cab.x + cab.w, cab.y + cab.h)
+  g.moveTo(x, y + h)
+  g.lineTo(x, y + roofR * 0.3)
+  g.quadraticCurveTo(x, y, x + roofR * 0.3, y)
+  g.lineTo(x + w - roofR, y)
+  g.quadraticCurveTo(x + w, y, x + w, y + roofR)
+  g.lineTo(x + w, y + h)
   g.closePath()
   g.fill()
   g.stroke()
+  // Livery stripe along the cab.
+  g.fillStyle = stripe
+  g.fillRect(x + 1, y + h * 0.62, w - 2, Math.max(2, h * 0.08))
+  // Side window and windscreen.
   g.fillStyle = C.glass
   g.beginPath()
-  g.moveTo(cab.x + cab.w * 0.3, cab.y + cab.h * 0.14)
-  g.lineTo(cab.x + cab.w * 0.55, cab.y + cab.h * 0.14)
-  g.lineTo(cab.x + cab.w * 0.86, cab.y + cab.h * 0.48)
-  g.lineTo(cab.x + cab.w * 0.3, cab.y + cab.h * 0.48)
+  g.roundRect(x + w * 0.18, y + h * 0.14, w * 0.36, h * 0.3, 2)
+  g.fill()
+  g.beginPath()
+  g.moveTo(x + w * 0.62, y + h * 0.14)
+  g.lineTo(x + w - roofR * 0.6, y + h * 0.14)
+  g.quadraticCurveTo(x + w - 2, y + h * 0.16, x + w - 2, y + h * 0.36)
+  g.lineTo(x + w - 2, y + h * 0.44)
+  g.lineTo(x + w * 0.62, y + h * 0.44)
   g.closePath()
   g.fill()
-  for (const w of t.wheels) {
-    g.fillStyle = C.wheel
-    g.beginPath()
-    g.arc(w.x, w.y, wheelR, 0, Math.PI * 2)
-    g.fill()
-    g.fillStyle = C.distant
-    g.beginPath()
-    g.arc(w.x, w.y, wheelR * 0.4, 0, Math.PI * 2)
-    g.fill()
+  g.fillStyle = 'rgb(255 255 255 / 45%)'
+  g.fillRect(x + w * 0.66, y + h * 0.17, w * 0.06, h * 0.22)
+  // Door handle and the grille, headlight and bumper at the front.
+  g.fillStyle = C.outline
+  g.fillRect(x + w * 0.42, y + h * 0.52, w * 0.1, 1.5)
+  g.fillStyle = C.chassis
+  g.fillRect(x + w - 3.5, y + h * 0.5, 3.5, h * 0.3)
+  g.fillStyle = C.headlight
+  g.beginPath()
+  g.roundRect(x + w - 4, y + h * 0.7, 4, Math.max(2, h * 0.08), 1)
+  g.fill()
+  g.fillStyle = C.chassis
+  g.fillRect(x + w - 2, y + h * 0.86, 4, h * 0.14)
+  // Cab mudguard.
+  const cw = t.wheels[0]!
+  g.beginPath()
+  g.arc(cw.x, cw.y, wheelR * 1.3, Math.PI, 0)
+  g.fillStyle = C.chassis
+  g.fill()
+  for (const wh of t.wheels) wheel(g, wh.x, wh.y, wheelR)
+}
+
+/** Draw a truck facing `t.facing`: mirrored about the bay centre for a left-facing one. */
+function truckFacing(g: CanvasRenderingContext2D, bayRect: Rect, geo: YardGeometry, facing: 'left' | 'right', cab: string, stripe: string): void {
+  g.save()
+  if (facing === 'left') {
+    const cx = bayRect.x + bayRect.w / 2
+    g.translate(cx, 0)
+    g.scale(-1, 1)
+    g.translate(-cx, 0)
   }
+  truck(g, truckIn(bayRect, geo, 'right'), cab, stripe)
+  g.restore()
 }
 
 function gantryFrame(g: CanvasRenderingContext2D, geo: YardGeometry): void {
@@ -418,33 +645,84 @@ function gantryFrame(g: CanvasRenderingContext2D, geo: YardGeometry): void {
   g.stroke()
 }
 
-function trolley(g: CanvasRenderingContext2D, geo: YardGeometry, x: number, hookY: number): void {
+/** The trolley on the beam, its hoist cables, and the spreader that grabs a box at `hookY` (the box's top face). */
+function trolley(g: CanvasRenderingContext2D, geo: YardGeometry, x: number, hookY: number, gripping: boolean): void {
   const { beamY, beamH } = geo.gantry
-  const w = Math.max(22, geo.boxW * 0.55)
-  const h = beamH + 6
+  const tw = Math.max(22, geo.boxW * 0.5)
+  const sw = geo.boxW + geo.dx
   g.strokeStyle = C.cable
-  g.lineWidth = 1.5
+  g.lineWidth = 1.2
   g.beginPath()
-  g.moveTo(x - w * 0.25, beamY + beamH)
-  g.lineTo(x - w * 0.25, hookY)
-  g.moveTo(x + w * 0.25, beamY + beamH)
-  g.lineTo(x + w * 0.25, hookY)
+  for (const f of [-0.3, -0.1, 0.1, 0.3]) {
+    g.moveTo(x + tw * f, beamY + beamH)
+    g.lineTo(x + sw * f * 1.2, hookY - 5)
+  }
   g.stroke()
-  g.fillStyle = C.cable
-  g.fillRect(x - w * 0.42, hookY - 3, w * 0.84, 3)
+  // Spreader: a frame as long as the box, with twist-lock legs that drop onto the corner castings when it grips.
   g.fillStyle = C.trolley
   g.strokeStyle = C.outline
+  g.lineWidth = 1.2
   g.beginPath()
-  g.roundRect(x - w / 2, beamY - 3, w, h, 3)
+  g.roundRect(x - sw / 2, hookY - 5, sw, 4, 1.5)
+  g.fill()
+  g.stroke()
+  g.fillStyle = C.outline
+  const leg = gripping ? 4 : 2
+  for (const f of [-0.5, 0.5]) g.fillRect(x + sw * f - (f < 0 ? 0 : 3), hookY - 1, 3, leg)
+  // Trolley on the beam.
+  g.fillStyle = C.trolley
+  g.beginPath()
+  g.roundRect(x - tw / 2, beamY - 3, tw, beamH + 6, 3)
   g.fill()
   g.stroke()
 }
 
-export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Ref<ViewModel>, move: Ref<CraneMove | null>) {
+export interface YardCanvasOptions {
+  /** Reduced motion: every cue static, no effects. */
+  reducedMotion?: () => boolean
+  /** Subscribe to engine events and refused moves (the store's `onYardEvent`); returns an unsubscribe function. */
+  subscribe?: (listener: (e: YardFxEvent) => void) => () => void
+}
+
+export function useYardCanvas(
+  canvasRef: Ref<HTMLCanvasElement | null>,
+  view: Ref<ViewModel>,
+  move: Ref<CraneMove | null>,
+  options: YardCanvasOptions = {},
+) {
   /** Trolley x at rest: where the last move ended (null: over the yard centre). */
   let restX: number | null = null
   let layoutKey = ''
   let pending = 0
+  /** Effects in flight. */
+  let fx: Fx[] = []
+  /** What the crane carried on the last frame of a move, for the landing and the collection truck's drive-off. */
+  let carried: { label: string; colour: string; bonus: boolean } | null = null
+  const still = () => options.reducedMotion?.() ?? false
+
+  function addFx(e: Fx): void {
+    if (still()) return
+    fx = [...liveFx(fx, e.at), e]
+  }
+
+  function onYardEvent(e: YardFxEvent): void {
+    const now = performance.now()
+    if (e.type === 'bonus-awarded') addFx({ kind: 'bonus', at: now })
+    else if (e.type === 'bonus-missed') addFx({ kind: 'bonus-miss', at: now, id: e.id })
+    else if (e.type === 'rejected') {
+      const a = e.action
+      const target: HitTarget | null =
+        a.type === 'receive'
+          ? { kind: 'receipt' }
+          : a.type === 'rehandle'
+            ? { kind: 'stack', index: a.from }
+            : a.type === 'collect' && a.from !== undefined
+              ? { kind: 'stack', index: a.from }
+              : null
+      if (target) addFx({ kind: 'reject', at: now, target })
+    }
+    render()
+  }
 
   function draw(now: number): boolean {
     const canvas = canvasRef.value
@@ -469,7 +747,9 @@ export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Re
     }
     const geo = yardGeometry(layout, vm.capacity)
     const m = move.value
-    let animated = false
+    const reduced = still()
+    fx = liveFx(fx, now)
+    let animated = fx.length > 0
 
     backdrop(g, geo.backdrop, layout.columns.length)
     floor(g, geo)
@@ -484,24 +764,32 @@ export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Re
     // Yard captions over the quay edge.
     g.font = '800 11px system-ui, sans-serif'
     g.textBaseline = 'alphabetic'
-    g.fillStyle = C.rim
-    g.shadowColor = 'rgb(0 0 0 / 45%)'
-    g.shadowBlur = 3
+    g.fillStyle = C['yard-text']
     g.textAlign = 'left'
     g.fillText('YARD 01', geo.backdrop.x + 8, geo.floor.y - 8)
     g.textAlign = 'right'
     const free = freeSlots(vm.capacity, layout.columns.length, vm.containers.length)
     g.fillText(`${free} FREE SLOT${free === 1 ? '' : 'S'}`, geo.backdrop.x + geo.backdrop.w - 8, geo.floor.y - 8)
-    g.shadowBlur = 0
 
     // Bays and trucks.
     const urgentBay = vm.incoming.status === 'mandatory'
-    bay(g, layout.collection, C['collection-bay'], C['collection-line'])
-    bay(g, layout.receipt, urgentBay ? C['receipt-urgent'] : C['receipt-bay'], urgentBay ? C.urgent : C['receipt-line'])
-    const collectTruck = truckIn(layout.collection, geo)
-    const receiptTruck = truckIn(layout.receipt, geo)
-    truck(g, collectTruck, C['cab-white'])
-    if (vm.receiptCargo) truck(g, receiptTruck, C['cab-orange'])
+    const collectTruck = truckIn(layout.collection, geo, 'left')
+    const receiptTruck = truckIn(layout.receipt, geo, 'right')
+    const stall = (t: Truck): Rect => ({ x: Math.min(t.cab.x, t.trailer.x) - 4, y: t.cab.y - 4, w: t.cab.w + t.trailer.w + 11, h: t.groundY - t.cab.y + 6 })
+    bay(g, layout.collection, C['collection-bay'], C['collection-line'], stall(collectTruck))
+    bay(g, layout.receipt, urgentBay ? C['receipt-urgent'] : C['receipt-bay'], urgentBay ? C.urgent : C['receipt-line'], stall(receiptTruck))
+    // The collection truck: bounces when it takes a box, drives off with it and comes back empty.
+    const collecting = fx.find((f): f is Extract<Fx, { kind: 'collect' }> => f.kind === 'collect')
+    const motion = collecting ? collectMotion(fxProgress(collecting, now), layout.collection.w) : { x: 0, y: 0, carrying: false }
+    g.save()
+    g.beginPath()
+    g.roundRect(layout.collection.x, layout.collection.y, layout.collection.w, layout.collection.h, 6)
+    g.clip()
+    g.translate(motion.x, motion.y)
+    truckFacing(g, layout.collection, geo, 'left', C['cab-white'], C['cab-teal'])
+    if (collecting && motion.carrying) container(g, collectTruck.cargo, { ...collecting, heavy: false, seed: 1 }, now)
+    g.restore()
+    if (vm.receiptCargo) truckFacing(g, layout.receipt, geo, 'right', C['cab-orange'], C['gantry-dark'])
 
     // Which container rides the crane: the top of its source stack, or the receipt cargo.
     const stackHeight = (i: number) => vm.containers.filter((c) => c.stack === i).length
@@ -511,7 +799,36 @@ export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Re
         : null
     const movingCargo = m && m.from === RECEIPT_TRUCK ? vm.receiptCargo : null
 
-    // Resting containers, left to right and bottom up (each side face stays inside its own column).
+    // Effects keyed to a target: the landing squash on a stack top, the reject shake, the missed-bonus fade.
+    const fxFor = (target: HitTarget, kind: 'land' | 'reject') =>
+      fx.find((f) => f.kind === kind && f.target.kind === target.kind && (target.kind !== 'stack' || (f.target.kind === 'stack' && f.target.index === target.index)))
+    const missFor = (id: number) => fx.find((f): f is Extract<Fx, { kind: 'bonus-miss' }> => f.kind === 'bonus-miss' && f.id === id)
+    const windowFor = (id: number) => (vm.bonus && vm.bonus.id === id ? vm.bonus.fraction : null)
+
+    /** Paint and offset of a resting container from its urgency, effects and the bonus window. */
+    function dressed(c: { id: number; shake: number; urgent: boolean; bonus: boolean }, current: boolean, target: HitTarget, top: boolean) {
+      const u = urgencyStyle(c, current, reduced)
+      const reject = top ? fxFor(target, 'reject') : undefined
+      const land = top ? fxFor(target, 'land') : undefined
+      const miss = missFor(c.id)
+      const rt = reject ? fxProgress(reject, now) : 0
+      if (u.vibrate > 0 || (u.glow && !reduced) || (u.red && !reduced)) animated = true
+      return {
+        dx: vibrateX(u.vibrate, now, c.id) + rejectX(rt),
+        paint: {
+          red: u.red || (reject !== undefined && rt < 1),
+          glow: u.glow,
+          window: windowFor(c.id),
+          miss: miss ? fxProgress(miss, now) : null,
+          squash: land ? squash(fxProgress(land, now)) : undefined,
+          still: reduced,
+        },
+        land,
+        miss,
+      }
+    }
+
+    // Resting containers, left to right and bottom up.
     layout.columns.forEach((_, i) => {
       if (stackHeight(i) > 0 && moving?.stack !== i) shadow(g, boxAt(geo, layout, i, 0), geo.groundY)
       else if (stackHeight(i) > 1) shadow(g, boxAt(geo, layout, i, 0), geo.groundY)
@@ -519,30 +836,38 @@ export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Re
     for (const c of vm.containers) {
       if (c === moving) continue
       const lift = c.selected && !m ? geo.lift : 0
-      const s = shakeOffset(c.shake, now, c.id)
-      if (c.shake > 0 || c.glint) animated = true
-      container(g, moveBox(boxAt(geo, layout, c.stack, c.tier, lift), s.x, s.y), { ...c, seed: c.id }, now)
+      const top = c.tier === stackHeight(c.stack) - 1
+      const d = dressed(c, c.next, { kind: 'stack', index: c.stack }, top)
+      if (c.glint) animated = true
+      const b = moveBox(boxAt(geo, layout, c.stack, c.tier, lift), d.dx, 0)
+      container(g, b, { ...c, ...d.paint, exposed: top, seed: c.id }, now)
+      if (d.land) dust(g, b, fxProgress(d.land, now))
+      if (d.miss) poof(g, b, fxProgress(d.miss, now))
     }
     if (vm.receiptCargo && !movingCargo) {
       const c = vm.receiptCargo
-      const s = shakeOffset(c.shake, now, c.id)
-      if (c.shake > 0) animated = true
+      const d = dressed(c, c.shake > 0 || c.urgent, { kind: 'receipt' }, true)
       const lift = c.selected ? geo.lift * 0.6 : 0
-      container(g, moveBox(receiptTruck.cargo, s.x, s.y - lift), { ...c, colour: C['cab-orange'], seed: c.id }, now)
+      const b = moveBox(receiptTruck.cargo, d.dx, -lift)
+      if (c.bonus && !reduced) animated = true
+      container(g, b, { ...c, ...d.paint, colour: C['cab-orange'], glint: c.bonus && !reduced, exposed: true, seed: c.id }, now)
+      if (d.miss) poof(g, b, fxProgress(d.miss, now))
     }
     // Ghost drop slots on every legal destination.
     if (!m) for (const to of vm.destinations) ghost(g, boxAt(geo, layout, to, stackHeight(to)))
 
     gantryFrame(g, geo)
 
-    // The crane: the trolley rests where the last move ended; a move animates hook and box.
+    // The crane: the trolley rests where the last move ended; a move animates hook, spreader and box.
     const yardMid = layout.yard.x + layout.yard.w / 2
     let hookX = restX ?? yardMid
     let hookY = geo.carryY - geo.dy
+    let gripping = false
     if (m && (moving || movingCargo)) {
       const paint: Paint = moving
-        ? { ...moving, selected: false, urgent: false, glint: false, seed: moving.id }
-        : { ...movingCargo!, colour: C['cab-orange'], selected: false, urgent: false, seed: movingCargo!.id }
+        ? { ...moving, selected: false, glint: false, exposed: true, seed: moving.id }
+        : { ...movingCargo!, colour: C['cab-orange'], selected: false, exposed: true, seed: movingCargo!.id }
+      carried = { label: paint.label, colour: paint.colour, bonus: paint.bonus }
       const src = moving ? boxAt(geo, layout, m.from, moving.tier) : receiptTruck.cargo
       const dst = m.to >= 0 ? boxAt(geo, layout, m.to, stackHeight(m.to)) : collectTruck.cargo
       const p = cranePhase(m.progress)
@@ -561,19 +886,47 @@ export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Re
         hookX = centreX(sized)
         box = p.carrying ? { ...sized, y } : src
         hookY = p.carrying ? y - sized.dy : y - src.dy
+        gripping = p.carrying
       }
       if (p.carrying || p.leg === 'release') shadow(g, { ...box, y: geo.groundY - box.h }, geo.groundY, 0.12)
       container(g, box, paint, now)
       if (m.progress >= 0.999) restX = centreX(dst)
     }
-    trolley(g, geo, hookX, hookY)
+    trolley(g, geo, hookX, hookY, gripping)
+
+    // The bonus collect: gold flash over the collection bay and a coin and star burst from the truck.
+    for (const f of fx) {
+      if (f.kind !== 'bonus') continue
+      const t = fxProgress(f, now)
+      const ox = centreX(collectTruck.cargo)
+      const oy = collectTruck.cargo.y
+      g.fillStyle = `rgb(255 218 117 / ${Math.round(Math.max(0, 1 - t * 2.5) * 40)}%)`
+      g.fillRect(layout.collection.x, layout.collection.y, layout.collection.w, layout.collection.h)
+      for (const p of burst(t, 16, Math.min(80, layout.collection.w * 0.45))) {
+        g.globalAlpha = p.alpha
+        if (p.star) {
+          g.fillStyle = C['gold-shine']
+          star(g, ox + p.x, oy + p.y, p.r * 1.6)
+          g.fill()
+        } else {
+          g.fillStyle = C['gold-body']
+          g.strokeStyle = C['gold-deep']
+          g.lineWidth = 1
+          g.beginPath()
+          g.ellipse(ox + p.x, oy + p.y, p.r, p.r * (0.5 + 0.5 * Math.abs(Math.cos(t * 12 + p.x))), 0, 0, Math.PI * 2)
+          g.fill()
+          g.stroke()
+        }
+      }
+      g.globalAlpha = 1
+    }
     return animated
   }
 
   function render(): void {
     if (pending) return
     const animated = draw(performance.now())
-    // Keep drawing only while something shakes or glints and nothing else drives a render.
+    // Keep drawing only while something animates and nothing else drives a render.
     if (animated) {
       pending = requestAnimationFrame(() => {
         pending = 0
@@ -583,16 +936,25 @@ export function useYardCanvas(canvasRef: Ref<HTMLCanvasElement | null>, view: Re
   }
 
   onMounted(render)
-  const stop = watch([view, move], () => {
+  const stop = watch([view, move], ([, m], [, prev]) => {
+    // A crane move ended: the box lands (squash and dust), or the collection truck takes it away.
+    if (prev && !m && carried) {
+      const now = performance.now()
+      if (prev.to >= 0) addFx({ kind: 'land', at: now, target: { kind: 'stack', index: prev.to } })
+      else addFx({ kind: 'collect', at: now, ...carried })
+      carried = null
+    }
     if (pending) {
       cancelAnimationFrame(pending)
       pending = 0
     }
     render()
   })
+  const unsubscribe = options.subscribe?.(onYardEvent)
 
   onBeforeUnmount(() => {
     stop()
+    unsubscribe?.()
     if (pending) cancelAnimationFrame(pending)
     pending = 0
   })

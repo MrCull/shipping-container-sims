@@ -45,11 +45,7 @@
   /* The 2D yard drawing (canvas), mirrored in modules/yardPalette.ts. */
   --ys-yard-sky-top: #a9c3cf;
   --ys-yard-sky-low: #dbe6e9;
-  --ys-yard-water: #3e6e89;
-  --ys-yard-water-deep: #2a5570;
   --ys-yard-distant: #6d8a9c;
-  --ys-yard-hull: #24394b;
-  --ys-yard-hull-stripe: #b5443b;
   --ys-yard-quay: #e3ddcf;
   --ys-yard-concrete: #d2cdc0;
   --ys-yard-concrete-dark: #bdb7a8;
@@ -79,4 +75,13 @@
   --ys-yard-medal-rim: #87531d;
   --ys-yard-medal-star: #634016;
   --ys-yard-heavy-tile: #1d232a;
+  --ys-yard-sky-haze: #c3d4da;
+  --ys-yard-cab-teal: #2f9e93;
+  --ys-yard-hub: #c9d3d8;
+  --ys-yard-headlight: #ffe9a8;
+  --ys-yard-casting: #20282f;
+  --ys-yard-dust: #efe7d6;
+  --ys-yard-gold-shine: #fffbe8;
+  --ys-yard-gold-body: #f5c542;
+  --ys-yard-gold-deep: #b9821f;
 }

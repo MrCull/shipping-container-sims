@@ -17,6 +17,9 @@ import { minRehandlesFor, starsFor } from '../modules/stars'
 /** A screen over the yard. Result and fail follow the shift status; the others are opened by the player. */
 export type Overlay = 'intro' | 'pause' | 'levels' | null
 
+/** What the yard effects hear: engine events, and a move the engine refused (the tapped container shakes red). */
+export type YardFxEvent = ShiftEvent | { type: 'rejected'; action: ShiftAction }
+
 /** `CraneMove.from` for a receipt: the crane lifts the cargo off the receipt truck. */
 export const RECEIPT_TRUCK = -2
 /** A pointer that moves farther than this (CSS px) from where it went down starts a drag (V20: 6 logical px). */
@@ -63,6 +66,15 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   /** Events the engine emitted during the current step. */
   let stepEvents: ShiftEvent[] = []
 
+  /** Yard effect listeners (art pass 2): every engine event, plus a refused move, for render-only juice. */
+  const fxListeners = new Set<(e: YardFxEvent) => void>()
+
+  /** Listen to engine events and refused moves for the yard effects; returns an unsubscribe function. */
+  function onYardEvent(listener: (e: YardFxEvent) => void): () => void {
+    fxListeners.add(listener)
+    return () => fxListeners.delete(listener)
+  }
+
   function emitCues(cues: readonly Cue[]): void {
     for (const cue of cues) for (const listener of cueListeners) listener(cue)
   }
@@ -95,6 +107,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   function watchEvents(): void {
     shift.onEvent((e) => {
       stepEvents.push(e)
+      for (const listener of fxListeners) listener(e)
       if (e.type === 'time-credit') creditPulse.value++
       if (e.type === 'arrival') announce(e.id, e.moves)
       // The red mandatory signal takes over: the announcement would only repeat it (playtest fix 7).
@@ -196,7 +209,10 @@ export const useYardshiftStore = defineStore('yardshift', () => {
 
   function dispatch(action: ShiftAction): DispatchResult {
     const r = step(() => shift.dispatch(action))
-    if (!r.ok) emitCues([rejectionCue()])
+    if (!r.ok) {
+      emitCues([rejectionCue()])
+      for (const listener of fxListeners) listener({ type: 'rejected', action })
+    }
     sync()
     message.value = r.ok ? '' : r.rejection.message
     return r
@@ -360,6 +376,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     announcement,
     bonusPulse,
     onCue,
+    onYardEvent,
     loadLevel,
     dispatch,
     tapTarget,
