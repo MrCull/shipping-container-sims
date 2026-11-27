@@ -211,7 +211,7 @@ function play(n: number): void {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgb(8 19 29 / 78%);
+  background: var(--ys-scrim-strong);
 }
 .card {
   width: min(360px, 100%);
@@ -219,13 +219,13 @@ function play(n: number): void {
   overflow-y: auto;
   padding: 20px;
   border-radius: 12px;
-  background: #142530;
+  background: var(--ys-panel);
   text-align: center;
   box-shadow: 0 8px 30px rgb(0 0 0 / 40%);
 }
 h2 {
   margin: 0 0 10px;
-  color: #ffc85c;
+  color: var(--ys-gold);
   letter-spacing: 0.06em;
 }
 p {
@@ -241,10 +241,10 @@ p {
 }
 .big-stars {
   font-size: 2rem;
-  color: #ffc85c;
+  color: var(--ys-gold);
 }
 .dim-star {
-  color: #3c5363;
+  color: var(--ys-line);
 }
 .buttons {
   display: flex;
@@ -255,17 +255,17 @@ p {
 }
 button {
   padding: 10px 16px;
-  border: 1px solid #3c5363;
+  border: 1px solid var(--ys-line);
   border-radius: 8px;
-  background: #1d3442;
-  color: #e7eef2;
+  background: var(--ys-panel-raised);
+  color: var(--color-text);
   font-weight: 700;
   cursor: pointer;
 }
 button.primary {
-  border-color: #ffcb60;
-  background: #ffcb60;
-  color: #142530;
+  border-color: var(--ys-selected);
+  background: var(--ys-selected);
+  color: var(--ys-panel);
 }
 .levels {
   list-style: none;
@@ -288,7 +288,7 @@ button.primary {
   cursor: default;
 }
 .row .stars {
-  color: #ffc85c;
+  color: var(--ys-gold);
 }
 .row .best {
   font-size: 0.8rem;
