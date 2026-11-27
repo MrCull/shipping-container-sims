@@ -19,7 +19,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #386 | Y6 progress, picker, results, undo | #384, #385 | merged in branch (dbbcd25) | |
 | #387 | Y7 drag, keyboard, urgency, coaching | #384 | merged in branch (9d56b4f) | |
 | #388 | Y8 audio cues and crane sounds | #384, #385 | merged in branch (c2454ec) | |
-| #389 | Y9 phone layout, cover, sim guide | #386, #387 | in progress | session 1 |
+| #389 | Y9 phone layout, cover, sim guide | #386, #387 | merged in branch (1542a3d) | |
 | #390 | Y10 background music | #388 | merged in branch (0d739ef) | |
 | #391 | Y11 smoke suite and regressions | all | open | |
 
