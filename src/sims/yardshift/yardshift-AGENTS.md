@@ -7,7 +7,7 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 
 1. **Engine** (`modules/engine.ts`, types in `types/engine.ts`): pure TS, no DOM, timers or `Date.now`.
    `createShift(level)` returns a `Shift` with `dispatch(action)` (next state and events, or a typed `Rejection`
-   with a reason code and message; a rejection changes nothing), `tick(dtMs)` (no-op until the clocks, #383),
+   with a reason code and message; a rejection changes nothing), `tick(dtMs)` (the injected clock, see Clocks),
    read-only `state`, the `events` log and `onEvent(listener)`. `rejectionFor(state, action)` is the single
    legality rule set; the presentation layer and the solver reuse it. `applyAction(state, action)` is the pure
    transition (no legality check) that `dispatch` and the solver share. Actions so far: `collect` (with `from`, or
@@ -33,6 +33,26 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
    there to `input`; nothing else interprets them.
 
 `store/yardshiftStore.ts` (Pinia) is glue: it holds the `Shift`, UI state and viewport.
+
+## Clocks and the crane (#383)
+
+- State holds `shiftMs`, `truckMs`, `truckAllowanceMs`, `operations` (collections plus receipts), `overtime`,
+  `pauses` and `failure`. `tick(dtMs)` caps each step at `MAX_STEP_MS` (100 ms) and does nothing while any pause
+  reason is held or the shift is over. Allowances come from `level.truckSeconds` (tutorial 30/20/15, others
+  `truckSecondsFrom(first)`: x1, 0.5, 0.28); a collect or receive resets the next-truck clock to the next allowance,
+  a rehandle adds `REHANDLE_CREDIT_MS` (+1 s, `time-credit` event) and never touches the shift. With the truck clock
+  at 0 the part of a step past it drains the shift at `level.overtimeMultiplier` (`overtime-start`/`-end` events).
+  Shift 0 sets status `failed` with `failure.reason` `timeout` (`failed` event). Clocks never go negative.
+- Pause reasons (`pause`/`resume` actions, each held on its own): `intro`, `player`, `animation`, `hidden`. While
+  `animation` is held every move is rejected as `crane-busy`, and `input` drops taps (no queued double move).
+- `clocksView(state)` (presentation) gives both HUD clocks: text, bar fraction (truck: value over
+  max(allowance, value), never above 1), red, shake (overtime on both). `craneDurationMs(dx)` is
+  330 + |dx| x 0.38 ms, with `moveSpan(layout, action, state)` giving the screen x travel.
+- Host: `Yardshift.vue` runs a requestAnimationFrame loop calling `store.frame(now)` and forwards
+  `visibilitychange` to `store.setHidden`. `store.startMove` holds `animation`, animates `store.move.progress`
+  0..1 (the scene draws the gantry phases: travel, lower, lift, travel, lower, release), then releases the pause
+  and dispatches the action. Reduced motion dispatches at once. The dev hook's `applyActions` skips the animation.
+  No intro or pause modal yet (#386): the engine supports `intro` and `player`, the host does not send them.
 
 ## Levels
 

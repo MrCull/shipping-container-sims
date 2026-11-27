@@ -32,8 +32,11 @@ test('the home tile opens Yardshift and the tutorial is won by taps', { tag: '@y
   await tap(page, stack(1)) // select #4
   await tap(page, stack(3)) // move #4 to the empty stack
   await expect(page.getByTestId('ys-rehandles')).toHaveText('1/5')
+  // Each move plays a crane animation that drops taps until it ends, so wait for the move before the next tap.
   await tap(page, stack(1)) // collect #2
+  await expect(page.getByTestId('ys-loaded')).toHaveText('2/4')
   await tap(page, { kind: 'collection' }) // collect #3 through the truck
+  await expect(page.getByTestId('ys-loaded')).toHaveText('3/4')
   await tap(page, stack(3)) // collect #4
 
   await expect(page.getByTestId('ys-complete')).toBeVisible()
