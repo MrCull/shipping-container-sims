@@ -336,11 +336,11 @@ onBeforeUnmount(() => {
 }
 .incoming {
   /* Reserved space: the band keeps its height with or without a truck, so the layout never jumps on arrival. */
-  line-height: 26px;
+  line-height: 28px;
   padding: 0 16px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   background: var(--ys-green-dark);
   white-space: nowrap;
   overflow: hidden;
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
 .announce {
   position: absolute;
   left: 50%;
-  top: 8px;
+  top: 36px;
   transform: translateX(-50%);
   margin: 0;
   padding: 6px 12px;

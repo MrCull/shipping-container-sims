@@ -36,7 +36,7 @@ export const MIN_SURFACE_PX = 200
 /** Fixed band heights (CSS px) for a column of `width`. */
 export function bandHeights(width: number): { hud: number; queue: number; incoming: number; hint: number; controls: number } {
   const wide = width >= WIDE_PX
-  return { hud: wide ? 62 : 100, queue: 52, incoming: 26, hint: 42, controls: 46 }
+  return { hud: wide ? 74 : 108, queue: 54, incoming: 28, hint: 42, controls: 46 }
 }
 
 export function screenLayout(box: { width: number; height: number }, insets: Insets = NO_INSETS): ScreenLayout {

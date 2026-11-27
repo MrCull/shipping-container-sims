@@ -29,37 +29,53 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
    container or animated positions. `input(ui, event, state)` returns the next UI state and at most one engine action
    (it takes the state too, to tell a collect tap from a select tap). `hitTest(regions, x, y)` maps a point to a
    target; regions never overlap, so the collection and receipt bays never resolve to each other.
-3. **Renderers** (thin): `composables/useYardScene.ts` (Three.js, fixed orthographic camera pitched down and
-   turned a little sideways, two truck bays; every object is placed by projecting a layout point onto the ground, so
-   it sits inside its hit region; renders only when the view-model, the crane move or the size changes; see Scene),
-   `Yardshift.vue` and `components/ui/YardHud.vue` (Vue HUD). Pointer and key events go to the store
+3. **Renderers** (thin): `composables/useYardCanvas.ts` (Canvas 2D, see Renderer), `Yardshift.vue` and
+   `components/ui/YardHud.vue`, `YardQueue.vue` (Vue HUD). Pointer and key events go to the store
    (`pointerDown`/`pointerMove`/`pointerUp`, `key`, `tapAt`) and from there to `input`; nothing else interprets them.
 
 `store/yardshiftStore.ts` (Pinia) is glue: it holds the `Shift`, UI state and viewport.
 
-## Scene (review of #374)
+## Renderer (2D canvas, owner decision)
 
-- Scene adapter: `build` makes the meshes once per layout key (surface width and height, stack count, capacity; a
-  new key also puts the trolley back over the yard centre) and `update` only sets transforms, colours, label maps and
-  visibility each render. `disposeTree` disposes each geometry and material once even when meshes share them (the
-  gantry legs, the label meshes). Never create geometry or materials in `update`.
-- Containers: bodies are one `InstancedMesh` (instance colour: sequence colour, grey, selected gold, arrival orange,
-  darkened when `dimYard`, mixed 35 % toward red when `urgent`) with one shared canvas corrugation normal map.
-  `containerMesh(built, slot, draw, now)` draws yard containers, the receipt cargo and the container on the hook
-  alike. Each container's label is one mesh (its top and front faces merged) with a transparent texture of the
-  number, the gold medallion (`bonus`) and the "H" tile (`heavy`); the cache key is the label and badges only, so it
-  holds at most one texture per id and badge pair of a level.
-- `ContainerView.heavy` (and `ReceiptCargoView.heavy`) draw the H badge, also buried or grey. `ContainerView.glint`
-  (a bonus container on top of its stack, false under reduced motion) rocks the container a few degrees and sweeps a
-  gold flash over its label; render only, hit regions unchanged.
-- Cheap extras: baked contact-shadow quads (one `InstancedMesh`: the two trucks, each non-empty stack, a lifted
-  container) and a harbour backdrop behind the yard (apron, water, quay edge, three ship-to-shore crane and two ship
-  silhouettes merged into one mesh). About 30 draw calls on a level of 16 containers.
-- Smoke frame cost: the tutorial spec went from 8.1 s to 4.6 s and the receipt spec from 4.2 and 5.5 s to 1.4 and
-  2.0 s (`--repeat-each=2`, dev project) once the scene stopped rebuilding every frame.
-- Screenshot: `docs/prototypes/review-374/level-11-heavy-harbour.png` (level 11 at 390 px).
+The owner rejected the Three.js yard on the phone ("It looks shit!! Try implement it 2d like the original reference
+prototype"), so the yard is a flat illustration in the style of `docs/prototypes/yardshift/target-look.jpg`, drawn
+with Canvas 2D. Canvas rather than SVG: one paint pass per change with no DOM node per shape, cheap per-frame shake
+and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3) for crisp lines.
+
+- `modules/yardGeometry.ts` (pure) places every shape from `layoutFor`'s layout and the capacity: the harbour
+  backdrop (at least 30 % of the yard, up to 50 % when the stacks are short), the concrete floor, the ground line,
+  the container size (front 0.64 of the column, side face 0.16, top rise 0.12; height from the room at full
+  capacity plus the selection lift), the gantry (legs in the 16 px side margins, outside every column), the crane
+  carry height and each bay's truck (`truckIn`: cab at the bay's right end under `arrowBox`, flatbed at most 4.2
+  cabs long, cargo sized like a yard box where the bed allows). `boxAt(geo, layout, stack, tier, lift)` is a
+  container's oblique box; `boxBounds` its whole drawn area. `modules/yardGeometry.test.ts` proves, for every level
+  and five surfaces, that every slot (the top one lifted too) lies inside its own column hit region and under the
+  beam, the legs touch no column, trucks lie inside their bays and the arrow sits over the cab, clear of the cargo.
+- `composables/useYardCanvas.ts` only paints: backdrop (sky, water, distant STS cranes, a loaded ship, quay edge),
+  floor, dashed slot outlines up to capacity, "YARD 01" and "n FREE SLOT(S)" captions, the two bays (dashed border,
+  teal collection with a white cab, orange receipt with an orange cab, red at deadline 0), containers (front face
+  with the big dark number, lighter top, darker side, ribs, outline, gold star medallion for `bonus`, "H" tile for
+  `heavy`), ghost drop boxes on `destinations`, the blue gantry and the yellow trolley. Selection lifts the box
+  `LIFT` (0.3 of its height) with a white rim; `urgent` (reduced motion) draws a red rim; `shake` offsets the box
+  (0.65 + 3.35 x risk px); `glint` rocks it and flashes the body. The crane move (`cranePhase`, 330 to 460 ms)
+  slides the trolley to the source, lowers, lifts, travels, lowers and releases; the trolley rests where the last
+  move ended.
+- It renders on a change of the view-model or the crane move (the store's frame loop drives both while playing) and
+  schedules its own frames only while a container shakes or glints.
+- DOM over the canvas (`Yardshift.vue`): stack numbers, bay titles, "LOAD #n" and the receipt status
+  (`ys-receipt-status`) at the bay's bottom-left, the dim overlay (`ys-dim`), the bobbing arrow (`ys-arrow`), the
+  arrival announcement (36 px down, clear of the beam) and the "+250 · +5s" burst.
+- HUD in the target's style: wordmark and uppercase level title, big shift and next-truck numbers with bars, LOADED
+  with "n/max REHANDLES" under it; queue chips with a top lip and lower rail (gold for a bonus, its sequence colour
+  kept as the rail). Band heights: `bandHeights` (HUD 108 px narrow, 74 wide; queue 54; incoming 28).
+- Screenshots: `docs/prototypes/2d/` (phone 390x844 at 2x: level 4 optional and mandatory, level 2 bonus window,
+  tutorial with a selection; desktop 1280x800).
 
 ## Playtest fixes (spec #374 phase 1)
+
+The Three.js details below (`Built.*`, `ch`, `cargoScale`) are history: the 2D renderer replaced that scene and
+keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow beside the cab).
+
 
 - Selection never changes a container's colour (the gold matched the yellow sequence slot): the selected stack top
   or receipt cargo lifts `SELECTED_LIFT` (0.3 of its height) and gets a white back-face rim shell (`Built.rim`).
@@ -273,7 +289,8 @@ the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no int
 properties: the six sequence colours, grey, gold, arrival orange, red and the panel shades. Background, text and muted
 text use the shared tokens of `src/assets/main.css`. Components use those or `--ys-*`, never hex
 (`scripts/check-no-hex-colours.mjs` in verify); `modules/palette.test.ts` keeps `--ys-seq-*` and `--ys-grey` equal to `SEQUENCE_COLOURS` and `GREY`. The
-WebGL scene keeps its colours in TS.
+canvas yard keeps its colours in `modules/yardPalette.ts`, each mirrored as `--ys-yard-*` in the palette and kept
+equal by the same test.
 
 ## Dev hook
 
@@ -289,7 +306,7 @@ coordinates so smoke tests tap real points.
   `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
   `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/audioCues.test.ts`, `store/yardshiftStoreAudio.test.ts`,
   `modules/music.test.ts`, `composables/useYardMusic.test.ts` (happy-dom), `composables/useYardAudio.test.ts`,
-  `modules/palette.test.ts`,
+  `modules/palette.test.ts`, `modules/yardGeometry.test.ts`,
   `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 2.1 s wall time (#391) through
   `pnpm test:sim yardshift` (#389); no test over 15 ms.

@@ -14,7 +14,7 @@ defineProps<{
 <template>
   <header class="hud">
     <div class="brand">
-      <span class="wordmark">YARDSHIFT</span>
+      <span class="wordmark">YARD<em>SHIFT</em></span>
       <span class="title">{{ title }}</span>
     </div>
     <dl class="stats">
@@ -22,7 +22,7 @@ defineProps<{
         v-for="(clock, key) in { shift: clocks.shift, truck: clocks.truck }"
         :key="key"
         class="clock"
-        :class="{ red: clock.red, shake: clock.shake }"
+        :class="[key, { red: clock.red, shake: clock.shake }]"
         :data-testid="`ys-clock-${key}`"
       >
         <dt>{{ clock.label }}</dt>
@@ -37,17 +37,12 @@ defineProps<{
         </dd>
         <span class="bar"><span :style="{ width: `${clock.fraction * 100}%` }" /></span>
       </div>
-      <div>
+      <div class="loaded">
         <dt>LOADED</dt>
         <dd data-testid="ys-loaded">
           {{ loaded }}
         </dd>
-      </div>
-      <div>
-        <dt>REHANDLES</dt>
-        <dd data-testid="ys-rehandles">
-          {{ rehandles }}
-        </dd>
+        <span class="sub"><span data-testid="ys-rehandles">{{ rehandles }}</span> REHANDLES</span>
       </div>
     </dl>
   </header>
@@ -56,68 +51,88 @@ defineProps<{
 <style scoped>
 .hud {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px 12px;
-  padding: 8px 16px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px 6px;
   background: var(--ys-panel);
   color: var(--color-text);
 }
+@media (min-width: 620px) {
+  .hud {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
 .brand {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 10px;
   min-width: 0;
 }
 .wordmark {
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--color-text);
+}
+.wordmark em {
   color: var(--ys-gold);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  font-size: 0.95rem;
 }
 .title {
-  font-size: 0.75rem;
-  opacity: 0.8;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .stats {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin: 0;
 }
-.stats div {
-  text-align: right;
+@media (min-width: 620px) {
+  .stats {
+    width: 380px;
+  }
 }
 dt {
   font-size: 0.6rem;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   opacity: 0.7;
   white-space: nowrap;
 }
 dd {
   position: relative;
   margin: 0;
-  font-weight: 700;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-}
-.clock {
-  min-width: 4.4em;
 }
 .bar {
   display: block;
-  height: 3px;
-  margin-top: 2px;
+  height: 5px;
+  margin-top: 3px;
   background: var(--ys-track);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 .bar span {
   display: block;
   height: 100%;
-  margin-left: auto;
+  border-radius: 3px;
   background: var(--ys-seq-0);
+}
+.clock.truck .bar span {
+  background: var(--ys-gold);
 }
 .clock.red dd {
   color: var(--ys-red-light);
@@ -127,6 +142,15 @@ dd {
 }
 .clock.shake dd {
   animation: shake 0.25s linear infinite;
+}
+.sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 .credit {
   position: absolute;

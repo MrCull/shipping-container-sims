@@ -54,6 +54,8 @@ const DEPTH = 0.16
 const RISE = 0.12
 /** Lift of the selected container, as a share of its height. */
 export const LIFT = 0.3
+/** Least share of the yard height the harbour backdrop keeps. */
+const MIN_BACKDROP = 0.3
 
 export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const { yard } = layout
@@ -62,17 +64,17 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const dx = colW * DEPTH
   const dy = colW * RISE
   const groundY = Math.round(yard.y + yard.h - LABEL_PX)
-  const beamH = Math.max(8, Math.min(14, yard.h * 0.035))
+  const beamH = Math.max(10, Math.min(18, yard.h * 0.045))
   const beamY = yard.y + 4
   const hookRoom = beamH + 10
   const cap = Math.max(1, capacity)
-  // Height for the stacks: from the ground up to under the beam and hook room, less the top face and the lift.
-  const room = groundY - (beamY + hookRoom) - dy
+  // The harbour backdrop keeps at least a third of the yard; the stacks (top face and lift included) fit under it.
+  const room = groundY - Math.max(beamY + hookRoom, yard.y + yard.h * MIN_BACKDROP) - dy
   // Whole pixels, so neighbouring tiers share an edge exactly.
-  const boxH = Math.floor(Math.max(8, Math.min(boxW * 0.72, room / (cap + LIFT + 0.9))))
+  const boxH = Math.floor(Math.max(8, Math.min(boxW * 0.72, room / (cap + LIFT + 0.3))))
   const stackTop = groundY - cap * boxH - dy - boxH * LIFT
-  // The backdrop fills what the stacks leave, between a fifth and a half of the yard.
-  const backdropBottom = Math.min(yard.y + yard.h * 0.5, Math.max(yard.y + yard.h * 0.2, stackTop - boxH * 0.4))
+  // The backdrop fills what the stacks leave, between a third and a half of the yard.
+  const backdropBottom = Math.min(yard.y + yard.h * 0.5, Math.max(yard.y + yard.h * MIN_BACKDROP, stackTop - boxH * 0.3))
   const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: backdropBottom - yard.y }
   const floor = { x: yard.x, y: backdropBottom, w: yard.w, h: yard.y + yard.h - backdropBottom }
   const legW = Math.max(6, Math.min(12, yard.x - 4))
@@ -133,7 +135,9 @@ export function truckIn(bay: Rect, g: YardGeometry): Truck {
   const cabW = Math.max(18, Math.min(46, bay.w * 0.2))
   const cabH = Math.max(12, Math.min(h * 0.55, cabW * 1.05))
   const cab: Rect = { x: bay.x + bay.w - pad - cabW, y: bedY + bedH - cabH, w: cabW, h: cabH }
-  const bed: Rect = { x: bay.x + pad, y: bedY, w: cab.x - 2 - (bay.x + pad), h: bedH }
+  // The flatbed runs left from the cab, at most about four cabs long on a wide desktop bay.
+  const bedW = Math.min(cab.x - 2 - (bay.x + pad), cabW * 4.2)
+  const bed: Rect = { x: cab.x - 2 - bedW, y: bedY, w: bedW, h: bedH }
   const wheels = [bed.x + wheelR * 2, bed.x + bed.w * 0.62, cab.x + cabW * 0.55].map((x) => ({ x, y: bedY + bedH + wheelR * 0.6 }))
   // The cargo: as wide as a yard container where the bed allows, as tall as the room above the bed allows.
   const scale = Math.min(1, (bed.w - 6) / (g.boxW + g.dx), (bedY - top - 2) / (g.boxH + g.dy))
