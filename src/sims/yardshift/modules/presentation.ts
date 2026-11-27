@@ -60,7 +60,7 @@ const BAY_GAP = 12
 export function layoutFor(stackCount: number, vp: Viewport): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
   // The yard is the hero (playtest fix 8): the bays take a fixed share under it, with a small gap.
-  const bayH = Math.round(Math.min(vp.height * 0.22, Math.max(84, vp.height * 0.18)))
+  const bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
   const yardTop = Math.round(vp.height * 0.02)
   const bayBottom = Math.max(yardTop, vp.height - 8)
   const bayTop = Math.max(yardTop, bayBottom - bayH)

@@ -356,20 +356,25 @@ export function useYardScene(
     const group = new THREE.Group()
     const { layout } = vm
     const colW = layout.columns[0]?.w ?? 80
-    const cw = Math.min(colW * 0.86, 120) / PX_PER_UNIT
-    const cd = cw * 0.55
+    const cw = Math.min(colW * 0.9, 120) / PX_PER_UNIT
+    const cd = cw * 0.58
     // Fit the stacks at full capacity (plus the gantry over them) to the yard height, so the yard is the hero.
     const baseY = layout.yard.y + layout.yard.h - 22
     const rise = (baseY - layout.yard.y) * 0.8
     const tierPx = rise / (vm.capacity + 1.5) - (cd * PX_PER_UNIT * Math.sin(PITCH)) / (vm.capacity + 1.5)
-    const ch = Math.min(cw * 0.62, Math.max(cw * 0.36, tierPx / Math.cos(PITCH) / PX_PER_UNIT))
+    const ch = Math.min(cw * 0.8, Math.max(cw * 0.36, tierPx / Math.cos(PITCH) / PX_PER_UNIT))
     const colBase = layout.columns.map((col) => groundAt(col.x + col.w / 2, baseY, width, height))
     const first = colBase[0] ?? new THREE.Vector3()
     const last = colBase[colBase.length - 1] ?? first
     const run = Math.hypot(last.x - first.x, last.z - first.z) || 1
     const dir = { x: (last.x - first.x) / run, z: (last.z - first.z) / run }
 
-    buildBackdrop(group, groundAt(layout.yard.x + layout.yard.w / 2, layout.yard.y + layout.yard.h * 0.3, width, height), dir)
+    // The harbour is a strip behind the gantry, not a band of its own: the quay edge sits just above the gantry top
+    // on screen, so the stacks at full capacity and the crane take the yard (playtest fix 8).
+    const gantryTop = new THREE.Vector3(colBase[0]?.x ?? 0, (vm.capacity + 1.2) * ch * 1.04 + ch * 0.9, colBase[0]?.z ?? 0).project(camera)
+    const gantryTopPx = ((1 - gantryTop.y) / 2) * height
+    const quayPx = Math.max(layout.yard.y + 4, gantryTopPx - 8)
+    buildBackdrop(group, groundAt(layout.yard.x + layout.yard.w / 2, quayPx, width, height), dir)
 
     const yardCentre = groundAt(layout.yard.x + layout.yard.w / 2, baseY, width, height)
     const yardPad = boxAt(group, run + cw * 2, 0.02, cd * 2.2, standard(COLOURS.ground), yardCentre.x, -0.02, yardCentre.z)
@@ -384,8 +389,11 @@ export function useYardScene(
     const collect = groundAt(layout.collection.x + layout.collection.w / 2, layout.collection.y + layout.collection.h * 0.66, width, height)
     const receiptBed = groundAt(layout.receipt.x + layout.receipt.w / 2, layout.receipt.y + layout.receipt.h * 0.66, width, height)
     // Trucks and the receipt cargo shrink to fit a short bay (desktop), so they stay under the bay label.
-    const cargoPx = (ch * Math.cos(PITCH) + cd * Math.sin(PITCH) + ch) * PX_PER_UNIT
-    const k = Math.min(1, Math.max(0.55, (layout.receipt.h * 0.6) / Math.max(1, cargoPx)))
+    // k scales the truck and its cargo against a yard container: the cargo fills about 60 % of the truck length,
+    // and the loaded truck's height on screen fits the bay under its label row.
+    const cargoPx = (ch * Math.cos(PITCH) + cd * Math.sin(PITCH) + ch * 0.6) * PX_PER_UNIT
+    const bayLen = (layout.receipt.w * 0.9) / PX_PER_UNIT
+    const k = Math.max(0.3, Math.min((bayLen * 0.7 * 0.6) / cw, (layout.receipt.h - 34) * 0.6 / Math.max(1, cargoPx), 1.4))
     let receiptBayMat = standard(COLOURS.receiptBay)
     let receiptBedMat = standard(COLOURS.receiptTruck, 0.6)
     const shadowSpots: { x: number; z: number; w: number; d: number }[] = []
@@ -397,7 +405,8 @@ export function useYardScene(
       const bayMat = standard(bayColour)
       if (facing === 1) receiptBayMat = bayMat
       boxAt(group, bw, 0.02, cd * 1.8, bayMat, centre.x, 0, centre.z)
-      const tl = Math.min(bw * 0.8, cw * 1.6 * k)
+      // As long as the bay allows (a 20 ft box on a long chassis on a desktop); heights follow k.
+      const tl = Math.min(bw * 0.85, Math.max(cw * 1.6 * k, bw * 0.6))
       const bedMat = standard(truckColour, 0.6)
       if (facing === 1) receiptBedMat = bedMat
       boxAt(group, tl * 0.72, ch * 0.35 * k, cd * 0.9 * k, bedMat, centre.x - facing * tl * 0.12, ch * 0.3 * k, centre.z)

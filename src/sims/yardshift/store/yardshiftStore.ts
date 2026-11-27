@@ -284,6 +284,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   /** Forward one raw UI event to `input`. */
   function send(event: UiEvent): void {
     const r = input(ui.value, event, state.value)
+    // A new selection answers the last rejection, so its message gives way to the live hint.
+    if (r.ui.selection !== ui.value.selection) message.value = ''
     ui.value = r.ui
     if (r.action) apply(r.action)
   }

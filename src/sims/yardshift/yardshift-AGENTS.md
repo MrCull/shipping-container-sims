@@ -66,16 +66,18 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 - Legal destinations: a translucent green ghost container at the drop height of each (`Built.ghosts`, one
   `InstancedMesh`), as well as the green column pad. Capacity: dashed outlines of every slot up to `capacity` (one
   merged `LineSegments`, `LineDashedMaterial`), and `view.stackLabels` ("01".."0n") drawn under each column.
-- Fit: `layoutFor` gives the bays a fixed share (about 18 to 22 % of the surface) right under the yard (6 px gap);
-  the scene sizes containers from the column width and the yard height at full capacity (`ch` 0.36 to 0.62 of `cw`).
-  Trucks and the receipt cargo scale down (`Built.cargoScale`, 0.55 to 1) to fit a short desktop bay.
+- Fit: `layoutFor` gives the bays a fixed share (24 to 25 % of the surface) right under the yard (6 px gap);
+  the scene sizes containers from the column width (0.9) and the yard height at full capacity (`ch` 0.36 to 0.8 of
+  `cw`). The harbour backdrop is a strip behind the gantry: its quay edge is placed just above the gantry top on
+  screen (projected), not at a fixed share of the yard. Trucks take 60 to 85 % of the bay length; their heights and the
+  receipt cargo scale by `Built.cargoScale` (0.3 to 1.4) so the loaded truck fits under the bay label.
 - Bay labels sit top-left on a scrim pill; `arrowBox` puts the mandatory arrow beside the cab (bay's right end), so
   it never covers the cargo number. The empty receipt bed is grey (no truck). The bonus glint flashes the body, never
   the label, so numbers stay dark navy; the open bonus window draws a gold countdown ring round the first queue chip
   (`view.bonus.fraction`). The "+250 · +5s" float starts 36 px above the collection bay.
 - At deadline 0 a stack tap sends `collect(from)`, which the engine rejects with "Receive truck #n first."
   (`receive-first`), so the message and the invalid cue fire. The store clears the arrival announcement on
-  `deadline-zero`. With no truck waiting the incoming band reads "COLLECT #n · READY".
+  `deadline-zero`, and clears a rejection message whenever an input changes the selection (`send`). With no truck waiting the incoming band reads "COLLECT #n · READY".
 - Pause keeps no focus ring after a click (`:focus-visible` only); the timeout message is "Shift time ran down before
   the yard was clear." (the fail title is "Time's up").
 - Tests: `modules/playtestFixes.test.ts`, `store/yardshiftStoreAnnounce.test.ts`. Before and after phone captures:
