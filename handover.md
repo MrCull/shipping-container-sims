@@ -11,7 +11,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #378 | Smoke selection anchoring, home-wall only | none | merged in branch (b9c62f0) | |
 | #379 | Scoped verify and verify:all | #377 | merged in branch (c7830c6) | |
 | #380 | CI unit tests use the selection | #379 | in progress | session 1 |
-| #381 | Y1 tracer: tutorial won by taps | #377 | in progress | session 1 |
+| #381 | Y1 tracer: tutorial won by taps | #377 | merged in branch (47105c7) | |
 | #382 | Y2 13 levels, heavy rule, solver | #381 | open | |
 | #383 | Y3 clocks, overtime, crane animation | #381 | open | |
 | #384 | Y4 incoming trucks and receipts | #382, #383 | open | |
