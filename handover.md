@@ -14,8 +14,8 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #381 | Y1 tracer: tutorial won by taps | #377 | merged in branch (47105c7) | |
 | #382 | Y2 13 levels, heavy rule, solver | #381 | merged in branch (99f4614) | |
 | #383 | Y3 clocks, overtime, crane animation | #381 | merged in branch (b8c8648) | |
-| #384 | Y4 incoming trucks and receipts | #382, #383 | open | |
-| #385 | Y5 score, combo, queue colours, bonus | #383 | open | |
+| #384 | Y4 incoming trucks and receipts | #382, #383 | in progress | session 1 |
+| #385 | Y5 score, combo, queue colours, bonus | #383 | in progress | session 1 |
 | #386 | Y6 progress, picker, results, undo | #384, #385 | open | |
 | #387 | Y7 drag, keyboard, urgency, coaching | #384 | open | |
 | #388 | Y8 audio cues and crane sounds | #384, #385 | open | |
@@ -30,3 +30,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - Implementers run `pnpm run verify <integration-branch>`: with no base, verify compares with `origin/main` and covers the whole branch.
 - Y1 seam: `input(ui, event, state)` takes state as a third argument (needed to tell a collect tap from a select tap); `window.__ys.hitRegions()` gives page coordinates for smoke taps. PR needs `smoke:yardshift`.
 - #382 put receipt rules in the engine early (solver needs them): levels 4, 6, 8, 9, 10, 13 start with a waiting truck the UI cannot serve until #384. Tutorial fixture rehandles #4 before collecting #1 (optimal, not the coached order).
+- #383: intro and player pause are in the engine but unused until #386 modals; receipts have no crane animation yet (#384); the gantry beam runs past the left edge at 390 px (phase 2 visual).
