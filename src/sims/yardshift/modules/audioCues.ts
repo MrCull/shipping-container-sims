@@ -42,6 +42,7 @@ export type CueName =
   | 'win'
   | 'timeout'
   | 'blocked'
+  | 'undo'
 
 export interface Cue {
   name: CueName
@@ -166,6 +167,8 @@ function eventCues(e: ShiftEvent, after: ShiftState): Cue[] {
               ],
             },
           ]
+    case 'undone':
+      return [{ name: 'undo', tones: [tone(740, 550, 0.09, 0.025), tone(550, 420, 0.1, 0.025, 0.08)] }]
     case 'time-credit':
       return []
   }

@@ -99,9 +99,18 @@ export interface ShiftState {
   /**
    * Bonus window left for the next required container, ms. Above 0 only while `next` is a bonus container whose
    * window is open: collecting it now awards the bonus. 0 means not eligible (no bonus, or the window ran out).
-   * Undo (#386) restores it from the snapshot.
+   * Undo (#386) restores the smaller of now and the snapshot, so it is never refunded.
    */
   readonly bonusMs: number
+  /** Shift time earned this shift, ms: quick service, combo chains and bonuses (the result screen's "time earned"). */
+  readonly earnedMs: number
+  /** Undos left this shift (one per shift). */
+  readonly undosLeft: number
+  /**
+   * The state before the last accepted move (its own `undoSnapshot` is null), or null before the first move and after
+   * an undo. `undo` returns to it.
+   */
+  readonly undoSnapshot: ShiftState | null
   /** Set when status is 'failed'. */
   readonly failure: { readonly reason: FailureReason; readonly message: string } | null
 }
@@ -119,6 +128,11 @@ export type ShiftAction =
   | { type: 'pause'; reason: PauseReason }
   /** Release a pause reason. */
   | { type: 'resume'; reason: PauseReason }
+  /**
+   * Undo the last move (#386): one per shift, -25 points and -3 s of shift. Restores puzzle, combo, receipts and
+   * deadline; the clocks and bonus window keep the smaller of now and the snapshot (no refund, no farming).
+   */
+  | { type: 'undo' }
 
 export type RejectReason =
   | 'shift-over'
@@ -133,6 +147,9 @@ export type RejectReason =
   | 'no-truck'
   | 'receive-first'
   | 'crane-busy'
+  | 'nothing-to-undo'
+  | 'undo-used'
+  | 'undo-low-time'
 
 export interface Rejection {
   readonly reason: RejectReason
@@ -161,6 +178,8 @@ export type ShiftEvent =
   | { type: 'bonus-awarded'; id: number; points: number; ms: number }
   /** A bonus window ran out: the container is ordinary cargo now. */
   | { type: 'bonus-missed'; id: number }
+  /** The last move was undone (score and shift costs applied). */
+  | { type: 'undone'; points: number; ms: number }
 
 export type DispatchResult =
   | { ok: true; state: ShiftState; events: ShiftEvent[] }

@@ -41,11 +41,8 @@ export type UiEvent =
   /** `KeyboardEvent.key`: 1 to 9 (stack), C (collection truck), R (receipt truck), U (undo), Escape. */
   | { type: 'key'; key: string }
 
-/**
- * What `input` can ask of the engine: an engine action, or `undo` (the engine's undo action is #386's; once it is in
- * `ShiftAction` this is the same shape).
- */
-export type UiAction = ShiftAction | { type: 'undo' }
+/** What `input` can ask of the engine: an engine action (undo included, #386). */
+export type UiAction = ShiftAction
 
 export interface Layout {
   yard: Rect

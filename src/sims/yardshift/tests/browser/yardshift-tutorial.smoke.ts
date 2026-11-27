@@ -24,6 +24,7 @@ test('the home tile opens Yardshift and the tutorial is won by taps', { tag: '@y
   await page.getByTestId('game-tile-yardshift').tap()
   await expect(page).toHaveURL(/\/sim\/yardshift$/)
   await page.waitForFunction(() => window.__ys !== undefined)
+  await page.getByTestId('ys-start').click()
   await expect(page.getByTestId('ys-loaded')).toHaveText('0/4')
 
   const stack = (index: number): HitTarget => ({ kind: 'stack', index })
@@ -39,7 +40,7 @@ test('the home tile opens Yardshift and the tutorial is won by taps', { tag: '@y
   await expect(page.getByTestId('ys-loaded')).toHaveText('3/4')
   await tap(page, stack(3)) // collect #4
 
-  await expect(page.getByTestId('ys-complete')).toBeVisible()
+  await expect(page.getByTestId('ys-screen-result')).toBeVisible()
   await expect(page.getByTestId('ys-loaded')).toHaveText('4/4')
   expect(await page.evaluate(() => window.__ys!.state().status)).toBe('complete')
 })

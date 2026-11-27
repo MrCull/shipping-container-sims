@@ -11,6 +11,11 @@ import { craneDurationMs, hitTest, input, moveSpan, present } from '../modules/p
 import { craneCues, craneStartCue, cuesForStep, PICK_AT, rejectionCue, type Cue } from '../modules/audioCues'
 import type { DispatchResult, Shift, ShiftAction, ShiftEvent, ShiftState } from '../types/engine'
 import type { HitTarget, UiAction, UiEvent, UiState, Viewport } from '../types/presentation'
+import { loadProgress, recordCompletion, saveProgress, type Progress } from '../modules/progress'
+import { minRehandlesFor, starsFor } from '../modules/stars'
+
+/** A screen over the yard. Result and fail follow the shift status; the others are opened by the player. */
+export type Overlay = 'intro' | 'pause' | 'levels' | null
 
 /** `CraneMove.from` for a receipt: the crane lifts the cargo off the receipt truck. */
 export const RECEIPT_TRUCK = -2
@@ -47,6 +52,10 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   const bonusPulse = ref(0)
   let lastFrame: number | null = null
   let reducedMotion = false
+  const progress = ref<Progress>(loadProgress())
+  /** `?unlock=all` in a dev or smoke build (set by the host). */
+  const unlockAll = ref(false)
+  const overlay = ref<Overlay>(null)
   /** The pointer that went down and has not come up yet: where, on what, and whether it became a drag. */
   let pointer: { x: number; y: number; target: HitTarget | null; dragging: boolean } | null = null
   /** Audio cue listeners (#388); each engine step's cues are sent once, when the step happens. */
@@ -90,19 +99,34 @@ export const useYardshiftStore = defineStore('yardshift', () => {
       if (e.type === 'time-credit') creditPulse.value++
       if (e.type === 'arrival') announce(e.id, e.moves)
       if (e.type === 'bonus-awarded') bonusPulse.value++
+      if (e.type === 'completed') recordResult()
     })
   }
   watchEvents()
 
   const view = computed(() => present(state.value, ui.value, viewport.value))
 
-  function loadLevel(n: number): void {
+  /** Best stars and score kept, next level unlocked; a refused storage write keeps the progress for this visit. */
+  function recordResult(): void {
+    const s = shift.state
+    const stars = starsFor(s.rehandles, minRehandlesFor(s.level.number))
+    progress.value = recordCompletion(progress.value, s.level.number, stars, s.score, LEVELS.length)
+    saveProgress(progress.value)
+  }
+
+  /**
+   * Load level `n`. With `intro` the intro screen opens and holds the `intro` pause until `startShift`; without it
+   * (the dev hook) play starts at once.
+   */
+  function loadLevel(n: number, options: { intro?: boolean } = {}): void {
     const level = levelByNumber(n)
     if (!level) throw new Error(`Yardshift: no level ${n}`)
     const hidden = shift.state.pauses.includes('hidden')
     shift = createShift(level)
     watchEvents()
     if (hidden) shift.dispatch({ type: 'pause', reason: 'hidden' })
+    overlay.value = options.intro ? 'intro' : null
+    if (options.intro) shift.dispatch({ type: 'pause', reason: 'intro' })
     move.value = null
     lastFrame = null
     sync()
@@ -111,8 +135,59 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     message.value = ''
     announcement.value = ''
     announceLeftMs = 0
+    if (!options.intro) announceWaiting()
+  }
+
+  function announceWaiting(): void {
     const waiting = waitingArrival(shift.state)
     if (waiting !== undefined) announce(waiting, shift.state.deadline ?? 0)
+  }
+
+  /** Close the intro and start the clocks. */
+  function startShift(): void {
+    overlay.value = null
+    shift.dispatch({ type: 'resume', reason: 'intro' })
+    lastFrame = null
+    sync()
+    announceWaiting()
+  }
+
+  function pause(): void {
+    if (shift.state.status !== 'playing' || overlay.value) return
+    shift.dispatch({ type: 'pause', reason: 'player' })
+    overlay.value = 'pause'
+    sync()
+  }
+
+  function resume(): void {
+    overlay.value = null
+    shift.dispatch({ type: 'resume', reason: 'player' })
+    lastFrame = null
+    sync()
+  }
+
+  /** The level picker; the shift underneath stays paused until a level is chosen or the picker is closed. */
+  function openLevels(): void {
+    if (shift.state.status === 'playing') shift.dispatch({ type: 'pause', reason: 'player' })
+    overlay.value = 'levels'
+    sync()
+  }
+
+  function closeLevels(): void {
+    if (shift.state.pauses.includes('intro')) overlay.value = 'intro'
+    else if (shift.state.status === 'playing') overlay.value = 'pause'
+    else overlay.value = null
+  }
+
+  /** Undo the last move (one per shift); ignored while a crane move plays. */
+  function undo(): DispatchResult | null {
+    if (move.value) return null
+    const r = dispatch({ type: 'undo' })
+    if (r.ok) {
+      ui.value = { selection: null }
+      message.value = 'Undo · −25 pts · −3s'
+    }
+    return r
   }
 
   function dispatch(action: ShiftAction): DispatchResult {
@@ -189,16 +264,17 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     ui.value = { ...ui.value, reducedMotion: on }
   }
 
-  /** Undo is #386's engine action; until the engine has it, U only says so. */
-  function undo(): void {
-    message.value = 'Undo is not available yet.'
-  }
-
-  /** Apply what `input` resolved: a move plays as a crane animation, pause and resume apply at once. */
+  /**
+   * Apply what `input` resolved: a move plays as a crane animation, undo goes to `undo`, and pause and resume (Esc)
+   * open and close the pause menu (resume from the level picker goes back to the screen under it).
+   */
   function apply(action: UiAction): void {
     if (action.type === 'undo') undo()
-    else if (action.type === 'pause' || action.type === 'resume') dispatch(action)
-    else startMove(action)
+    else if (action.type === 'pause') pause()
+    else if (action.type === 'resume') {
+      if (overlay.value === 'pause') resume()
+      else if (overlay.value === 'levels') closeLevels()
+    } else startMove(action)
   }
 
   /** Forward one raw UI event to `input`. */
@@ -263,6 +339,10 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     loadLevel(state.value.level.number)
   }
 
+  function setUnlockAll(on: boolean): void {
+    unlockAll.value = on
+  }
+
   return {
     state,
     ui,
@@ -285,6 +365,16 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     pointerCancel,
     setViewport,
     restart,
+    progress,
+    unlockAll,
+    overlay,
+    startShift,
+    pause,
+    resume,
+    openLevels,
+    closeLevels,
+    undo,
+    setUnlockAll,
     frame,
     setHidden,
     setReducedMotion,

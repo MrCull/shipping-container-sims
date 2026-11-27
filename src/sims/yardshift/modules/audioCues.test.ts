@@ -145,6 +145,7 @@ describe('Yardshift audio cues', () => {
     expect(map({ type: 'bonus-window', id: 3, ms: 1200 })).toEqual(['bonus-window'])
     expect(map({ type: 'bonus-awarded', id: 3, points: 250, ms: 5000 })).toEqual(['jackpot'])
     expect(map({ type: 'bonus-missed', id: 3 })).toEqual(['bonus-missed'])
+    expect(map({ type: 'undone', points: -25, ms: 3000 })).toEqual(['undo'])
     expect(map({ type: 'time-credit', ms: 1000 })).toEqual([])
   })
 
