@@ -9,8 +9,17 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
    `createShift(level)` returns a `Shift` with `dispatch(action)` (next state and events, or a typed `Rejection`
    with a reason code and message; a rejection changes nothing), `tick(dtMs)` (no-op until the clocks, #383),
    read-only `state`, the `events` log and `onEvent(listener)`. `rejectionFor(state, action)` is the single
-   legality rule set; the presentation layer reuses it for legal destinations. Actions so far: `collect` (with
-   `from`, or without to collect the exposed next container), `rehandle(from, to)`.
+   legality rule set; the presentation layer and the solver reuse it. `applyAction(state, action)` is the pure
+   transition (no legality check) that `dispatch` and the solver share. Actions so far: `collect` (with `from`, or
+   without to collect the exposed next container), `rehandle(from, to)`, `receive(to)`.
+   - **Heavy rule:** a heavy container (`level.heavy`) goes only on an empty stack or another heavy container, for
+     rehandles and receipts alike (reason `heavy`).
+   - **Receipt rule core (#382, gameplay in #384):** the state carries `receipts` (trucks served) and `deadline` (moves
+     left on the waiting truck, null when none). A truck activates when none waits and `collected >= arrival.after`,
+     at the start and after every move; collections and rehandles count the deadline down before activation, so the
+     triggering move never counts; receipts do not count; deadline 0 rejects everything but `receive`
+     (`receive-first`); completion needs every truck served. Events `received` and `arrival`. #384 adds the
+     presentation (truck bay selection, arrow, dimming, announcements) and the no-legal-move failure.
 2. **Presentation** (`modules/presentation.ts`, types in `types/presentation.ts`): pure TS.
    `present(state, ui, viewport)` returns the view-model (containers with labels, selection, legal destinations,
    HUD strings, hint, hit regions). Hit regions come from `layoutFor(stackCount, viewport)` only, never from
@@ -27,8 +36,24 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 
 ## Levels
 
-`modules/levels.ts` holds the tutorial (stacks `[[1],[2,4],[3],[]]`, capacity 2, max 5 rehandles). #382 ports the
-other twelve V20 levels and the solver. Progress (#386) unlocks level 1 only at first.
+`modules/levels.ts` holds all 13 V20 levels exactly (`levels.test.ts` checks them against the V20 array). V20's code
+rules keyed on the level index are explicit data: `truckSeconds` (tutorial 30/20/15, else first, x0.5, x0.28),
+`bonusIds` (multiples of 3 from level 2), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
+`tutorialCoaching`, `heavyHints` (11 and 12) and `tip`. There is no hand-entered minimum: the star target comes from
+the solver fixture. No level picker yet (#386); start a level in dev with `window.__ys.loadLevel(n)`. Arrival levels
+(4, 6, 8, 9, 10, 13) start with a truck waiting that the UI cannot receive until #384.
+
+## Solver and stars
+
+- `modules/solver.ts`: `solve(level)` is A* over engine states (rehandle cost 1, collect and receive 0) with the
+  engine's `rejectionFor` and `applyAction`, clocks ignored. Key: stacks as an unordered multiset, next, receipts and
+  deadline. Heuristic: containers above a lower-numbered one (admissible and consistent). Returns null when no
+  completion fits the rehandle cap. All 13 levels solve in under 15 ms each.
+- `pnpm run ys:solve [n...]` writes `fixtures/level-NN.json` (minimum and one optimal action list); `--check` writes
+  nothing and exits 1 on a missing or stale fixture, 2 on an unsolvable level. Re-run it after any level or rule change.
+- `modules/fixtures.ts` loads the fixtures (Vite glob); `modules/stars.ts`: three stars at or below the fixture
+  minimum, two at minimum + 1, one otherwise. Proven minima (#382) equal the V20 targets for all 13 levels:
+  1, 3, 5, 3, 3, 6, 9, 6, 7, 11, 1, 4, 7.
 
 ## Dev hook
 
@@ -38,7 +63,9 @@ coordinates so smoke tests tap real points.
 
 ## Tests and budget
 
-- Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`.
+- Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
+  `modules/levels.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
+  re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
   `yardshift-tutorial.smoke.ts` (phone viewport, home tile to route, tutorial won by touch taps). Each spec under 10 s.
