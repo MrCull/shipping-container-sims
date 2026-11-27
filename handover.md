@@ -16,8 +16,8 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #383 | Y3 clocks, overtime, crane animation | #381 | merged in branch (b8c8648) | |
 | #384 | Y4 incoming trucks and receipts | #382, #383 | merged in branch (3598431) | |
 | #385 | Y5 score, combo, queue colours, bonus | #383 | merged in branch (3436249) | |
-| #386 | Y6 progress, picker, results, undo | #384, #385 | open | |
-| #387 | Y7 drag, keyboard, urgency, coaching | #384 | open | |
+| #386 | Y6 progress, picker, results, undo | #384, #385 | in progress | session 1 |
+| #387 | Y7 drag, keyboard, urgency, coaching | #384 | in progress | session 1 |
 | #388 | Y8 audio cues and crane sounds | #384, #385 | open | |
 | #389 | Y9 phone layout, cover, sim guide | #386, #387 | open | |
 | #390 | Y10 background music | #388 | open | |
@@ -31,3 +31,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - Y1 seam: `input(ui, event, state)` takes state as a third argument (needed to tell a collect tap from a select tap); `window.__ys.hitRegions()` gives page coordinates for smoke taps. PR needs `smoke:yardshift`.
 - #382 put receipt rules in the engine early (solver needs them): levels 4, 6, 8, 9, 10, 13 start with a waiting truck the UI cannot serve until #384. Tutorial fixture rehandles #4 before collecting #1 (optimal, not the coached order).
 - #383: intro and player pause are in the engine but unused until #386 modals; receipts have no crane animation yet (#384); the gantry beam runs past the left edge at 390 px (phase 2 visual).
+- #384: arrival announcement does not pause clocks (spec allows either); tutorial smoke spec runs 10 to 11.6 s, over its 10 s target (Y11 to trim).
