@@ -35,3 +35,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - #387: U emits `{type: "undo"}` (`UiAction` in types/presentation.ts); until #386 the store shows "Undo is not available yet". #386 must wire the store `undo()` to `dispatch`. No drag or keyboard smoke spec yet (Y11 may add one).
 - #386: undo also allowed after a "Yard blocked" failure (V20), never after timeout; a hidden tab freezes clocks but does not open the pause menu; tutorial smoke spec now 10.5 to 11.1 s.
 - #388: no sound was listened to in a browser (owner checks audio quality in the phase 2 playtest); added overtime-end and undo cues not in V20.
+- #390 added a fourth smoke spec (yardshift-music.smoke.ts); the spec says exactly three, so the review fix folds it into a unit test or an existing spec. Music licence: available-media records none (same as other sims); owner to confirm before a public release.
