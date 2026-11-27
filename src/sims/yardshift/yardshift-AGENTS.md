@@ -264,15 +264,23 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `tick`) to cues in event order (collect, combo, receive, rehandle, arrival, deadline-one, deadline-zero, overtime
   start and end, bonus window, jackpot, bonus missed, truck-low, `shift-tick` from `shift-low`, win, timeout,
   blocked, undo). It never diffs states.
-  `rejectionCue()` (invalid), `craneStartCue()`, `comboCue(c)` (pitch 660 + min(c, 8) x 65 Hz, ascending) and
+  `rejectionCue()` (invalid), `craneStartCue()`, `comboCue(c)` (one C major pentatonic step per combo,
+  `pentatonicNote(min(c, 8) - 1)`: D5 at 2 up to E6 at 8, so chains play a tune) and
   `craneCues(before, after)` (pick at progress `PICK_AT` 0.30, land at `LAND_AT` 0.88). Tones are V20's
   `tone(f0, f1, dur, vol, delay, type)` with `vol` a relative sound gain.
+- Bonus sounds (owner feedback: phone clicker game mini sounds): `jackpot` (on `bonus-awarded`) keeps the fanfare
+  chord and layers `coinLayer()` over it, tagged by `Tone.role`: a `pop` for the +250 float (same event, no cue of
+  its own), six quick `coin` notes rising E6 to E7 on the pentatonic, then a `shimmer` of high detuned sine pairs.
+  `bonus-window` is a soft twinkle (G6, C7, E7 sines with faint detuned twins); `bonus-missed` a gentle two-step
+  downward sine blip. Level budget: no cue's summed envelope peaks exceed 0.306 (the jackpot before this pass; its
+  low thump went 0.09 to 0.08 and its arpeggio 0.045 to 0.04 to make room), checked in `audioCues.test.ts`.
 - Store: `step()` wraps every dispatch and tick and sends its cues to `onCue` listeners; `startMove` sends the
   crane start, `frame` the pick and land crossings; reduced motion sends only the landing.
 - `composables/useYardAudio.ts` (mounted by `Yardshift.vue`): one Web Audio bus `GainNode` set from
   `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live; the context starts on the
   first pointer or key press. No fixed volumes. Every oscillator or buffer source and its envelope gain disconnect on
-  `onended` (`releaseOnEnded`, `composables/useYardAudio.test.ts`).
+  `onended` (`releaseOnEnded`; `playTone` is exported, and `composables/useYardAudio.test.ts` plays the whole jackpot
+  through a fake context and checks every node reaches the bus and disconnects).
 - Samples in `assets/audio/` (mono 64 kbit/s, trimmed with a fade out from `available-media/sound-samples`):
   `crane-pick.mp3` (first 0.6 s of `container-loaded-to-ship.mp3`), `crane-land.mp3` (first 0.7 s of
   `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and

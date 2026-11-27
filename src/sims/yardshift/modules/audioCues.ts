@@ -17,6 +17,8 @@ export interface Tone {
   vol: number
   delay: number
   type: ToneType
+  /** The layer a tone belongs to in a layered cue: the bonus coin arpeggio, its shimmer, or the score pop. */
+  role?: 'coin' | 'shimmer' | 'pop'
 }
 
 export type SampleName = 'pick' | 'land' | 'truck'
@@ -66,6 +68,42 @@ function tone(f0: number, f1: number, dur = 0.09, vol = 0.035, delay = 0, type: 
 
 const FANFARE = [523.25, 659.25, 783.99, 1046.5, 1318.5]
 
+/** Semitones of the major pentatonic (C D E G A) above its root. */
+const PENTATONIC = [0, 2, 4, 7, 9]
+/** C5: the root the combo ladder and the bonus sounds count pentatonic steps from. */
+const PENTATONIC_ROOT = 523.2511
+
+/** The frequency `step` notes up C major pentatonic from C5 (step 5 is C6), so ladders and arpeggios stay in key. */
+export function pentatonicNote(step: number): number {
+  const octave = Math.floor(step / PENTATONIC.length)
+  const degree = PENTATONIC[step - octave * PENTATONIC.length]!
+  return PENTATONIC_ROOT * 2 ** (octave + degree / 12)
+}
+
+/**
+ * The bonus collect's coin layer, laid over the fanfare chord: a short upward pop as the +250 float appears (the
+ * float is the same `bonus-awarded` event, so it has no cue of its own), a quick rising pentatonic coin arpeggio
+ * (E6 to E7, 30 ms apart, alternating triangle and sine, done before the chord swells), then a shimmer of high
+ * detuned sine pairs that beat gently as the chord rings.
+ */
+function coinLayer(): Tone[] {
+  const COIN_START = 0.02
+  const COIN_GAP = 0.03
+  const coins = [7, 8, 9, 10, 11, 12].map((step, i) =>
+    coin(pentatonicNote(step), 0.06, 0.013, COIN_START + i * COIN_GAP, i % 2 === 0 ? 'triangle' : 'sine'),
+  )
+  const shimmerAt = COIN_START + 6 * COIN_GAP
+  const shimmer = [pentatonicNote(15), pentatonicNote(15) + 7, pentatonicNote(17), pentatonicNote(17) - 9].map(
+    (f, i): Tone => ({ ...tone(f, f * 1.01, 0.36, 0.0045, shimmerAt + i * 0.03), role: 'shimmer' }),
+  )
+  const pop: Tone = { ...tone(pentatonicNote(10), pentatonicNote(13), 0.05, 0.012, 0.02), role: 'pop' }
+  return [pop, ...coins, ...shimmer]
+}
+
+function coin(f: number, dur: number, vol: number, delay: number, type: ToneType): Tone {
+  return { ...tone(f, f, dur, vol, delay, type), role: 'coin' }
+}
+
 export function rejectionCue(): Cue {
   return { name: 'invalid', tones: [tone(150, 80)] }
 }
@@ -75,9 +113,12 @@ export function craneStartCue(): Cue {
   return { name: 'crane-start', tones: [tone(92, 140, 0.28, 0.02, 0, 'triangle')] }
 }
 
-/** The combo ladder: pitch rises with the combo length up to `COMBO_LADDER_TOP`. */
+/**
+ * The combo ladder: one pentatonic step up per combo length, up to `COMBO_LADDER_TOP` (combo 2 is D5, 8 is E6, about the old 790 to 1180 Hz slide), so a
+ * chain plays a tune instead of a slide.
+ */
 export function comboCue(combo: number): Cue {
-  const f = 660 + Math.min(combo, COMBO_LADDER_TOP) * 65
+  const f = pentatonicNote(Math.min(combo, COMBO_LADDER_TOP) - 1)
   return { name: 'combo', tones: [tone(f, f, 0.15, 0.04, 0.13)], detail: combo }
 }
 
@@ -127,20 +168,31 @@ function eventCues(e: ShiftEvent, after: ShiftState): Cue[] {
     case 'overtime-end':
       return [{ name: 'overtime-end', tones: [tone(300, 520, 0.12, 0.035)] }]
     case 'bonus-window':
-      return [{ name: 'bonus-window', tones: [tone(880, 1108, 0.1, 0.035, 0.1), tone(1320, 1320, 0.14, 0.035, 0.2)] }]
+      // A soft twinkle: three high pentatonic sines rising (G6, C7, E7), each with a faint detuned twin a few hertz up.
+      return [
+        {
+          name: 'bonus-window',
+          tones: [8, 10, 12].flatMap((step, i) => {
+            const f = pentatonicNote(step)
+            return [tone(f, f, 0.12, 0.022, 0.08 + i * 0.07), tone(f + 4, f + 4, 0.16, 0.007, 0.08 + i * 0.07)]
+          }),
+        },
+      ]
     case 'bonus-awarded':
       return [
         {
           name: 'jackpot',
           tones: [
-            tone(160, 43, 0.19, 0.09, 0, 'triangle'),
-            ...FANFARE.flatMap((f, i) => [tone(f, f, 0.24, 0.045, i * 0.052, 'triangle'), tone(2 * f, 2 * f, 0.13, 0.012, i * 0.052)]),
+            tone(160, 43, 0.19, 0.08, 0, 'triangle'),
+            ...FANFARE.flatMap((f, i) => [tone(f, f, 0.24, 0.04, i * 0.052, 'triangle'), tone(2 * f, 2 * f, 0.13, 0.012, i * 0.052)]),
             ...FANFARE.slice(0, 4).map((f) => tone(f, f, 0.42, 0.024, 0.25)),
+            ...coinLayer(),
           ],
         },
       ]
     case 'bonus-missed':
-      return [{ name: 'bonus-missed', tones: [tone(650, 290, 0.12, 0.025)] }]
+      // A gentle short downward blip: two soft sine drops, the second lower.
+      return [{ name: 'bonus-missed', tones: [tone(660, 440, 0.07, 0.022), tone(440, 294, 0.1, 0.018, 0.07)] }]
     case 'completed':
       return [
         {

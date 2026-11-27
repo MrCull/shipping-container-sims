@@ -6,7 +6,16 @@
 import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
 import { levelByNumber, TUTORIAL, truckSecondsFrom } from './levels'
-import { comboCue, craneCues, cuesForStep, rejectionCue, SHIFT_TICK_SECONDS, type Cue, type CueName } from './audioCues'
+import {
+  COMBO_LADDER_TOP,
+  comboCue,
+  craneCues,
+  cuesForStep,
+  rejectionCue,
+  SHIFT_TICK_SECONDS,
+  type Cue,
+  type CueName,
+} from './audioCues'
 import type { LevelDef, Shift, ShiftAction, ShiftEvent } from '../types/engine'
 
 /** Four exposed-in-order collections; first truck 12 s, shift 40 s, overtime 3x. */
@@ -55,6 +64,24 @@ function names(cues: readonly Cue[]): CueName[] {
 
 function count(cues: readonly Cue[], name: CueName): number {
   return cues.filter((c) => c.name === name).length
+}
+
+/** True when `f` is a note of C major pentatonic (C D E G A), to the nearest semitone and within 1 cent. */
+function onPentatonic(f: number): boolean {
+  const semis = 12 * Math.log2(f / 261.6256)
+  const n = Math.round(semis)
+  return Math.abs(semis - n) < 0.01 && [0, 2, 4, 7, 9].includes(((n % 12) + 12) % 12)
+}
+
+/** The largest sum of envelope peaks of a cue's tones sounding at once (checked at each tone's attack peak). */
+function peakGain(cue: Cue): number {
+  let peak = 0
+  for (const t of cue.tones) {
+    const at = t.delay + 0.008
+    const sum = cue.tones.filter((o) => o.delay <= at && at < o.delay + o.dur).reduce((s, o) => s + o.vol, 0)
+    peak = Math.max(peak, sum)
+  }
+  return peak
 }
 
 describe('Yardshift audio cues', () => {
@@ -160,6 +187,70 @@ describe('Yardshift audio cues', () => {
     for (let c = 2; c < 8; c++) expect(pitch(c + 1)).toBeGreaterThan(pitch(c))
     expect(pitch(12)).toBe(pitch(8))
     expect(comboCue(3).detail).toBe(3)
+  })
+
+  it('the combo ladder steps on the major pentatonic, so a chain plays a tune', () => {
+    for (let c = 2; c <= COMBO_LADDER_TOP; c++) expect(onPentatonic(comboCue(c).tones[0]!.f0)).toBe(true)
+  })
+
+  it('a bonus collect layers a rising pentatonic coin arpeggio and a high shimmer over the chord', () => {
+    const [jackpot] = cuesForStep(createShift(timed).state, [{ type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }])
+    const coins = jackpot!.tones.filter((t) => t.role === 'coin')
+    expect(coins.length).toBeGreaterThanOrEqual(4)
+    expect(coins.length).toBeLessThanOrEqual(6)
+    for (const t of coins) {
+      expect(['triangle', 'sine']).toContain(t.type)
+      expect(onPentatonic(t.f0)).toBe(true)
+      expect(t.dur).toBeLessThanOrEqual(0.12)
+    }
+    for (let i = 1; i < coins.length; i++) {
+      expect(coins[i]!.f0).toBeGreaterThan(coins[i - 1]!.f0)
+      expect(coins[i]!.delay).toBeGreaterThan(coins[i - 1]!.delay)
+    }
+    const shimmer = jackpot!.tones.filter((t) => t.role === 'shimmer')
+    expect(shimmer.length).toBeGreaterThanOrEqual(2)
+    for (const t of shimmer) expect(t.f0).toBeGreaterThan(2000)
+    const detuned = shimmer.some((a) => shimmer.some((b) => a !== b && Math.abs(a.f0 - b.f0) > 0 && Math.abs(a.f0 - b.f0) < 20))
+    expect(detuned).toBe(true)
+    // The existing fanfare chord (the character the owner likes) is still there underneath.
+    expect(jackpot!.tones.filter((t) => t.role === undefined).length).toBeGreaterThanOrEqual(14)
+  })
+
+  it('a bonus window opens with a soft twinkle and a miss is a gentle short downward blip', () => {
+    const s = createShift(timed).state
+    const [open] = cuesForStep(s, [{ type: 'bonus-window', id: 3, ms: 1200 }])
+    expect(open!.tones.length).toBeGreaterThanOrEqual(3)
+    for (const t of open!.tones) {
+      expect(t.type).toBe('sine')
+      expect(t.f0).toBeGreaterThan(1000)
+      expect(t.vol).toBeLessThanOrEqual(0.03)
+    }
+    const [miss] = cuesForStep(s, [{ type: 'bonus-missed', id: 3 }])
+    for (const t of miss!.tones) {
+      expect(t.f1).toBeLessThan(t.f0)
+      expect(t.type).toBe('sine')
+    }
+    const end = Math.max(...miss!.tones.map((t) => t.delay + t.dur))
+    expect(end).toBeLessThanOrEqual(0.25)
+  })
+
+  it('no cue sums louder than the loudest cue before the bonus sounds (the old jackpot, 0.306)', () => {
+    const s = createShift(timed).state
+    const events: ShiftEvent[] = [
+      { type: 'completed' },
+      { type: 'failed', reason: 'timeout' },
+      { type: 'failed', reason: 'blocked' },
+      { type: 'bonus-window', id: 3, ms: 1200 },
+      { type: 'bonus-awarded', id: 3, points: 250, ms: 5000 },
+      { type: 'bonus-missed', id: 3 },
+    ]
+    const all = [...events.flatMap((e) => cuesForStep(s, [e])), comboCue(COMBO_LADDER_TOP)]
+    for (const cue of all) expect(peakGain(cue), cue.name).toBeLessThanOrEqual(0.306)
+    // A bonus collect plays collect, combo and jackpot in one step: together they stay under 0.45.
+    const r = recorder(timed)
+    r.act({ type: 'collect' })
+    const collectStep = [...cuesForStep(r.shift.state, [{ type: 'collected', id: 2, from: 1 }]), comboCue(8), all[4]!]
+    expect(collectStep.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.45)
   })
 
   it('the bonus window chord rises', () => {
