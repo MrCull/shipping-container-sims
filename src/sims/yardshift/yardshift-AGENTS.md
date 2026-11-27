@@ -141,6 +141,29 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   "... No valid stack. Make space first." while heavy cargo is selected; 13 has none. Rejection messages (the store's
   `message`, shown over the hint) stay on every level.
 
+## Screen layout, phone first (#389)
+
+- `modules/screenLayout.ts` (pure): `screenLayout(box, insets)` stacks the HUD, queue, incoming band, play surface,
+  hint and control bar top to bottom inside the safe area (`box` minus `insets`). Fixed band heights come from
+  `bandHeights(width)` (the HUD takes two rows below `WIDE_PX` 620, one row above); the surface takes the rest
+  (never under `MIN_SURFACE_PX` 200), so the yard is the hero. On a desktop the column is at most `MAX_COLUMN_PX`
+  880 wide, centred. Helpers `overlaps`, `contains`, `offset` (surface rect to page rect).
+- `Yardshift.vue` measures its root (top edge to the window bottom, so the page never scrolls) and the safe-area
+  insets (a hidden probe padded with `env(safe-area-inset-*)`), places every band absolutely at its rect
+  (`overflow: hidden`), and gives the store the surface size as the presentation viewport. `SimPage.vue` uses
+  `100dvh` and hides its centred sim name below 480 px (it was clipped and sat under the menu button).
+- `layoutFor` uses whole-pixel column edges (neighbours share an edge, no float overlap). `view.arrowAt` is the
+  mandatory-receipt arrow's box: inside the receipt bay, under its label, never over a stack or the yard.
+- `modules/screenLayout.test.ts`: at 390 px (under the site header, and full screen with notch insets), tablet and
+  two desktop sizes, no band overlaps another or leaves the safe area, the surface is the tallest band and over 55 %
+  of the safe height, every level's stack and bay regions sit inside the surface without overlapping, the arrow is
+  in the receipt bay; plus singular and plural copy ("1 MOVE LEFT", "1 rehandle", "1 star bonus").
+- Scene: the gantry beam runs along the slanted row of stacks (first to last column, legs just outside) and moves
+  across it with the trolley; the trolley rest point resets when the surface size or stack count changes.
+- Cover: `assets/cover.png` is a 640x360 capture of level 6 at 1280 px (8-bit palette, about 19 KB); recapture with
+  `pnpm run screenshot --path "/sim/yardshift?unlock=all" --width 1280 --height 760 --scale 2` plus
+  `window.__ys.loadLevel(6)` and the first four fixture actions, then crop the game column to 16:9.
+
 ## Levels
 
 `modules/levels.ts` holds all 13 V20 levels exactly (`levels.test.ts` checks them against the V20 array). V20's code
@@ -172,11 +195,11 @@ coordinates so smoke tests tap real points.
 ## Tests and budget
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
-  `modules/receiptsView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
+  `modules/receiptsView.test.ts`, `modules/screenLayout.test.ts`, `modules/clocks.test.ts`, `modules/clocksView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
   `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
   `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/solver.test.ts` (every fixture replayed through the
   engine, and the solver
-  re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
+  re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 2.4 s wall time through `pnpm test:sim yardshift` (#389); no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
   `yardshift-tutorial.smoke.ts` (phone viewport, home tile to route, tutorial won by touch taps); spec 2

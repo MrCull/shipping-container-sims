@@ -118,6 +118,8 @@ export interface ViewModel {
   dimYard: boolean
   /** Where the bobbing red arrow points: the receipt truck at deadline 0 (until it is selected), else null. */
   arrow: 'receipt' | null
+  /** The arrow's box (surface px) inside the receipt bay, under the bay label and over the truck; null with no arrow. */
+  arrowAt: Rect | null
   hitRegions: HitRegion[]
   hud: { title: string; loaded: string; rehandles: string; score: string; combo: string }
   /** The next six collection positions. */

@@ -12,6 +12,7 @@ import { unlockAllRequested } from './modules/progress'
 import { undoView } from './modules/screens'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
+import { NO_INSETS, screenLayout, type Insets } from './modules/screenLayout'
 import type { Rect } from './types/presentation'
 
 function rectStyle(r: Rect): Record<string, string> {
@@ -26,6 +27,12 @@ store.setUnlockAll(unlockAllRequested(window.location.search, import.meta.env.DE
 store.loadLevel(Math.min(LEVELS.length, store.progress.unlocked), { intro: true })
 const undo = computed(() => undoView(store.state))
 
+const root = ref<HTMLElement | null>(null)
+const probe = ref<HTMLElement | null>(null)
+/** The game box (fills the window below the site header) and its safe-area insets; `screenLayout` places the bands. */
+const box = ref({ width: 390, height: 600 })
+const insets = ref<Insets>(NO_INSETS)
+const screen = computed(() => screenLayout(box.value, insets.value))
 const surface = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const view = computed(() => store.view)
@@ -47,9 +54,29 @@ function onVisibility(): void {
   store.setHidden(document.hidden)
 }
 
+/** Safe-area insets from a probe padded with `env(safe-area-inset-*)`, in game-box coordinates. */
+function readInsets(top: number): Insets {
+  const el = probe.value
+  if (!el) return NO_INSETS
+  const cs = getComputedStyle(el)
+  const px = (v: string) => parseFloat(v) || 0
+  return {
+    top: Math.max(0, px(cs.paddingTop) - top),
+    right: px(cs.paddingRight),
+    bottom: px(cs.paddingBottom),
+    left: px(cs.paddingLeft),
+  }
+}
+
 function measure(): void {
-  const el = surface.value
-  if (el) store.setViewport(el.clientWidth, el.clientHeight)
+  const el = root.value
+  if (!el) return
+  // The game box runs from its top edge to the bottom of the window, so the page never scrolls.
+  const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY)
+  box.value = { width: el.clientWidth, height: Math.max(0, window.innerHeight - top) }
+  insets.value = readInsets(top)
+  const s = screen.value.surface
+  store.setViewport(s.w, s.h)
 }
 
 /** Play-surface coordinates (CSS px) of a pointer event, or null before layout. */
@@ -94,7 +121,8 @@ onMounted(async () => {
   raf = requestAnimationFrame(loop)
   measure()
   observer = new ResizeObserver(measure)
-  if (surface.value) observer.observe(surface.value)
+  if (root.value) observer.observe(root.value)
+  window.addEventListener('resize', measure)
   if (devApiEnabled) {
     const { installDevApi } = await import('./dev/devApi')
     if (!unmounted) uninstallDevApi = installDevApi(store, () => surface.value)
@@ -107,13 +135,25 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibility)
   window.removeEventListener('keydown', onKey)
   observer?.disconnect()
+  window.removeEventListener('resize', measure)
   uninstallDevApi?.()
 })
 </script>
 
 <template>
-  <div class="yardshift">
+  <div
+    ref="root"
+    class="yardshift"
+    :style="{ height: `${box.height}px` }"
+  >
+    <div
+      ref="probe"
+      class="safe-probe"
+      aria-hidden="true"
+    />
     <YardHud
+      class="band"
+      :style="rectStyle(screen.hud)"
       :title="view.hud.title"
       :loaded="view.hud.loaded"
       :rehandles="view.hud.rehandles"
@@ -121,14 +161,17 @@ onBeforeUnmount(() => {
       :credit-pulse="store.creditPulse"
     />
     <YardQueue
+      class="band"
+      :style="rectStyle(screen.queue)"
       :queue="view.queue"
       :score="view.hud.score"
       :combo="view.hud.combo"
       :bonus="view.bonus"
     />
     <div
-      class="incoming"
+      class="incoming band"
       :class="view.incoming.status"
+      :style="rectStyle(screen.incoming)"
       data-testid="ys-incoming"
       :data-status="view.incoming.status"
     >
@@ -136,8 +179,9 @@ onBeforeUnmount(() => {
     </div>
     <div
       ref="surface"
-      class="surface"
+      class="surface band"
       data-testid="ys-surface"
+      :style="rectStyle(screen.surface)"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
@@ -168,10 +212,10 @@ onBeforeUnmount(() => {
         >{{ view.incoming.bay }}</small>
       </span>
       <div
-        v-if="view.arrow === 'receipt'"
+        v-if="view.arrow === 'receipt' && view.arrowAt"
         class="arrow"
         data-testid="ys-arrow"
-        :style="{ left: `${view.layout.receipt.x + view.layout.receipt.w / 2}px`, top: `${view.layout.receipt.y}px` }"
+        :style="rectStyle(view.arrowAt)"
       >
         ▼
       </div>
@@ -203,13 +247,15 @@ onBeforeUnmount(() => {
       </p>
     </div>
     <footer
-      class="hint"
+      class="hint band"
+      :style="rectStyle(screen.hint)"
       data-testid="ys-hint"
     >
       {{ store.message || view.hint }}
     </footer>
     <nav
-      class="controls"
+      class="controls band"
+      :style="rectStyle(screen.controls)"
       aria-label="Shift controls"
     >
       <button
@@ -249,18 +295,28 @@ onBeforeUnmount(() => {
 <style scoped>
 .yardshift {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   min-height: 0;
   position: relative;
+  overflow: hidden;
   background: #101c27;
   color: #e7eef2;
   user-select: none;
 }
+.band {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.safe-probe {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
 .surface {
-  position: relative;
-  flex: 1;
-  min-height: 0;
   touch-action: none;
 }
 .canvas {
@@ -270,7 +326,6 @@ onBeforeUnmount(() => {
 }
 .incoming {
   /* Reserved space: the band keeps its height with or without a truck, so the layout never jumps on arrival. */
-  height: 26px;
   line-height: 26px;
   padding: 0 16px;
   font-size: 0.75rem;
@@ -294,19 +349,21 @@ onBeforeUnmount(() => {
 .arrow {
   position: absolute;
   pointer-events: none;
-  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   color: #e9483d;
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   line-height: 1;
   text-shadow: 0 2px 4px rgb(0 0 0 / 50%);
   animation: bob 0.7s ease-in-out infinite alternate;
 }
 @keyframes bob {
   from {
-    margin-top: -7px;
+    transform: translateY(-4px);
   }
   to {
-    margin-top: 7px;
+    transform: translateY(4px);
   }
 }
 .announce {
@@ -409,16 +466,19 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 .hint {
-  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 2px 16px;
   background: #142530;
-  font-size: 0.9rem;
-  min-height: 1.4em;
+  font-size: 0.85rem;
+  line-height: 1.2;
 }
 .controls {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
+  padding: 0 16px;
   background: #142530;
 }
 .controls button {

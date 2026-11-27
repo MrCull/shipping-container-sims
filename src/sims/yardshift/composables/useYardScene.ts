@@ -144,6 +144,8 @@ export function useYardScene(
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   /** Where the trolley rests between moves (world x, z); null until the first build. */
   let rest: { x: number; z: number } | null = null
+  /** The layout the rest point belongs to; a resize or a new level puts the trolley back over the yard centre. */
+  let restKey = ''
 
   scene.add(new THREE.HemisphereLight(0xdfefff, 0x1a2630, 1.6))
   const sun = new THREE.DirectionalLight(0xffffff, 1.8)
@@ -251,14 +253,15 @@ export function useYardScene(
 
     // Gantry: a beam across the yard on two legs, a trolley and a hook cable; a crane move animates them.
     const topY = (vm.capacity + 1.2) * ch * 1.04
-    const left = groundAt(layout.yard.x, baseY, width, height)
-    const right = groundAt(layout.yard.x + layout.yard.w, baseY, width, height)
     const collect = groundAt(layout.collection.x + layout.collection.w / 2, layout.collection.y + layout.collection.h * 0.55, width, height)
     const colBase = (i: number) => {
       const col = layout.columns[i]!
       return groundAt(col.x + col.w / 2, baseY, width, height)
     }
-    rest ??= { x: left.x + (right.x - left.x) / 2, z: left.z }
+    const key = `${width}x${height}x${layout.columns.length}`
+    if (key !== restKey) rest = null
+    restKey = key
+    rest ??= groundAt(layout.yard.x + layout.yard.w / 2, baseY, width, height)
     let hook = { x: rest.x, z: rest.z, y: topY }
     if (m && moving) {
       const fromTruck = m.from === RECEIPT_TRUCK
@@ -286,13 +289,25 @@ export function useYardScene(
       dynamic.add(boxMesh)
     }
     const gantryMat = new THREE.MeshStandardMaterial({ color: COLOURS.gantry, roughness: 0.5 })
-    const beamLen = Math.abs(right.x - left.x) + cw
+    // The beam runs along the row of stacks (which the side-turned camera makes a slanted world line), from just
+    // outside the first stack to just outside the last, so it never runs past the screen edge on a phone (#389).
+    const first = colBase(0)
+    const last = colBase(layout.columns.length - 1)
+    const run = Math.hypot(last.x - first.x, last.z - first.z) || 1
+    const dir = { x: (last.x - first.x) / run, z: (last.z - first.z) / run }
+    const reach = cw * 0.62
+    const beamLen = run + 2 * reach
     const beam = box(beamLen, ch * 0.3, cd * 0.3, gantryMat)
-    beam.position.set((left.x + right.x) / 2, topY + ch * 0.6, hook.z)
+    // The gantry travels on its rails with the trolley: shift the whole frame across the row to the hook.
+    const mid = { x: (first.x + last.x) / 2, z: (first.z + last.z) / 2 }
+    const along = (hook.x - mid.x) * dir.x + (hook.z - mid.z) * dir.z
+    const off = { x: hook.x - mid.x - along * dir.x, z: hook.z - mid.z - along * dir.z }
+    beam.position.set(mid.x + off.x, topY + ch * 0.6, mid.z + off.z)
+    beam.rotation.y = -Math.atan2(dir.z, dir.x)
     const legL = box(ch * 0.25, topY + ch * 0.6, ch * 0.25, gantryMat)
-    legL.position.set(left.x - cw * 0.5, (topY + ch * 0.6) / 2, hook.z)
+    legL.position.set(first.x - dir.x * reach + off.x, (topY + ch * 0.6) / 2, first.z - dir.z * reach + off.z)
     const legR = legL.clone()
-    legR.position.x = right.x + cw * 0.5
+    legR.position.set(last.x + dir.x * reach + off.x, (topY + ch * 0.6) / 2, last.z + dir.z * reach + off.z)
     const trolley = box(cw * 0.6, ch * 0.35, cd * 0.6, new THREE.MeshStandardMaterial({ color: 0xe9b849 }))
     trolley.position.set(hook.x, topY + ch * 0.6, hook.z)
     const cableLen = Math.max(0.01, topY + ch * 0.6 - hook.y)
