@@ -91,7 +91,7 @@ export interface QueueItem {
 export interface IncomingView {
   /** `none`: no truck waits; `optional`: orange signal; `mandatory`: deadline 0, red signal. */
   status: 'none' | 'optional' | 'mandatory'
-  /** Band text ("↑ RECEIPT #8 · 3 MOVES LEFT"), empty when no truck waits. */
+  /** Band text ("↑ RECEIPT #8 · 3 MOVES LEFT"), or "COLLECT #n · READY" when no truck waits (empty once over). */
   text: string
   /** Receipt bay status ("NO TRUCK", "3 MOVES LEFT", "MANDATORY NOW"). */
   bay: string
@@ -114,6 +114,8 @@ export interface ReceiptCargoView {
 export interface ViewModel {
   layout: Layout
   capacity: number
+  /** Stack numbers under each column: "01", "02", ... */
+  stackLabels: string[]
   containers: ContainerView[]
   /** Stacks the selected container (or the selected receipt truck's cargo) may move to. */
   destinations: number[]

@@ -59,10 +59,12 @@ const BAY_GAP = 12
 /** Screen layout of the play surface: the yard band with one column per stack, and the two truck bays below. */
 export function layoutFor(stackCount: number, vp: Viewport): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
-  const yardTop = Math.round(vp.height * 0.06)
-  const yardBottom = Math.round(vp.height * 0.68)
-  const bayTop = Math.round(vp.height * 0.72)
-  const bayBottom = Math.max(bayTop, vp.height - 12)
+  // The yard is the hero (playtest fix 8): the bays take a fixed share under it, with a small gap.
+  const bayH = Math.round(Math.min(vp.height * 0.22, Math.max(84, vp.height * 0.18)))
+  const yardTop = Math.round(vp.height * 0.02)
+  const bayBottom = Math.max(yardTop, vp.height - 8)
+  const bayTop = Math.max(yardTop, bayBottom - bayH)
+  const yardBottom = Math.max(yardTop, bayTop - 6)
   const yard: Rect = { x: SIDE, y: yardTop, w: innerW, h: yardBottom - yardTop }
   // Whole-pixel column edges, so neighbouring columns share an edge exactly and never overlap by a rounding error.
   const edge = (i: number) => SIDE + Math.round((i * innerW) / Math.max(1, stackCount))
@@ -80,10 +82,13 @@ export function layoutFor(stackCount: number, vp: Viewport): Layout {
 const BAY_LABEL_PX = 32
 const ARROW_PX = 28
 
-/** The bobbing arrow's box: centred in the receipt bay, under its label, pointing down at the truck. */
+/**
+ * The bobbing arrow's box: in the receipt bay under its label, beside the cab at the bay's right end, so it never
+ * covers the cargo's number (playtest fix 3).
+ */
 export function arrowBox(bay: Rect): Rect {
   const h = Math.min(ARROW_PX, Math.max(0, bay.h - BAY_LABEL_PX) / 2)
-  return { x: bay.x + bay.w / 2 - ARROW_PX / 2, y: bay.y + Math.min(BAY_LABEL_PX, bay.h / 3), w: ARROW_PX, h }
+  return { x: bay.x + bay.w - ARROW_PX - 6, y: bay.y + Math.min(BAY_LABEL_PX, bay.h / 3), w: ARROW_PX, h }
 }
 
 function regionsFor(layout: Layout): HitRegion[] {
@@ -127,7 +132,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 'S'}`
 export function incomingView(state: ShiftState): IncomingView {
   const id = waitingArrival(state)
   if (id === undefined || state.deadline === null || state.status !== 'playing') {
-    return { status: 'none', text: '', bay: 'NO TRUCK' }
+    const text = state.status === 'playing' && state.next <= state.level.count ? `COLLECT #${state.next} · READY` : ''
+    return { status: 'none', text, bay: 'NO TRUCK' }
   }
   if (state.deadline === 0) return { status: 'mandatory', text: `↑ RECEIPT #${id} · MANDATORY`, bay: 'MANDATORY NOW' }
   const left = `${plural(state.deadline, 'MOVE')} LEFT`
@@ -288,6 +294,7 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
   return {
     layout,
     capacity: state.level.capacity,
+    stackLabels: state.stacks.map((_, i) => String(i + 1).padStart(2, '0')),
     containers,
     destinations:
       ui.selection === 'receipt'
@@ -413,8 +420,9 @@ function tap(ui: UiState, target: HitTarget | null, state: ShiftState): InputRes
   if (ui.selection === 'receipt') return { ui: clear, action: { type: 'receive', to: j } }
   if (ui.selection === j) return { ui: clear }
   if (ui.selection !== null) return { ui: clear, action: { type: 'rehandle', from: ui.selection, to: j } }
-  // At deadline 0 only the receipt is legal: a stack tap selects nothing (the hint names the receipt truck).
-  if (state.deadline === 0) return { ui }
+  // At deadline 0 only the receipt is legal: a stack tap selects nothing and sends a move for the engine to reject
+  // ("Receive truck #n first."), so the message and the invalid cue fire (story 17).
+  if (state.deadline === 0) return { ui: clear, action: { type: 'collect', from: j } }
   const top = topOf(state, j)
   if (top === undefined) return { ui }
   if (top === state.next) return { ui, action: { type: 'collect', from: j } }

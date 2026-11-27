@@ -165,7 +165,7 @@ export function rejectionFor(state: ShiftState, action: ShiftAction): Rejection 
     if (!hasStack(state, action.to)) return reject('no-such-stack')
     return placeRejection(state, id, action.to)
   }
-  if (state.deadline === 0) return reject('receive-first')
+  if (state.deadline === 0) return { reason: 'receive-first', message: `Receive truck #${waitingArrival(state)} first.` }
   if (action.type === 'collect') {
     if (action.from === undefined) return exposedNextStack(state) < 0 ? reject('not-exposed') : null
     if (!hasStack(state, action.from)) return reject('no-such-stack')

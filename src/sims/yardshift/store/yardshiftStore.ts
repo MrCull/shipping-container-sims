@@ -97,6 +97,11 @@ export const useYardshiftStore = defineStore('yardshift', () => {
       stepEvents.push(e)
       if (e.type === 'time-credit') creditPulse.value++
       if (e.type === 'arrival') announce(e.id, e.moves)
+      // The red mandatory signal takes over: the announcement would only repeat it (playtest fix 7).
+      if (e.type === 'deadline-zero') {
+        announcement.value = ''
+        announceLeftMs = 0
+      }
       if (e.type === 'bonus-awarded') bonusPulse.value++
       if (e.type === 'completed') recordResult()
     })

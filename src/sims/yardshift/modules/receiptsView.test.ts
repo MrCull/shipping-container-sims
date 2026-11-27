@@ -99,9 +99,12 @@ describe('Yardshift receipt input', () => {
     expect(input(RECEIPT, { type: 'tap', target: { kind: 'collection' } }, state)).toEqual({ ui: NONE })
   })
 
-  it('at deadline 0 a stack tap without the truck selected selects nothing and sends nothing', () => {
+  it('at deadline 0 a stack tap without the truck selected selects nothing; its move is rejected (receive-first)', () => {
     const state = level4(TO_ZERO)
-    expect(input(NONE, { type: 'tap', target: { kind: 'stack', index: 1 } }, state)).toEqual({ ui: NONE })
+    expect(input(NONE, { type: 'tap', target: { kind: 'stack', index: 1 } }, state)).toEqual({
+      ui: NONE,
+      action: { type: 'collect', from: 1 },
+    })
   })
 
   it('a receipt crane move runs from the receipt bay to the stack', () => {
