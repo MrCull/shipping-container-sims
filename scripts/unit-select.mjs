@@ -21,10 +21,14 @@
  * `--json` one object `{ base, how, scope, projects, skipped, reasons }` (`projects` is `"all"` or a list; for CI).
  * `--run` then runs `vitest run` with those projects.
  *
+ * CI (#380, .github/workflows/pr-checks.yml): `--event NAME` is the GitHub event; `pull_request` selects from
+ * `--files-from`, any other event (push to main, workflow_dispatch) is scope `all` without reading paths.
+ * `--summary FILE` appends the scope, projects and reasons as Markdown (the step summary).
+ *
  * Test: node --test scripts/test-unit-select.mjs
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { simIdsWithTests } from './vitest-projects.mjs'
 
@@ -79,6 +83,27 @@ export function projectsFor(scope, simsWithTests) {
   return { projects, skipped }
 }
 
+/**
+ * The scope for a CI event (#380): a pull request uses its changed paths; a push to main, a manual run and any other
+ * event run every project. Pure.
+ * @param {string} event the GitHub event name
+ * @param {string[]} files
+ */
+export function selectForEvent(event, files) {
+  if (event === 'pull_request') return selectUnitScope(files)
+  return { scope: 'all', reasons: [{ path: `(event ${event})`, why: `all (a ${event} run tests every project)` }] }
+}
+
+/** Markdown for the CI step summary: scope, projects, skipped sims and one line per changed path. Pure. */
+export function summaryMarkdown({ scope, projects, skipped, reasons }) {
+  const list = (x) => (Array.isArray(x) ? (x.length ? x.join(' ') : '(none)') : x)
+  const lines = [`### Unit-test scope: ${list(scope)}`, '', `Projects: ${list(projects)}`]
+  if (Array.isArray(projects) && projects.length === 0) lines.push('', 'Nothing selected: no unit tests to run for this change, a passing no-op.')
+  for (const s of skipped) lines.push('', `Skipped sim ${s.sim}: ${s.reason}`)
+  if (reasons.length) lines.push('', ...reasons.map((r) => `- \`${r.path}\`: ${r.why}`))
+  return lines.join('\n') + '\n'
+}
+
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 
 /** The base to compare against, as test-related.sh picks it: `{ sha, how }`, or throws when it does not resolve. */
@@ -126,19 +151,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const vitestArgs = dd >= 0 ? argv.slice(dd + 1) : []
   const json = args.includes('--json')
   const runIt = args.includes('--run')
-  const fi = args.indexOf('--files-from')
-  const filesFrom = fi >= 0 ? args[fi + 1] : undefined
-  const positional = args.filter((a, i) => !a.startsWith('--') && !(fi >= 0 && i === fi + 1))
-  const unknown = args.filter((a) => a.startsWith('--') && !['--json', '--run', '--files-from'].includes(a))
+  const valued = ['--files-from', '--event', '--summary']
+  const valueOf = (flag) => (args.indexOf(flag) >= 0 ? args[args.indexOf(flag) + 1] : undefined)
+  const filesFrom = valueOf('--files-from')
+  const event = valueOf('--event')
+  const summary = valueOf('--summary')
+  const valueAt = new Set(valued.map((f) => args.indexOf(f)).filter((i) => i >= 0).map((i) => i + 1))
+  const positional = args.filter((a, i) => !a.startsWith('--') && !valueAt.has(i))
+  const unknown = args.filter((a) => a.startsWith('--') && !['--json', '--run', ...valued].includes(a))
   if (unknown.length || positional.length > 1) {
-    console.error('usage: node scripts/unit-select.mjs [--run] [--json] [--files-from FILE] [base] [-- vitest args]')
+    console.error('usage: node scripts/unit-select.mjs [--run] [--json] [--event NAME] [--files-from FILE] [--summary FILE] [base] [-- vitest args]')
     process.exit(2)
   }
 
-  let base = { sha: null, how: `files from ${filesFrom}` }
-  let files
+  let base = { sha: null, how: event && event !== 'pull_request' ? `event ${event}` : `files from ${filesFrom}` }
+  let files = []
   try {
-    if (filesFrom) files = readFileSync(filesFrom, 'utf8').split('\n').map((s) => s.trim()).filter(Boolean)
+    if (event && event !== 'pull_request') files = []
+    else if (filesFrom) files = readFileSync(filesFrom, 'utf8').split('\n').map((s) => s.trim()).filter(Boolean)
     else {
       base = resolveBase(root, positional[0])
       files = changedFiles(root, base.sha)
@@ -148,8 +178,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(2)
   }
 
-  const { scope, reasons } = selectUnitScope(files)
+  const { scope, reasons } = event ? selectForEvent(event, files) : selectUnitScope(files)
   const { projects, skipped } = projectsFor(scope, simIdsWithTests(root))
+  if (summary) appendFileSync(summary, summaryMarkdown({ scope, projects, skipped, reasons }))
   const out = json ? console.error : console.log
   if (json) console.log(JSON.stringify({ base: base.sha, how: base.how, scope, projects, skipped, reasons }))
   out(`unit-select: base ${base.sha ? base.sha.slice(0, 7) : '-'} (${base.how})`)
