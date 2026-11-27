@@ -10,7 +10,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #377 | Per-sim vitest projects and test:sim | none | merged in branch (bf5c7e4) | |
 | #378 | Smoke selection anchoring, home-wall only | none | merged in branch (b9c62f0) | |
 | #379 | Scoped verify and verify:all | #377 | merged in branch (c7830c6) | |
-| #380 | CI unit tests use the selection | #379 | open | |
+| #380 | CI unit tests use the selection | #379 | in progress | session 1 |
 | #381 | Y1 tracer: tutorial won by taps | #377 | in progress | session 1 |
 | #382 | Y2 13 levels, heavy rule, solver | #381 | open | |
 | #383 | Y3 clocks, overtime, crane animation | #381 | open | |
@@ -27,3 +27,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 
 - V20 unlocks levels 1 to 4 and `?test` unlocks all in any build; the spec wins (level 1 only, `?unlock=all` in dev and smoke builds).
 - box-empire and container-stack have no unit tests, so they are not vitest projects (`simIdsWithTests()` in `scripts/vitest-projects.mjs`).
+- Implementers run `pnpm run verify <integration-branch>`: with no base, verify compares with `origin/main` and covers the whole branch.
