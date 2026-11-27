@@ -133,7 +133,7 @@ export interface ViewModel {
   /** The next six collection positions. */
   queue: QueueItem[]
   /** The open bonus window, or null. */
-  bonus: { id: number; text: string } | null
+  bonus: { id: number; text: string; fraction: number } | null
   clocks: ClocksView
   hint: string
   complete: boolean

@@ -326,7 +326,14 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
       combo: `×${state.combo}`,
     },
     queue: queueFor(state),
-    bonus: state.bonusMs > 0 ? { id: state.next, text: `${(state.bonusMs / 1000).toFixed(1)}s` } : null,
+    bonus:
+      state.bonusMs > 0
+        ? {
+            id: state.next,
+            text: `${(state.bonusMs / 1000).toFixed(1)}s`,
+            fraction: Math.min(1, state.bonusMs / Math.max(1, state.level.bonusWindowSeconds * 1000)),
+          }
+        : null,
     clocks: clocksView(state),
     hint: hintFor(state, ui),
     complete: state.status === 'complete',

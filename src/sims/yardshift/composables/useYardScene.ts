@@ -22,8 +22,10 @@ const PX_PER_UNIT = 40
 const PITCH = THREE.MathUtils.degToRad(28)
 const YAW = THREE.MathUtils.degToRad(-14)
 
-/** The selected container (sequence colours and grey come from the view-model). */
-const SELECTED = '#ffcb60'
+/** How far a selected container lifts, as a share of its height (selection never changes its colour). */
+const SELECTED_LIFT = 0.3
+/** The selected container's rim: a white shell drawn round it. */
+const SELECTED_RIM = 0xffffff
 /** A receipt container while it waits on the receipt truck or rides the crane (V20 arrival orange). */
 const ARRIVAL = '#eda54e'
 /** Warning red of the static urgency glow (reduced motion), V20's arrow red. */
@@ -42,6 +44,9 @@ const COLOURS = {
   silhouette: 0x1b3346,
   column: 0x26404f,
   destination: 0x2f8f6a,
+  ghost: 0x5ff0b0,
+  slotLine: 0x6f8a99,
+  emptyBed: 0x56636b,
   collectionBay: 0x31595a,
   receiptBay: 0x85552e,
   receiptBayUrgent: 0x85382e,
@@ -191,7 +196,7 @@ function disposeTree(root: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>()
   const materials = new Set<THREE.Material>()
   root.traverse((o) => {
-    if (o instanceof THREE.Mesh) {
+    if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
       geometries.add(o.geometry)
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) materials.add(m)
     }
@@ -211,6 +216,10 @@ interface ContainerDraw extends LabelSpec {
   y: number
   z: number
   seed: number
+  /** Drawn lifted with the white selection rim. */
+  selected?: boolean
+  /** Uniform scale (the receipt cargo shrinks to fit a short desktop bay); 1 elsewhere. */
+  scale?: number
 }
 
 /** The meshes of one layout, built once and updated every render. */
@@ -228,6 +237,10 @@ interface Built {
   yardCentre: THREE.Vector3
   columnMats: THREE.MeshStandardMaterial[]
   receiptBayMat: THREE.MeshStandardMaterial
+  receiptBedMat: THREE.MeshStandardMaterial
+  cargoScale: number
+  rim: THREE.Mesh
+  ghosts: THREE.InstancedMesh
   bodies: THREE.InstancedMesh
   labelGeometry: THREE.BufferGeometry
   labels: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[]
@@ -343,10 +356,13 @@ export function useYardScene(
     const group = new THREE.Group()
     const { layout } = vm
     const colW = layout.columns[0]?.w ?? 80
-    const cw = Math.min(colW * 0.82, 110) / PX_PER_UNIT
-    const ch = cw * 0.42
+    const cw = Math.min(colW * 0.86, 120) / PX_PER_UNIT
     const cd = cw * 0.55
-    const baseY = layout.yard.y + layout.yard.h * 0.82
+    // Fit the stacks at full capacity (plus the gantry over them) to the yard height, so the yard is the hero.
+    const baseY = layout.yard.y + layout.yard.h - 22
+    const rise = (baseY - layout.yard.y) * 0.8
+    const tierPx = rise / (vm.capacity + 1.5) - (cd * PX_PER_UNIT * Math.sin(PITCH)) / (vm.capacity + 1.5)
+    const ch = Math.min(cw * 0.62, Math.max(cw * 0.36, tierPx / Math.cos(PITCH) / PX_PER_UNIT))
     const colBase = layout.columns.map((col) => groundAt(col.x + col.w / 2, baseY, width, height))
     const first = colBase[0] ?? new THREE.Vector3()
     const last = colBase[colBase.length - 1] ?? first
@@ -365,9 +381,13 @@ export function useYardScene(
       return mat
     })
 
-    const collect = groundAt(layout.collection.x + layout.collection.w / 2, layout.collection.y + layout.collection.h * 0.55, width, height)
-    const receiptBed = groundAt(layout.receipt.x + layout.receipt.w / 2, layout.receipt.y + layout.receipt.h * 0.55, width, height)
+    const collect = groundAt(layout.collection.x + layout.collection.w / 2, layout.collection.y + layout.collection.h * 0.66, width, height)
+    const receiptBed = groundAt(layout.receipt.x + layout.receipt.w / 2, layout.receipt.y + layout.receipt.h * 0.66, width, height)
+    // Trucks and the receipt cargo shrink to fit a short bay (desktop), so they stay under the bay label.
+    const cargoPx = (ch * Math.cos(PITCH) + cd * Math.sin(PITCH) + ch) * PX_PER_UNIT
+    const k = Math.min(1, Math.max(0.55, (layout.receipt.h * 0.6) / Math.max(1, cargoPx)))
     let receiptBayMat = standard(COLOURS.receiptBay)
+    let receiptBedMat = standard(COLOURS.receiptTruck, 0.6)
     const shadowSpots: { x: number; z: number; w: number; d: number }[] = []
     for (const [rect, centre, bayColour, truckColour, facing] of [
       [layout.collection, collect, COLOURS.collectionBay, COLOURS.collectionTruck, -1],
@@ -377,11 +397,50 @@ export function useYardScene(
       const bayMat = standard(bayColour)
       if (facing === 1) receiptBayMat = bayMat
       boxAt(group, bw, 0.02, cd * 1.8, bayMat, centre.x, 0, centre.z)
-      const tl = Math.min(bw * 0.8, cw * 1.6)
-      boxAt(group, tl * 0.72, ch * 0.35, cd * 0.9, standard(truckColour, 0.6), centre.x - facing * tl * 0.12, ch * 0.3, centre.z)
-      boxAt(group, tl * 0.22, ch * 0.9, cd * 0.9, standard(COLOURS.cab, 0.6), centre.x + facing * tl * 0.38, ch * 0.45, centre.z)
-      shadowSpots.push({ x: centre.x, z: centre.z, w: tl * 1.15, d: cd * 1.5 })
+      const tl = Math.min(bw * 0.8, cw * 1.6 * k)
+      const bedMat = standard(truckColour, 0.6)
+      if (facing === 1) receiptBedMat = bedMat
+      boxAt(group, tl * 0.72, ch * 0.35 * k, cd * 0.9 * k, bedMat, centre.x - facing * tl * 0.12, ch * 0.3 * k, centre.z)
+      boxAt(group, tl * 0.22, ch * 0.9 * k, cd * 0.9 * k, standard(COLOURS.cab, 0.6), centre.x + facing * tl * 0.38, ch * 0.45 * k, centre.z)
+      shadowSpots.push({ x: centre.x, z: centre.z, w: tl * 1.15, d: cd * 1.5 * k })
     }
+
+
+    // Capacity: a dashed outline of every slot up to the stack capacity (story 8), one merged line mesh.
+    const slotEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(cw, ch, cd))
+    const slotParts: THREE.BufferGeometry[] = []
+    for (const base of colBase) {
+      for (let t = 0; t < vm.capacity; t++) slotParts.push(slotEdges.clone().translate(base.x, ch / 2 + t * ch * 1.04, base.z))
+    }
+    slotEdges.dispose()
+    if (slotParts.length > 0) {
+      const slotGeo = mergeGeometries(slotParts)!
+      for (const g of slotParts) g.dispose()
+      const slots = new THREE.LineSegments(
+        slotGeo,
+        new THREE.LineDashedMaterial({ color: COLOURS.slotLine, dashSize: 0.12, gapSize: 0.1, transparent: true, opacity: 0.55 }),
+      )
+      slots.computeLineDistances()
+      group.add(slots)
+    }
+
+    // Legal destinations: a ghost container at the drop height of each one (fix 4), filled per render.
+    const ghosts = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(cw, ch, cd),
+      new THREE.MeshBasicMaterial({ color: COLOURS.ghost, transparent: true, opacity: 0.4, depthWrite: false }),
+      Math.max(1, colBase.length),
+    )
+    ghosts.count = 0
+    ghosts.frustumCulled = false
+    group.add(ghosts)
+
+    // The selection rim: a white back-face shell a little larger than a container (fix 1).
+    const rim = new THREE.Mesh(
+      new THREE.BoxGeometry(cw * 1.1, ch * 1.16, cd * 1.12),
+      new THREE.MeshBasicMaterial({ color: SELECTED_RIM, side: THREE.BackSide }),
+    )
+    rim.visible = false
+    group.add(rim)
 
     const bodyMat = new THREE.MeshStandardMaterial({ roughness: 0.65, metalness: 0.1, normalMap: corrugation })
     bodyMat.normalScale.set(0.6, 0.6)
@@ -432,13 +491,17 @@ export function useYardScene(
       ch,
       cd,
       topY,
-      bedY: ch * 0.5 + ch / 2,
+      bedY: ch * k,
       colBase,
       collect,
       receiptBed,
       yardCentre,
       columnMats,
       receiptBayMat,
+      receiptBedMat,
+      cargoScale: k,
+      rim,
+      ghosts,
       bodies,
       labelGeometry,
       labels: [],
@@ -489,8 +552,14 @@ export function useYardScene(
     const rock = c.glint ? Math.sin(now * 0.006 + c.seed) * 0.06 : 0
     tmp.q.setFromEuler(tmp.e.set(0, 0, rock))
     tmp.p.set(c.x, c.y, c.z)
+    const k = c.scale ?? 1
+    tmp.s.setScalar(k)
     b.bodies.setMatrixAt(i, tmp.m.compose(tmp.p, tmp.q, tmp.s))
+    tmp.s.setScalar(1)
+    // The glint: a gold flash sweeping over the exposed bonus container's body; the number stays dark navy.
+    const flash = c.glint ? Math.pow(0.5 + 0.5 * Math.sin(now * 0.004 + c.seed), 6) : 0
     tmp.c.set(c.colour)
+    if (flash > 0) tmp.c.lerp(new THREE.Color(0xffe39a), flash * 0.45)
     if (c.urgent) tmp.c.lerp(new THREE.Color(URGENT_GLOW), 0.35)
     if (c.dim) tmp.c.multiplyScalar(DIM)
     b.bodies.setColorAt(i, tmp.c)
@@ -498,15 +567,13 @@ export function useYardScene(
     label.visible = true
     label.position.copy(tmp.p)
     label.quaternion.copy(tmp.q)
+    label.scale.setScalar(k)
     const map = labelTexture(c, textures)
     if (label.material.map !== map) {
       label.material.map = map
       label.material.needsUpdate = true
     }
     label.material.color.setScalar(c.dim ? DIM : 1)
-    // The glint: a gold flash sweeping over the exposed bonus container's label.
-    const flash = c.glint ? Math.pow(0.5 + 0.5 * Math.sin(now * 0.004 + c.seed), 6) : 0
-    label.material.emissive.set(0xffd36a).multiplyScalar(flash * 0.7)
   }
 
   function update(vm: ViewModel, b: Built): void {
@@ -514,6 +581,8 @@ export function useYardScene(
     const now = performance.now()
     b.columnMats.forEach((mat, i) => mat.color.setHex(vm.destinations.includes(i) ? COLOURS.destination : COLOURS.column))
     b.receiptBayMat.color.setHex(vm.incoming.status === 'mandatory' ? COLOURS.receiptBayUrgent : COLOURS.receiptBay)
+    // No truck waiting: the empty bed is grey, so it never reads as cargo (story 23).
+    b.receiptBedMat.color.setHex(vm.receiptCargo ? COLOURS.receiptTruck : COLOURS.emptyBed)
 
     const m = move.value
     const stackTop = (stack: number) => vm.containers.filter((o) => o.stack === stack).length
@@ -536,12 +605,13 @@ export function useYardScene(
         label: c.label,
         bonus: c.bonus,
         heavy: c.heavy,
-        colour: c.selected ? SELECTED : c.colour,
+        colour: c.colour,
+        selected: c.selected,
         dim: vm.dimYard,
         urgent: c.urgent,
         glint: c.glint,
         x: base.x + dx / PX_PER_UNIT,
-        y: ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * 0.25 : 0) + dy / PX_PER_UNIT,
+        y: ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * SELECTED_LIFT : 0) + dy / PX_PER_UNIT,
         z: base.z,
         seed: c.id,
       })
@@ -553,16 +623,34 @@ export function useYardScene(
         label: cargo.label,
         bonus: cargo.bonus,
         heavy: cargo.heavy,
-        colour: cargo.selected ? SELECTED : ARRIVAL,
+        colour: ARRIVAL,
+        selected: cargo.selected,
         dim: false,
         urgent: cargo.urgent,
         glint: false,
         x: receiptBed.x + dx / PX_PER_UNIT,
-        y: bedY + (cargo.selected ? ch * 0.25 : 0) + dy / PX_PER_UNIT,
+        y: bedY + (cargo.selected ? ch * SELECTED_LIFT : 0) + dy / PX_PER_UNIT,
         z: receiptBed.z,
         seed: cargo.id,
+        scale: b.cargoScale,
       })
     }
+    // The rim follows the selected container (a stack top or the receipt cargo), never while the crane moves it.
+    const sel = draws.find((d) => d.selected)
+    b.rim.visible = !m && sel !== undefined
+    if (sel) {
+      b.rim.position.set(sel.x, sel.y, sel.z)
+      b.rim.scale.setScalar(sel.scale ?? 1)
+    }
+    // Ghost containers at the drop height of each legal destination.
+    b.ghosts.count = 0
+    for (const to of vm.destinations) {
+      const base = colBase[to]
+      if (!base || b.ghosts.count >= b.ghosts.instanceMatrix.count) continue
+      tmp.p.set(base.x, ch / 2 + stackTop(to) * ch * 1.04, base.z)
+      b.ghosts.setMatrixAt(b.ghosts.count++, tmp.m.compose(tmp.p, new THREE.Quaternion(), tmp.s))
+    }
+    b.ghosts.instanceMatrix.needsUpdate = true
 
     // The crane: the trolley rests where the last move ended; a move animates hook and box.
     let hook = { x: b.rest.x, z: b.rest.z, y: topY }
@@ -571,8 +659,9 @@ export function useYardScene(
       const fromTruck = m.from === RECEIPT_TRUCK
       const src = fromTruck ? receiptBed : colBase[m.from]!
       const dst = m.to >= 0 ? colBase[m.to]! : b.collect
-      const srcY = fromTruck ? bedY : ch / 2 + moving.tier * ch * 1.04
-      const dstY = m.to >= 0 ? ch / 2 + stackTop(m.to) * ch * 1.04 : ch * 0.5 + ch / 2
+      const truckY = bedY + (ch * (1 - b.cargoScale)) / 2
+      const srcY = fromTruck ? truckY : ch / 2 + moving.tier * ch * 1.04
+      const dstY = m.to >= 0 ? ch / 2 + stackTop(m.to) * ch * 1.04 : truckY
       const p = cranePhase(m.progress)
       if (p.leg === 'toSource') {
         hook = { x: lerp(b.rest.x, src.x, p.t), z: lerp(b.rest.z, src.z, p.t), y: topY }

@@ -44,7 +44,7 @@ export const UNDO_SHIFT_MS = 3000
 export const MAX_STEP_MS = 100
 /** Next-truck time a valid rehandle adds (never to the shift clock). */
 export const REHANDLE_CREDIT_MS = 1000
-const TIMEOUT_MESSAGE = 'Time ran out.'
+const TIMEOUT_MESSAGE = 'Shift time ran down before the yard was clear.'
 const BLOCKED_MESSAGE = 'No legal move left: the yard is blocked.'
 const BLOCKED_RECEIPT_MESSAGE = 'The mandatory receipt has no legal space: the yard is blocked.'
 

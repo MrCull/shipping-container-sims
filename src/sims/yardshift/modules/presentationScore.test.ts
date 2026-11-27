@@ -96,7 +96,7 @@ describe('Yardshift bonus badges', () => {
     shift.dispatch({ type: 'collect' })
     expect(byId(shift).get(3)!.bonus).toBe(true)
     expect(view(shift).queue[0]!.bonus).toBe(true)
-    expect(view(shift).bonus).toEqual({ id: 3, text: '1.3s' })
+    expect(view(shift).bonus).toMatchObject({ id: 3, text: '1.3s' })
     run(shift, 1300)
     expect(byId(shift).get(3)!.bonus).toBe(false)
     expect(view(shift).queue[0]!.bonus).toBe(false)

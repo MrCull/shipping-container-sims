@@ -50,6 +50,13 @@ describe('Yardshift playtest fixes', () => {
     expect(vm.capacity).toBe(levelByNumber(4)!.capacity)
   })
 
+  it('an open bonus window carries the share left for the countdown ring', () => {
+    const state = createShift(levelByNumber(2)!).state
+    const windowMs = state.level.bonusWindowSeconds * 1000
+    const vm = present({ ...state, bonusMs: windowMs / 4 }, NONE, PHONE)
+    expect(vm.bonus?.fraction).toBeCloseTo(0.25)
+  })
+
   it('the mandatory arrow sits beside the cab, clear of the cargo number in the bay centre', () => {
     const bay = layoutFor(5, PHONE).receipt
     const arrow = arrowBox(bay)

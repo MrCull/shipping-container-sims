@@ -6,7 +6,7 @@ defineProps<{
   score: string
   combo: string
   /** The open bonus window, or null. */
-  bonus: { id: number; text: string } | null
+  bonus: { id: number; text: string; fraction: number } | null
 }>()
 </script>
 
@@ -24,6 +24,12 @@ defineProps<{
         :class="{ empty: item.id === null }"
       >
         {{ item.label }}
+        <span
+          v-if="i === 0 && bonus"
+          class="ring"
+          data-testid="ys-bonus-ring"
+          :style="{ '--ring': bonus.fraction }"
+        />
         <span
           v-if="item.bonus"
           class="star"
@@ -90,6 +96,18 @@ defineProps<{
   color: var(--ys-gold-bright);
   font-size: 0.7rem;
   text-shadow: 0 0 2px var(--ys-gold-deep);
+}
+/* The bonus countdown (story 55): a gold ring round the current chip that empties with the window. */
+.ring {
+  position: absolute;
+  inset: -3px;
+  padding: 2px;
+  border-radius: 6px;
+  background: conic-gradient(var(--ys-gold-bright) calc(var(--ring) * 1turn), transparent 0);
+  mask:
+    linear-gradient(black 0 0) content-box exclude,
+    linear-gradient(black 0 0);
+  pointer-events: none;
 }
 .bonus {
   color: var(--ys-gold-bright);

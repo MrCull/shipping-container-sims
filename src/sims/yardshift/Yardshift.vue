@@ -202,10 +202,17 @@ onBeforeUnmount(() => {
         :style="rectStyle(view.layout.yard)"
       />
       <span
+        v-for="(col, i) in view.layout.columns"
+        :key="`n${i}`"
+        class="stack-no"
+        data-testid="ys-stack-no"
+        :style="{ left: `${col.x}px`, top: `${view.layout.yard.y + view.layout.yard.h - 16}px`, width: `${col.w}px` }"
+      >{{ view.stackLabels[i] }}</span>
+      <span
         v-for="region in view.hitRegions.filter((r) => r.kind !== 'stack')"
         :key="region.kind"
         class="bay-label"
-        :style="{ left: `${region.rect.x}px`, top: `${region.rect.y}px`, width: `${region.rect.w}px` }"
+        :style="{ left: `${region.rect.x + 6}px`, top: `${region.rect.y + 4}px` }"
       >
         {{ region.kind === 'collection' ? '▼ COLLECTION' : '▲ RECEIPT' }}
         <small
@@ -237,7 +244,7 @@ onBeforeUnmount(() => {
         data-testid="ys-bonus-burst"
         :style="{
           left: `${view.layout.collection.x + view.layout.collection.w / 2}px`,
-          top: `${view.layout.collection.y}px`,
+          top: `${Math.max(0, view.layout.collection.y - 36)}px`,
         }"
       >
         <span class="ring" />
@@ -265,7 +272,7 @@ onBeforeUnmount(() => {
       <button
         type="button"
         data-testid="ys-pause"
-        @click="store.pause()"
+        @click="($event.currentTarget as HTMLElement).blur(); store.pause()"
       >
         Pause
       </button>
@@ -401,11 +408,22 @@ onBeforeUnmount(() => {
 }
 .bay-label {
   position: absolute;
+  z-index: 1;
   pointer-events: none;
-  text-align: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ys-scrim);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
-  opacity: 0.75;
+}
+.stack-no {
+  position: absolute;
+  pointer-events: none;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
 }
 .burst {
   position: absolute;
@@ -495,6 +513,13 @@ onBeforeUnmount(() => {
   color: var(--color-text);
   font-weight: 700;
   cursor: pointer;
+}
+.controls button:focus {
+  outline: none;
+}
+.controls button:focus-visible {
+  outline: 2px solid var(--ys-gold);
+  outline-offset: 2px;
 }
 .controls button:disabled {
   opacity: 0.45;

@@ -54,7 +54,7 @@ describe('screens', () => {
     for (let t = 0; t < 2000; t += MAX_STEP_MS) shift.tick(MAX_STEP_MS)
     expect(failView(shift.state)).toEqual({
       title: 'Time’s up',
-      reason: 'Time ran out.',
+      reason: 'Shift time ran down before the yard was clear.',
       left: '2 containers left · 0 points',
       canUndo: false,
     })
