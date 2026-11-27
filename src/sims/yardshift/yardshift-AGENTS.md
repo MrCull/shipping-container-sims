@@ -59,6 +59,28 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   2.0 s (`--repeat-each=2`, dev project) once the scene stopped rebuilding every frame.
 - Screenshot: `docs/prototypes/review-374/level-11-heavy-harbour.png` (level 11 at 390 px).
 
+## Playtest fixes (spec #374 phase 1)
+
+- Selection never changes a container's colour (the gold matched the yellow sequence slot): the selected stack top
+  or receipt cargo lifts `SELECTED_LIFT` (0.3 of its height) and gets a white back-face rim shell (`Built.rim`).
+- Legal destinations: a translucent green ghost container at the drop height of each (`Built.ghosts`, one
+  `InstancedMesh`), as well as the green column pad. Capacity: dashed outlines of every slot up to `capacity` (one
+  merged `LineSegments`, `LineDashedMaterial`), and `view.stackLabels` ("01".."0n") drawn under each column.
+- Fit: `layoutFor` gives the bays a fixed share (about 18 to 22 % of the surface) right under the yard (6 px gap);
+  the scene sizes containers from the column width and the yard height at full capacity (`ch` 0.36 to 0.62 of `cw`).
+  Trucks and the receipt cargo scale down (`Built.cargoScale`, 0.55 to 1) to fit a short desktop bay.
+- Bay labels sit top-left on a scrim pill; `arrowBox` puts the mandatory arrow beside the cab (bay's right end), so
+  it never covers the cargo number. The empty receipt bed is grey (no truck). The bonus glint flashes the body, never
+  the label, so numbers stay dark navy; the open bonus window draws a gold countdown ring round the first queue chip
+  (`view.bonus.fraction`). The "+250 · +5s" float starts 36 px above the collection bay.
+- At deadline 0 a stack tap sends `collect(from)`, which the engine rejects with "Receive truck #n first."
+  (`receive-first`), so the message and the invalid cue fire. The store clears the arrival announcement on
+  `deadline-zero`. With no truck waiting the incoming band reads "COLLECT #n · READY".
+- Pause keeps no focus ring after a click (`:focus-visible` only); the timeout message is "Shift time ran down before
+  the yard was clear." (the fail title is "Time's up").
+- Tests: `modules/playtestFixes.test.ts`, `store/yardshiftStoreAnnounce.test.ts`. Before and after phone captures:
+  `docs/prototypes/playtest/`.
+
 ## Clocks and the crane (#383)
 
 - State holds `shiftMs`, `truckMs`, `truckAllowanceMs`, `operations` (collections plus receipts), `overtime`,
@@ -182,9 +204,9 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   in the receipt bay; plus singular and plural copy ("1 MOVE LEFT", "1 rehandle", "1 star bonus").
 - Scene: the gantry beam runs along the slanted row of stacks (first to last column, legs just outside) and moves
   across it with the trolley; the trolley rest point resets when the surface size or stack count changes.
-- Cover: `assets/cover.png` is a 640x360 capture of level 6 at 1280 px (8-bit palette, about 19 KB); recapture with
-  `pnpm run screenshot --path "/sim/yardshift?unlock=all" --width 1280 --height 760 --scale 2` plus
-  `window.__ys.loadLevel(6)` and the first four fixture actions, then crop the game column to 16:9.
+- Cover: `assets/cover.png` is a 640x360 capture of level 6 at 1280x760, scale 2 (8-bit palette, about 24 KB):
+  `window.__ys.loadLevel(6)` and the first four fixture actions, wait about 2 s so no announcement or message shows,
+  then crop the 880 px game column from the incoming band down to 16:9 (no toast, no control bar).
 
 ## Audio cues (#388)
 
@@ -261,7 +283,7 @@ coordinates so smoke tests tap real points.
 ## Tests and budget
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
-  `modules/receiptsView.test.ts`, `modules/screenLayout.test.ts`, `modules/clocks.test.ts`, `modules/clocksView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
+  `modules/receiptsView.test.ts`, `modules/playtestFixes.test.ts`, `store/yardshiftStoreAnnounce.test.ts`, `modules/screenLayout.test.ts`, `modules/clocks.test.ts`, `modules/clocksView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
   `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
   `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/audioCues.test.ts`, `store/yardshiftStoreAudio.test.ts`,
   `modules/music.test.ts`, `composables/useYardMusic.test.ts` (happy-dom), `composables/useYardAudio.test.ts`,
