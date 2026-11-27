@@ -5,18 +5,33 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__ys typing
-import type { HitTarget } from '../../types/presentation'
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 
-async function tap(page: Page, target: HitTarget): Promise<void> {
-  const point = await page.evaluate((t) => {
-    const region = window.__ys!.hitRegions().find(
-      (r) => r.kind === t.kind && (r.kind !== 'stack' || t.kind !== 'stack' || r.index === t.index),
-    )!
-    return { x: region.rect.x + region.rect.w / 2, y: region.rect.y + region.rect.h / 2 }
-  }, target)
-  await page.touchscreen.tap(point.x, point.y)
+type Point = { x: number; y: number }
+
+/** Tap points by target key (`stack-0`, `collection`): the hit region centres, read once (the layout is fixed). */
+async function tapPoints(page: Page): Promise<Record<string, Point>> {
+  return page.evaluate(() =>
+    Object.fromEntries(
+      window.__ys!.hitRegions().map((r) => [
+        r.kind === 'stack' ? `stack-${r.index}` : r.kind,
+        { x: r.rect.x + r.rect.w / 2, y: r.rect.y + r.rect.h / 2 },
+      ]),
+    ),
+  )
+}
+
+/**
+ * Waits for a HUD counter's text, polled every animation frame in the page (#391: a software-GL frame here is about
+ * 140 ms, and the expect retry steps of 250 to 500 ms overshoot the end of a crane move).
+ */
+async function untilText(page: Page, testId: string, text: string): Promise<void> {
+  await page.waitForFunction(
+    ([id, want]) => document.querySelector(`[data-testid="${id}"]`)?.textContent?.trim() === want,
+    [testId, text] as const,
+    { polling: 'raf' },
+  )
 }
 
 test('the home tile opens Yardshift and the tutorial is won by taps', { tag: '@yardshift' }, async ({ page }) => {
@@ -27,18 +42,19 @@ test('the home tile opens Yardshift and the tutorial is won by taps', { tag: '@y
   await page.getByTestId('ys-start').click()
   await expect(page.getByTestId('ys-loaded')).toHaveText('0/4')
 
-  const stack = (index: number): HitTarget => ({ kind: 'stack', index })
-  await tap(page, stack(0)) // collect #1
-  await expect(page.getByTestId('ys-loaded')).toHaveText('1/4')
-  await tap(page, stack(1)) // select #4
-  await tap(page, stack(3)) // move #4 to the empty stack
-  await expect(page.getByTestId('ys-rehandles')).toHaveText('1/5')
+  const points = await tapPoints(page)
+  const tap = (key: string) => page.touchscreen.tap(points[key]!.x, points[key]!.y)
   // Each move plays a crane animation that drops taps until it ends, so wait for the move before the next tap.
-  await tap(page, stack(1)) // collect #2
-  await expect(page.getByTestId('ys-loaded')).toHaveText('2/4')
-  await tap(page, { kind: 'collection' }) // collect #3 through the truck
-  await expect(page.getByTestId('ys-loaded')).toHaveText('3/4')
-  await tap(page, stack(3)) // collect #4
+  await tap('stack-0') // collect #1
+  await untilText(page, 'ys-loaded', '1/4')
+  await tap('stack-1') // select #4
+  await tap('stack-3') // move #4 to the empty stack
+  await untilText(page, 'ys-rehandles', '1/5')
+  await tap('stack-1') // collect #2
+  await untilText(page, 'ys-loaded', '2/4')
+  await tap('collection') // collect #3 through the truck
+  await untilText(page, 'ys-loaded', '3/4')
+  await tap('stack-3') // collect #4
 
   await expect(page.getByTestId('ys-screen-result')).toBeVisible()
   await expect(page.getByTestId('ys-loaded')).toHaveText('4/4')

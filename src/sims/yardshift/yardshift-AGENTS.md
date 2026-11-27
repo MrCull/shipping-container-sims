@@ -229,9 +229,9 @@ coordinates so smoke tests tap real points.
   `modules/receiptsView.test.ts`, `modules/screenLayout.test.ts`, `modules/clocks.test.ts`, `modules/clocksView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
   `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
   `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/audioCues.test.ts`, `store/yardshiftStoreAudio.test.ts`,
-  `modules/music.test.ts`,
+  `modules/music.test.ts`, `composables/useYardMusic.test.ts` (happy-dom),
   `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
-  re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 2.4 s wall time through
+  re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 2.1 s wall time (#391) through
   `pnpm test:sim yardshift` (#389); no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
@@ -240,3 +240,8 @@ coordinates so smoke tests tap real points.
   and dimming, both cleared by a real tap on the receipt truck); spec 3 `yardshift-progress.smoke.ts` (desktop
   viewport: level 1's fixture through `window.__ys` gives the result screen, the reload opens on level 2 and the
   picker shows level 1's stars and level 2 unlocked). Each spec under 10 s. Spec 1 taps "Start shift" first.
+  Timings (#391, `--repeat-each=2`, dev project): tutorial 7.9 to 8.1 s, receipt 4.0 to 4.3 s, progress 2.0 to
+  2.1 s. A software-GL frame is about 140 ms there and a touch tap costs about 5 frames, so spec 1 reads the tap
+  points once and waits for each crane move with a `raf`-polled `waitForFunction`, not `expect` retries.
+- Music has no smoke spec (spec #374 allows three): `composables/useYardMusic.test.ts` (happy-dom, a fake `Audio`)
+  covers the loop, the music channel, the sliders and mute, pause and unmount.
