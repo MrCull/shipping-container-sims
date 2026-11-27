@@ -5,10 +5,14 @@
  *
  *   __ys.loadLevel(1); __ys.applyActions([{ type: 'collect' }]); __ys.state()
  *   __ys.hitRegions()   // tap targets in client (page) coordinates, for real taps in smoke tests
+ *   __ys.solution(2)    // the solver fixture's optimal action list for level 2
+ *   __ys.progress()     // the stored progress (unlocked level, best stars and score per level)
  */
 import type { useYardshiftStore } from '../store/yardshiftStore'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type { HitRegion } from '../types/presentation'
+import { fixtureFor } from '../modules/fixtures'
+import type { Progress } from '../modules/progress'
 
 export interface YardshiftDevApi {
   loadLevel(n: number): void
@@ -16,6 +20,8 @@ export interface YardshiftDevApi {
   applyActions(actions: ShiftAction[]): string | null
   state(): ShiftState
   hitRegions(): HitRegion[]
+  solution(level: number): ShiftAction[]
+  progress(): Progress
 }
 
 declare global {
@@ -38,6 +44,8 @@ export function installDevApi(
       return null
     },
     state: () => JSON.parse(JSON.stringify(store.state)) as ShiftState,
+    solution: (n) => fixtureFor(n)?.actions ?? [],
+    progress: () => JSON.parse(JSON.stringify(store.progress)) as Progress,
     hitRegions() {
       const box = surface()?.getBoundingClientRect()
       const dx = box?.left ?? 0

@@ -55,7 +55,7 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   `visibilitychange` to `store.setHidden`. `store.startMove` holds `animation`, animates `store.move.progress`
   0..1 (the scene draws the gantry phases: travel, lower, lift, travel, lower, release), then releases the pause
   and dispatches the action. Reduced motion dispatches at once. The dev hook's `applyActions` skips the animation.
-  No intro or pause modal yet (#386): the engine supports `intro` and `player`, the host does not send them.
+  The intro screen holds `intro`, the pause menu and level picker hold `player` (#386).
 
 ## Receipts in the UI (#384)
 
@@ -85,7 +85,7 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   (`bonus-window` event) when a collect makes a `level.bonusIds` container next, with `level.bonusWindowSeconds`;
   `tick` counts it down except while a pause is held or the deadline is 0 (forced receipt); receipts and rehandles
   leave it alone. Collecting with `bonusMs > 0` adds +250 and +5 s and a gold (`bonus-awarded`); reaching 0 emits
-  `bonus-missed` once. Undo (#386) restores `bonusMs` from its snapshot (V20 takes the min, so no farming).
+  `bonus-missed` once. Undo (#386) keeps the smaller of now and the snapshot's `bonusMs` (no farming).
   Stars never read score or golds.
 - Presentation: `ContainerView.slot` (0..5 or null), `colour` (`SEQUENCE_COLOURS` or `GREY`), `bonus` (medallion:
   a later bonus id, or the current one while its window is open, so it shows buried or grey and vanishes on a miss),
@@ -95,13 +95,36 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
   a gold star medallion; `components/ui/YardQueue.vue` shows queue, bonus countdown, score and combo; the store's
   `bonusPulse` replays a gold burst and "+250 · +5s" float over the collection bay. Sounds are #388's.
 
+## Undo, progress and screens (#386)
+
+- **Undo** (`{ type: 'undo' }`, `undoRejection(state)`): every accepted move stores the state before it as
+  `state.undoSnapshot` (whose own snapshot is null, so no chain). One per shift (`undosLeft`), allowed while playing and
+  after a blocked failure, never after a timeout or completion. It returns to the snapshot (puzzle, combo, golds,
+  receipts, deadline, rehandles) with score snapshot - 25, shift min(now, snapshot) - 3 s, truck clock, bonus window
+  and `earnedMs` each min(now, snapshot) (no refund, no farming), clears the selection, re-runs the blocked check and
+  re-announces (`arrival` event) a truck the undone move had served. Rejections: `nothing-to-undo`, `undo-used`,
+  `undo-low-time` (shift 3 s or less). Event `undone`.
+- `state.earnedMs`: shift time earned (quick service, combo, bonus), shown as "time earned" on the result screen.
+- **Progress** (`modules/progress.ts`): `{ version, unlocked, levels: { [n]: { stars, score } } }` in
+  `storage.sims.yardshift` of `src/utils/localStorage.ts`. `parseProgress` discards another version or a bad shape;
+  `recordCompletion` keeps best stars and best score independently and unlocks the next level; `saveProgress` catches
+  refused writes. Only level 1 starts unlocked; `unlockAllRequested(search, DEV, MODE)` honours `?unlock=all` in dev
+  and smoke builds only. The store records a completion on the `completed` event.
+- **Screens** (`modules/screens.ts`, rendered by `components/modals/YardScreens.vue`): `introView` (title, objective,
+  three-star target and max, shift, tip), `resultView` (stars, verdict, actual and minimum rehandles, score, best combo,
+  bonuses, time earned, `hasNext`), `failView` (title, reason, containers left, `canUndo` after a blocked failure),
+  `pickerRows` (best stars, best score, locks), `undoView` (enabled, label, reason). Store `overlay`: `intro`, `pause`
+  or `levels`; result and fail follow the shift status. The route opens on the intro of the highest unlocked level;
+  `store.loadLevel(n, { intro: true })` holds the `intro` pause until `startShift`. The control bar under the hint has
+  Pause, Undo (reason shown at 3 s or less) and Restart (restart skips the intro). Keyboard for undo and pause is #387's.
+
 ## Levels
 
 `modules/levels.ts` holds all 13 V20 levels exactly (`levels.test.ts` checks them against the V20 array). V20's code
 rules keyed on the level index are explicit data: `truckSeconds` (tutorial 30/20/15, else first, x0.5, x0.28),
 `bonusIds` (multiples of 3 from level 2), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
 `tutorialCoaching`, `heavyHints` (11 and 12) and `tip`. There is no hand-entered minimum: the star target comes from
-the solver fixture. No level picker yet (#386); start a level in dev with `window.__ys.loadLevel(n)`. Arrival levels
+the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no intro) or the level picker. Arrival levels
 (4, 6, 8, 9, 10, 13) start with a truck waiting.
 
 ## Solver and stars
@@ -119,17 +142,21 @@ the solver fixture. No level picker yet (#386); start a level in dev with `windo
 ## Dev hook
 
 `window.__ys` (`dev/devApi.ts`), installed only when `import.meta.env.DEV || import.meta.env.MODE === 'smoke'` (as
-Terminal Twin's `window.__tt`): `loadLevel(n)`, `applyActions(actions)`, `state()`, and `hitRegions()` in client
+Terminal Twin's `window.__tt`): `loadLevel(n)` (skips the intro), `applyActions(actions)` (undo too), `state()`, `solution(n)` (fixture actions),
+`progress()`, and `hitRegions()` in client
 coordinates so smoke tests tap real points.
 
 ## Tests and budget
 
 - Unit tests (vitest, node environment, no DOM or WebGL): `modules/engine.test.ts`, `modules/presentation.test.ts`,
   `modules/receiptsView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
-  `modules/presentationScore.test.ts`, `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
+  `modules/presentationScore.test.ts`, `modules/undo.test.ts`, `modules/progress.test.ts`, `modules/screens.test.ts`,
+  `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).
 - Browser smoke (`@yardshift` group, `smoke:yardshift` label, `tests/browser/`): spec 1
   `yardshift-tutorial.smoke.ts` (phone viewport, home tile to route, tutorial won by touch taps); spec 2
   `yardshift-receipt.smoke.ts` (level 4 driven to a mandatory receipt through `window.__ys`: arrow over the receipt bay
-  and dimming, both cleared by a real tap on the receipt truck). Each spec under 10 s.
+  and dimming, both cleared by a real tap on the receipt truck); spec 3 `yardshift-progress.smoke.ts` (desktop
+  viewport: level 1's fixture through `window.__ys` gives the result screen, the reload opens on level 2 and the
+  picker shows level 1's stars and level 2 unlocked). Each spec under 10 s. Spec 1 taps "Start shift" first.

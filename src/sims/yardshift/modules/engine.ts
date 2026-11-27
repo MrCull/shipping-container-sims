@@ -27,7 +27,18 @@ const MESSAGES: Record<RejectReason, string> = {
   'no-truck': 'No incoming truck is waiting.',
   'receive-first': 'Deadline reached. Receive the incoming truck first.',
   'crane-busy': 'The crane is busy.',
+  'nothing-to-undo': 'Nothing to undo yet.',
+  'undo-used': 'Undo already used this shift.',
+  'undo-low-time': 'Too little shift time left to undo.',
 }
+
+type MoveAction = Extract<ShiftAction, { type: 'collect' | 'rehandle' | 'receive' }>
+
+/** Undos per shift. */
+export const UNDOS_PER_SHIFT = 1
+/** Score and shift time an undo costs. */
+export const UNDO_POINTS = -25
+export const UNDO_SHIFT_MS = 3000
 
 /** The longest clock step one `tick` applies; a longer stall loses no more than this. */
 export const MAX_STEP_MS = 100
@@ -98,6 +109,9 @@ export function initialState(level: LevelDef): ShiftState {
     bestCombo: 0,
     golds: 0,
     bonusMs: bonusWindowMs(level, 1),
+    earnedMs: 0,
+    undosLeft: UNDOS_PER_SHIFT,
+    undoSnapshot: null,
     failure: null,
   }), [])
 }
@@ -130,8 +144,19 @@ function placeRejection(state: ShiftState, id: number, to: number): Rejection | 
   return null
 }
 
+/** Why undo is illegal now, or null. Allowed while playing and after a blocked failure (never after a timeout). */
+export function undoRejection(state: ShiftState): Rejection | null {
+  if (state.status === 'complete' || state.failure?.reason === 'timeout') return reject('shift-over')
+  if (state.pauses.includes('animation')) return reject('crane-busy')
+  if (state.undosLeft <= 0) return reject('undo-used')
+  if (state.shiftMs <= UNDO_SHIFT_MS) return reject('undo-low-time')
+  if (!state.undoSnapshot) return reject('nothing-to-undo')
+  return null
+}
+
 export function rejectionFor(state: ShiftState, action: ShiftAction): Rejection | null {
   if (action.type === 'pause' || action.type === 'resume') return null
+  if (action.type === 'undo') return undoRejection(state)
   if (state.status !== 'playing') return reject('shift-over')
   if (state.pauses.includes('animation')) return reject('crane-busy')
   if (action.type === 'receive') {
@@ -218,7 +243,42 @@ export function applyAction(state: ShiftState, action: ShiftAction): { state: Sh
   if (action.type === 'pause' || action.type === 'resume') {
     return { state: withPause(state, action.reason, action.type === 'pause'), events: [] }
   }
-  return withClocks(state, action, withScore(state, action, applyMove(state, action)))
+  if (action.type === 'undo') return applyUndo(state)
+  const moved = withClocks(state, action, withScore(state, action, applyMove(state, action)))
+  return { state: { ...moved.state, undoSnapshot: { ...state, undoSnapshot: null } }, events: moved.events }
+}
+
+/**
+ * Back to the snapshot: puzzle, combo, golds, receipts and deadline come from it; score is the snapshot's minus 25;
+ * the shift is the smaller of now and the snapshot minus 3 s, and the truck clock and bonus window the smaller of now
+ * and the snapshot, so spent time is never refunded and a bonus cannot be farmed. Re-announces a waiting truck the
+ * undone move had served.
+ */
+function applyUndo(state: ShiftState): { state: ShiftState; events: ShiftEvent[] } {
+  const snap = state.undoSnapshot!
+  const truckMs = Math.min(state.truckMs, snap.truckMs)
+  const events: ShiftEvent[] = [{ type: 'undone', points: UNDO_POINTS, ms: UNDO_SHIFT_MS }]
+  let next: ShiftState = {
+    ...snap,
+    score: snap.score + UNDO_POINTS,
+    shiftMs: Math.max(0, Math.min(state.shiftMs, snap.shiftMs) - UNDO_SHIFT_MS),
+    truckMs,
+    overtime: truckMs === 0,
+    bonusMs: Math.min(state.bonusMs, snap.bonusMs),
+    earnedMs: Math.min(state.earnedMs, snap.earnedMs),
+    pauses: state.pauses,
+    undosLeft: state.undosLeft - 1,
+    undoSnapshot: null,
+    status: 'playing',
+    failure: null,
+  }
+  events.push(...overtimeEvents(state, next))
+  const id = waitingArrival(next)
+  if (id !== undefined && (state.receipts !== snap.receipts || state.deadline === null)) {
+    events.push({ type: 'arrival', id, moves: next.deadline! })
+  }
+  next = withBlocked(next, events)
+  return { state: next, events }
 }
 
 /**
@@ -227,7 +287,7 @@ export function applyAction(state: ShiftState, action: ShiftAction): { state: Sh
  */
 function withScore(
   before: ShiftState,
-  action: Exclude<ShiftAction, { type: 'pause' | 'resume' }>,
+  action: MoveAction,
   moved: { state: ShiftState; events: ShiftEvent[] },
 ): { state: ShiftState; events: ShiftEvent[] } {
   const s = moved.state
@@ -237,19 +297,21 @@ function withScore(
   if (action.type === 'rehandle') {
     next = { ...s, combo: 0, score: before.score + rehandlePoints(action.from, action.to) }
   } else if (action.type === 'receive') {
-    next = { ...s, combo: 0, score: before.score + RECEIPT_POINTS, shiftMs: before.shiftMs + quick }
+    next = { ...s, combo: 0, score: before.score + RECEIPT_POINTS, shiftMs: before.shiftMs + quick, earnedMs: before.earnedMs + quick }
   } else {
     const combo = before.combo + 1
     const id = before.next
     const awarded = before.bonusMs > 0
     const bonusMs = bonusWindowMs(before.level, s.next)
+    const earned = quick + comboShiftMs(combo) + (awarded ? BONUS_SHIFT_MS : 0)
     next = {
       ...s,
       combo,
       bestCombo: Math.max(before.bestCombo, combo),
       score: before.score + collectPoints(combo) + (awarded ? BONUS_POINTS : 0),
       golds: before.golds + (awarded ? 1 : 0),
-      shiftMs: before.shiftMs + quick + comboShiftMs(combo) + (awarded ? BONUS_SHIFT_MS : 0),
+      shiftMs: before.shiftMs + earned,
+      earnedMs: before.earnedMs + earned,
       bonusMs,
     }
     const extra: ShiftEvent[] = []
@@ -316,7 +378,7 @@ export function advance(state: ShiftState, dtMs: number): { state: ShiftState; e
   return { state: next, events }
 }
 
-function applyMove(state: ShiftState, action: Exclude<ShiftAction, { type: 'pause' | 'resume' }>): { state: ShiftState; events: ShiftEvent[] } {
+function applyMove(state: ShiftState, action: MoveAction): { state: ShiftState; events: ShiftEvent[] } {
   const stacks = state.stacks.map((s) => [...s])
   if (action.type === 'receive') {
     const id = waitingArrival(state)!

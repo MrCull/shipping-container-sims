@@ -6,6 +6,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import YardHud from './components/ui/YardHud.vue'
 import YardQueue from './components/ui/YardQueue.vue'
+import YardScreens from './components/modals/YardScreens.vue'
+import { LEVELS } from './modules/levels'
+import { unlockAllRequested } from './modules/progress'
+import { undoView } from './modules/screens'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
 import type { Rect } from './types/presentation'
@@ -17,7 +21,10 @@ function rectStyle(r: Rect): Record<string, string> {
 const devApiEnabled = import.meta.env.DEV || import.meta.env.MODE === 'smoke'
 
 const store = useYardshiftStore()
-store.loadLevel(1)
+store.setUnlockAll(unlockAllRequested(window.location.search, import.meta.env.DEV, import.meta.env.MODE))
+// Open on the intro of the highest unlocked level.
+store.loadLevel(Math.min(LEVELS.length, store.progress.unlocked), { intro: true })
+const undo = computed(() => undoView(store.state))
 
 const surface = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -168,36 +175,41 @@ onBeforeUnmount(() => {
     >
       {{ store.message || view.hint }}
     </footer>
-    <div
-      v-if="view.failed"
-      class="complete"
-      data-testid="ys-failed"
+    <nav
+      class="controls"
+      aria-label="Shift controls"
     >
-      <h2>SHIFT OVER</h2>
-      <p>{{ view.failed }}</p>
       <button
         type="button"
-        class="again"
-        @click="store.restart()"
+        data-testid="ys-pause"
+        @click="store.pause()"
       >
-        Retry shift
+        Pause
       </button>
-    </div>
-    <div
-      v-if="view.complete"
-      class="complete"
-      data-testid="ys-complete"
-    >
-      <h2>YARD CLEARED</h2>
-      <p>{{ view.hud.rehandles }} rehandles</p>
       <button
         type="button"
-        class="again"
+        data-testid="ys-undo"
+        :disabled="!undo.enabled"
+        :title="undo.reason || 'Undo the last move: −25 pts, −3s'"
+        @click="store.undo()"
+      >
+        {{ undo.label }}
+      </button>
+      <small
+        v-if="!undo.enabled && store.state.status === 'playing' && store.state.shiftMs <= 3000"
+        class="undo-reason"
+        data-testid="ys-undo-reason"
+      >{{ undo.reason }}</small>
+      <button
+        type="button"
+        class="restart"
+        data-testid="ys-restart"
         @click="store.restart()"
       >
-        Play again
+        Restart
       </button>
-    </div>
+    </nav>
+    <YardScreens />
   </div>
 </template>
 
@@ -364,33 +376,36 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 .hint {
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  padding: 10px 16px;
   background: #142530;
   font-size: 0.9rem;
   min-height: 1.4em;
 }
-.complete {
-  position: absolute;
-  inset: 0;
+.controls {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  background: rgb(8 19 29 / 78%);
+  padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
+  background: #142530;
 }
-.complete h2 {
-  color: #ffc85c;
-  letter-spacing: 0.1em;
-  margin: 0;
-}
-.again {
-  padding: 10px 20px;
-  border: 0;
-  border-radius: 8px;
-  background: #ffcb60;
-  color: #142530;
+.controls button {
+  padding: 6px 12px;
+  border: 1px solid #3c5363;
+  border-radius: 6px;
+  background: #1d3442;
+  color: #e7eef2;
   font-weight: 700;
   cursor: pointer;
+}
+.controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.controls .restart {
+  margin-left: auto;
+}
+.undo-reason {
+  font-size: 0.7rem;
+  color: #ff8776;
 }
 </style>
