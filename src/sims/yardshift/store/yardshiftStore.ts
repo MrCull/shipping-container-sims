@@ -31,6 +31,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   const move = shallowRef<CraneMove | null>(null)
   /** Bumped on every +1 s time credit, so the HUD can replay its feedback. */
   const creditPulse = ref(0)
+  /** Bumped on every bonus award, so the view can replay the gold burst and "+250 · +5s" float. */
+  const bonusPulse = ref(0)
   let lastFrame: number | null = null
   let reducedMotion = false
 
@@ -41,6 +43,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   function watchEvents(): void {
     shift.onEvent((e) => {
       if (e.type === 'time-credit') creditPulse.value++
+      if (e.type === 'bonus-awarded') bonusPulse.value++
     })
   }
   watchEvents()
@@ -148,6 +151,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     view,
     move,
     creditPulse,
+    bonusPulse,
     loadLevel,
     dispatch,
     tapTarget,

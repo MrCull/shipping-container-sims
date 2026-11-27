@@ -87,6 +87,20 @@ export interface ShiftState {
   readonly overtime: boolean
   /** Pause reasons currently held; clocks run only when empty. */
   readonly pauses: readonly PauseReason[]
+  /** Arcade score; can go negative. */
+  readonly score: number
+  /** Consecutive collections; a rehandle or receipt resets it to 0. */
+  readonly combo: number
+  /** Highest combo this shift. */
+  readonly bestCombo: number
+  /** Bonus containers collected within their window. */
+  readonly golds: number
+  /**
+   * Bonus window left for the next required container, ms. Above 0 only while `next` is a bonus container whose
+   * window is open: collecting it now awards the bonus. 0 means not eligible (no bonus, or the window ran out).
+   * Undo (#386) restores it from the snapshot.
+   */
+  readonly bonusMs: number
   /** Set when status is 'failed'. */
   readonly failure: { readonly reason: FailureReason; readonly message: string } | null
 }
@@ -138,6 +152,12 @@ export type ShiftEvent =
   /** A valid rehandle added time to the next-truck clock. */
   | { type: 'time-credit'; ms: number }
   | { type: 'failed'; reason: FailureReason }
+  /** A bonus container became the next required one: its window of `ms` opened. */
+  | { type: 'bonus-window'; id: number; ms: number }
+  /** A bonus container was collected within its window. */
+  | { type: 'bonus-awarded'; id: number; points: number; ms: number }
+  /** A bonus window ran out: the container is ordinary cargo now. */
+  | { type: 'bonus-missed'; id: number }
 
 export type DispatchResult =
   | { ok: true; state: ShiftState; events: ShiftEvent[] }

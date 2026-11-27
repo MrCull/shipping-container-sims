@@ -181,6 +181,6 @@ describe('Yardshift clocks', () => {
     run(shift, 400)
     shift.dispatch({ type: 'resume', reason: 'animation' })
     expect(shift.dispatch({ type: 'collect' }).ok).toBe(true)
-    expect(shift.state).toMatchObject({ collected: 1, shiftMs: 40_000 })
+    expect(shift.state).toMatchObject({ collected: 1, shiftMs: 40_000 + 350 })
   })
 })

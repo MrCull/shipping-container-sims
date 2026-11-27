@@ -14,14 +14,14 @@ const PX_PER_UNIT = 40
 const PITCH = THREE.MathUtils.degToRad(28)
 const YAW = THREE.MathUtils.degToRad(-14)
 
+/** The selected container (sequence colours and grey come from the view-model). */
+const SELECTED = '#ffcb60'
+
 const COLOURS = {
   background: 0x101c27,
   ground: 0x1d3140,
   column: 0x26404f,
   destination: 0x2f8f6a,
-  next: 0x54ddb0,
-  other: 0x84949c,
-  selected: 0xffcb60,
   collectionBay: 0x31595a,
   receiptBay: 0x85552e,
   collectionTruck: 0xd8e1e3,
@@ -48,23 +48,49 @@ function cranePhase(u: number): { leg: 'toSource' | 'carry' | 'release'; t: numb
   return { leg: 'release', t: 1, lift: (u - 0.88) / 0.12, carrying: false }
 }
 
-function labelTexture(text: string, cache: Map<string, THREE.CanvasTexture>): THREE.CanvasTexture {
-  const hit = cache.get(text)
+/** Draws a gold star medallion (V20 gold palette) centred at (cx, cy) with radius r. */
+function drawMedallion(g: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  const fill = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r)
+  fill.addColorStop(0, '#fff2bd')
+  fill.addColorStop(1, '#d39b31')
+  g.beginPath()
+  g.arc(cx, cy, r, 0, Math.PI * 2)
+  g.fillStyle = fill
+  g.fill()
+  g.lineWidth = r * 0.16
+  g.strokeStyle = '#87531d'
+  g.stroke()
+  g.beginPath()
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5
+    const rr = i % 2 === 0 ? r * 0.62 : r * 0.26
+    g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr)
+  }
+  g.closePath()
+  g.fillStyle = '#634016'
+  g.fill()
+}
+
+/** A face texture: the container colour, its number, and a gold star medallion on a bonus container. */
+function labelTexture(text: string, colour: string, bonus: boolean, cache: Map<string, THREE.CanvasTexture>): THREE.CanvasTexture {
+  const key = `${text}|${colour}|${bonus ? 1 : 0}`
+  const hit = cache.get(key)
   if (hit) return hit
   const canvas = document.createElement('canvas')
   canvas.width = 128
   canvas.height = 64
   const g = canvas.getContext('2d')!
-  g.fillStyle = '#ffffff'
+  g.fillStyle = colour
   g.fillRect(0, 0, 128, 64)
   g.fillStyle = '#0d1b24'
   g.font = 'bold 44px system-ui, sans-serif'
   g.textAlign = 'center'
   g.textBaseline = 'middle'
-  g.fillText(text, 64, 34)
+  g.fillText(text, bonus ? 50 : 64, 34)
+  if (bonus) drawMedallion(g, 104, 32, 19)
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
-  cache.set(text, tex)
+  cache.set(key, tex)
   return tex
 }
 
@@ -161,9 +187,9 @@ export function useYardScene(
       const col = layout.columns[c.stack]
       if (!col) continue
       const base = groundAt(col.x + col.w / 2, baseY, width, height)
-      const colour = c.selected ? COLOURS.selected : c.next ? COLOURS.next : COLOURS.other
+      const colour = c.selected ? SELECTED : c.colour
       const body = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.7 })
-      const label = new THREE.MeshStandardMaterial({ color: colour, map: labelTexture(c.label, textures), roughness: 0.7 })
+      const label = new THREE.MeshStandardMaterial({ map: labelTexture(c.label, colour, c.bonus, textures), roughness: 0.7 })
       // BoxGeometry faces: +x, -x, +y (top), -y, +z (front, toward the camera), -z.
       const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
       mesh.position.set(base.x, ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * 0.25 : 0), base.z)
@@ -199,9 +225,8 @@ export function useYardScene(
         boxPos = p.leg === 'release' ? { x: dst.x, y: dstY, z: dst.z } : p.carrying ? { x, y: hook.y - ch / 2, z } : { x: src.x, y: srcY, z: src.z }
       }
       if (m.progress >= 0.999) rest = { x: dst.x, z: dst.z }
-      const colour = COLOURS.next
-      const mat = new THREE.MeshStandardMaterial({ color: moving.next ? colour : COLOURS.other, roughness: 0.7 })
-      const lab = new THREE.MeshStandardMaterial({ color: moving.next ? colour : COLOURS.other, map: labelTexture(moving.label, textures), roughness: 0.7 })
+      const mat = new THREE.MeshStandardMaterial({ color: moving.colour, roughness: 0.7 })
+      const lab = new THREE.MeshStandardMaterial({ map: labelTexture(moving.label, moving.colour, moving.bonus, textures), roughness: 0.7 })
       const boxMesh = box(cw, ch, cd, [mat, mat, lab, mat, lab, mat])
       boxMesh.position.set(boxPos.x, boxPos.y, boxPos.z)
       dynamic.add(boxMesh)
