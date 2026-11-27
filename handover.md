@@ -7,7 +7,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 
 | Ticket | Title | Blocked by | Status | Claimed by |
 |---|---|---|---|---|
-| #377 | Per-sim vitest projects and test:sim | none | in progress | session 1 |
+| #377 | Per-sim vitest projects and test:sim | none | merged in branch (bf5c7e4) | |
 | #378 | Smoke selection anchoring, home-wall only | none | merged in branch (b9c62f0) | |
 | #379 | Scoped verify and verify:all | #377 | open | |
 | #380 | CI unit tests use the selection | #379 | open | |
