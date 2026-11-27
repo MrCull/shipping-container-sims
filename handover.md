@@ -9,9 +9,9 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 |---|---|---|---|---|
 | #377 | Per-sim vitest projects and test:sim | none | merged in branch (bf5c7e4) | |
 | #378 | Smoke selection anchoring, home-wall only | none | merged in branch (b9c62f0) | |
-| #379 | Scoped verify and verify:all | #377 | open | |
+| #379 | Scoped verify and verify:all | #377 | in progress | session 1 |
 | #380 | CI unit tests use the selection | #379 | open | |
-| #381 | Y1 tracer: tutorial won by taps | #377 | open | |
+| #381 | Y1 tracer: tutorial won by taps | #377 | in progress | session 1 |
 | #382 | Y2 13 levels, heavy rule, solver | #381 | open | |
 | #383 | Y3 clocks, overtime, crane animation | #381 | open | |
 | #384 | Y4 incoming trucks and receipts | #382, #383 | open | |
@@ -25,4 +25,5 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 
 ## Open points
 
-- None yet.
+- V20 unlocks levels 1 to 4 and `?test` unlocks all in any build; the spec wins (level 1 only, `?unlock=all` in dev and smoke builds).
+- box-empire and container-stack have no unit tests, so they are not vitest projects (`simIdsWithTests()` in `scripts/vitest-projects.mjs`).
