@@ -29,3 +29,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - box-empire and container-stack have no unit tests, so they are not vitest projects (`simIdsWithTests()` in `scripts/vitest-projects.mjs`).
 - Implementers run `pnpm run verify <integration-branch>`: with no base, verify compares with `origin/main` and covers the whole branch.
 - Y1 seam: `input(ui, event, state)` takes state as a third argument (needed to tell a collect tap from a select tap); `window.__ys.hitRegions()` gives page coordinates for smoke taps. PR needs `smoke:yardshift`.
+- #382 put receipt rules in the engine early (solver needs them): levels 4, 6, 8, 9, 10, 13 start with a waiting truck the UI cannot serve until #384. Tutorial fixture rehandles #4 before collecting #1 (optimal, not the coached order).
