@@ -10,6 +10,10 @@
 # the scope. A sim-only change (every changed src/ path under src/sims/<id>/, no smoke label) runs the home wall spec
 # (`@home-wall`) in place of `core`. Add a line when a new area gets its own spec.
 
+# Yardshift: any change in its folder runs its own group.
+[src/sims/yardshift/]
+^src/sims/yardshift/ => yardshift
+
 [src/sims/terminal-twin/]
 (^|/)tests/browser/(openTwin|frameSampling)\.ts$ => all
 (^|/)(sceneDriver|sceneState|useTwinScene)\.ts$ => all
