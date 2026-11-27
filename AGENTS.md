@@ -15,25 +15,7 @@ Before handing work back after code changes, run **`pnpm run verify`** (dependen
 - **Script arguments:** pnpm passes arguments after the script name straight through (`pnpm run lint --fix` works), and a `--` is handed to the script literally. In `.claude/launch.json` and similar, write `pnpm exec vite --port 5174`, not `pnpm run dev --port 5174`.
 - **Unit-test speed:** `vitest.config.ts` runs one fork per CPU (`maxWorkers: '100%'`), and CI restores vitest's per-file durations so the slowest files start first. In a test, read the engine state every event through `sim.query`, not `sim.snapshot()` (a snapshot clones the state and the whole event log), and let tests in one file share one expensive preset run in `beforeAll` when none of them changes it.
 - **Where checks run:** test files (`*.test.ts`, `*.smoke.ts`) and Node-only CLI code (`src/sims/*/cli/`) are type-checked by `tsconfig.tools.json`, not `tsconfig.app.json`. Terminal Twin scripts (`pnpm run tt:*`): the sim guide's "How to prove a change works" lists them.
-- **Browser smoke tests** (`pnpm run test:smoke`, Playwright) are not part of `verify`. Locally they run on the smoke build (the bundled app with the dev API `window.__tt`) at Low quality with rendering off (`openTwin`'s defaults), one worker, one shared page per worker reset between tests (#329, `tests/browser/twinTest.ts`). Run one group alone with `scripts/bg.sh run --heavy <log> pnpm run test:smoke --project=dev --grep-invert @load --grep @<group>` and report the `SMOKE:` line. CI balances its shards by recorded test time (`scripts/smoke-shards.mjs`; times from the last green run's report, then `scripts/smoke-timings.jsonl`; details in `docs/agents/tooling.md`). Run the groups a change needs, never the whole suite: `node scripts/smoke-select.mjs --base <branch> --head HEAD --grep` prints the pattern. Commands, CI jobs and spec conventions: `docs/agents/tooling.md`; which test level a behaviour belongs to: the sim guide's "Test levels".
-
-### Smoke labels
-
-Every PR that changes `src/` carries the `smoke:<group>` label of each area it touches. CI runs `core` plus the groups from those labels, from the changed paths (`scripts/smoke-map.txt`) and from changed specs, and keeps one PR comment saying why each group ran. The plain `smoke` label, a manual Run workflow and every push to `main` run every group; a red run on `main` opens a `needs-triage` issue. A PR with no `src/` change and no `smoke` or `smoke:<group>` label runs none, and the required check `Browser smoke tests (Terminal Twin)` passes as a no-op.
-
-| Label | Area of the system |
-| --- | --- |
-| `smoke:core` | boot, URL switches, render budget, production build, home page, build stamp, menu music, headless parity, shared-page reset (always runs) |
-| `smoke:shell` | HUD, top bar, views, pacing, display settings, volume and FPS chip, phone layout |
-| `smoke:camera` | camera, keyboard and wheel zoom, follow |
-| `smoke:setup` | setup dialog, scenario picker, presets, equipment and subsystem modes, yard start, saves |
-| `smoke:analysis` | KPIs, dashboard, debugger and inspector, vessel status |
-| `smoke:vessel` | hulls, bays and bay viewer, ROB, hatch covers, crane plan, colour by |
-| `smoke:equipment` | STS, ASC, SHC, trucks, spreaders, hero models, gantry alarm |
-| `smoke:yard` | containers and close-ups, infrastructure, atmosphere, hero faces, scene performance |
-| `smoke:engine` | the worker running a fixture to its golden hash (engine checks live in unit and headless tests) |
-
-Each smoke test carries exactly one group tag (`{ tag: '@camera' }`, checked in `verify`) and stays under 30 s; CI's timing table flags any test over the budget, and a test that needs more says why in a comment. Review rules for smoke specs: `docs/agents/tooling.md`.
+- **Browser smoke tests** (`pnpm run test:smoke`, Playwright) are not part of `verify`. Run only the groups a change needs: `node scripts/smoke-select.mjs --base <branch> --head HEAD --grep` prints the pattern. Commands, CI jobs, spec review rules and the **Smoke labels** every PR that changes `src/` carries: `docs/agents/tooling.md`. Which test level a behaviour belongs to: the sim guide's "Test levels".
 
 ## Agent tooling
 

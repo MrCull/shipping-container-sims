@@ -1,12 +1,12 @@
 # Agent tooling and browser smoke tests
 
-Reference for `AGENTS.md`: reach for it when you run the smoke suite, work in a cloud session, take screenshots, record media, brief an implementer in a worktree, or benchmark Terminal Twin frame rate.
+Reference for `AGENTS.md`: reach for it when you run the smoke suite, label a PR with its smoke groups, work in a cloud session, take screenshots, record media, brief an implementer in a worktree, or benchmark Terminal Twin frame rate.
 
 ## Browser smoke tests
 
 - **Browser smoke tests** (`pnpm run test:smoke`, Playwright, `src/**/*.smoke.ts`) are not part of `verify`.
   - Run them alone with `scripts/bg.sh run --heavy pnpm run test:smoke <files> --trace off` (a second heavy job or a file edit during the run makes failures); every run ends with one `SMOKE: <n> passed, <n> failed, ...` line (`scripts/smoke-summary-reporter.mjs`), which is the result to report: a pipe (`| tail`) hides the exit code.
-  - When CI runs which groups, and the labels: `AGENTS.md`, **Smoke labels**.
+  - When CI runs which groups, and the labels: **Smoke labels** below.
   - `scripts/smoke-ci.mjs` holds the CI logic (`plan`: groups, grep pattern and the PR comment; `comment`: one PR comment updated in place; `red-main`: the issue a red `main` run opens, `--dry-run` prints it; `node --test scripts/test-smoke-ci.mjs`).
   - Specs titled `@load` need a real frame rate and never run in CI; local runs leave them out too unless `SMOKE_LOAD=1` (`playwright.config.ts` `grepInvert`). Frame assertions are ratios over a minimum wall-clock window (`tests/browser/frameSampling.ts`), never absolute counts.
   - The `dev` project needs the dev API (`window.__tt`, `?viewer=`) and runs against one of two servers (`scripts/smoke-server.mjs`, `node --test scripts/test-smoke-server.mjs`): by default, locally and in CI, the smoke build, a bundled `vite build --mode smoke` into `.smoke-build/` (`SMOKE_BUILD_DIR`) that keeps the dev API, served by `vite preview` (page open to `__tt` ready is faster; a run builds it once at start, about a minute; `pnpm run build:smoke` builds it and `SMOKE_BUILD_PREBUILT=1` serves it without rebuilding, as CI shards do, so set it when re-running specs against an unchanged app).
@@ -18,7 +18,7 @@ Reference for `AGENTS.md`: reach for it when you run the smoke suite, work in a 
   - Setting `SMOKE_JSONL_REPORT=<file>` appends one JSON line per finished test attempt (`scripts/smoke-jsonl-reporter.mjs`, `node --test scripts/test-smoke-jsonl-reporter.mjs`), so a cancelled or timed-out run keeps its timings (CI sets it, one file per shard, and merges them); `SMOKE_JSON_REPORT=<file>` writes a Playwright JSON report, only when the run ends.
   - `node scripts/smoke-timing.mjs <file>...` turns either (several files, one per shard, read together) into a duration-sorted Markdown table with a scene column, and flags every test over the 30 s budget (`--budget <s>`) in its row and in a `[!WARNING]` block, a warning that never fails the run (`node --test scripts/test-smoke-timing.mjs`).
 - **Smoke spec review rules** (judgement, not lints; `/code-review` and the implementer brief apply them to every new or changed smoke spec):
-  - **One group tag** on every test, the group of the area it checks (`AGENTS.md`, **Smoke labels**).
+  - **One group tag** on every test, the group of the area it checks (**Smoke labels** below).
   - **Smallest fixture** that proves the behaviour (the sim guide's "Test levels"); a TTI preset only for scale.
   - **Lowest level** that can see the behaviour: engine state in a unit test, scene state in the headless scene, a panel in a component test; the smoke spec keeps the wiring.
   - **30 s budget** per test, or a comment at the test saying why it needs more.
@@ -35,8 +35,29 @@ Reference for `AGENTS.md`: reach for it when you run the smoke suite, work in a 
   - Check shard balance locally: `pnpm exec playwright test --list --grep-invert @load > list.txt && node scripts/smoke-shards.mjs --list list.txt --shards auto` prints the shard count and the predicted time per shard (`--shards 4` fixes the count).
 - **Dispatch from the CLI:** `gh workflow run pr-checks.yml --ref <branch>` starts the sharded smoke run in CI (the Actions tab "Run workflow" does the same); `gh run watch` follows it. Use it to see whether a failure is specific to this machine before bisecting.
 
+## Smoke labels
+
+Every PR that changes `src/` carries the `smoke:<group>` label of each area it touches. CI runs `core` plus the groups from those labels, from the changed paths (`scripts/smoke-map.txt`) and from changed specs, and keeps one PR comment saying why each group ran. The plain `smoke` label, a manual Run workflow and every push to `main` run every group; a red run on `main` opens a `needs-triage` issue. A PR with no `src/` change and no `smoke` or `smoke:<group>` label runs none, and the required check `Browser smoke tests (Terminal Twin)` passes as a no-op.
+
+| Label | Area of the system |
+| --- | --- |
+| `smoke:core` | boot, URL switches, render budget, production build, home page, build stamp, menu music, headless parity, shared-page reset (always runs) |
+| `smoke:shell` | HUD, top bar, views, pacing, display settings, volume and FPS chip, phone layout |
+| `smoke:camera` | camera, keyboard and wheel zoom, follow |
+| `smoke:setup` | setup dialog, scenario picker, presets, equipment and subsystem modes, yard start, saves |
+| `smoke:analysis` | KPIs, dashboard, debugger and inspector, vessel status |
+| `smoke:vessel` | hulls, bays and bay viewer, ROB, hatch covers, crane plan, colour by |
+| `smoke:equipment` | STS, ASC, SHC, trucks, spreaders, hero models, gantry alarm |
+| `smoke:yard` | containers and close-ups, infrastructure, atmosphere, hero faces, scene performance |
+| `smoke:engine` | the worker running a fixture to its golden hash (engine checks live in unit and headless tests) |
+
+Each smoke test carries exactly one group tag (`{ tag: '@camera' }`, checked in `verify`) and stays under 30 s; CI's timing table flags any test over the budget, and a test that needs more says why in a comment. Review rules for smoke specs: **Browser smoke tests** above.
+
+Local runs use the smoke build (the bundled app with the dev API `window.__tt`) at Low quality with rendering off (`openTwin`'s defaults), one worker, one shared page per worker reset between tests (#329, `tests/browser/twinTest.ts`). Run one group alone with `scripts/bg.sh run --heavy <log> pnpm run test:smoke --project=dev --grep-invert @load --grep @<group>` and report the `SMOKE:` line.
+
 ## Tooling
 
+- **Reading another branch:** `git show <ref>:<path>` prints to stdout; read it there or pipe it, and write any copy only inside your scratchpad.
 - **Nightly peak day** (`.github/workflows/peak-day.yml`, also Run workflow): runs "TTI Algeciras, peak day" to `--until vessels:5` and judges its `--out` summary with `scripts/peak-day-check.mjs` (`node --test scripts/test-peak-day-check.mjs`). Fewer than 5 vessels, a violation or a first error fails it and opens one `needs-triage` issue, or comments on the open one; the run log and summary are the `peak-day-run` artifact. It guards the stall no PR check sees: a run that goes idle with 0 violations (#365).
 - **Doc engine version** (`scripts/check-doc-engine-version.mjs`, in `verify` and CI): a Terminal Twin doc changed on the branch must say `Checked against ENGINE_VERSION <current>` when it has that line; `reports/` are skipped. Base: `DOC_VERSION_BASE` (CI: `HEAD^1`), else the merge-base with `origin/main`.
 - **Cloud sessions:** a SessionStart hook (`.claude/hooks/session-start.sh`) runs `pnpm install` and sets `core.hooksPath` to `.githooks` (its `commit-msg` rejects a `Co-Authored-By` trailer); it does nothing locally.
