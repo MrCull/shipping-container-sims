@@ -21,7 +21,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #388 | Y8 audio cues and crane sounds | #384, #385 | merged in branch (c2454ec) | |
 | #389 | Y9 phone layout, cover, sim guide | #386, #387 | merged in branch (1542a3d) | |
 | #390 | Y10 background music | #388 | merged in branch (0d739ef) | |
-| #391 | Y11 smoke suite and regressions | all | in progress | session 1 |
+| #391 | Y11 smoke suite and regressions | all | merged in branch (72120bc) | |
 
 ## Open points
 
