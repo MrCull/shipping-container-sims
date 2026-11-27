@@ -6,7 +6,8 @@
  *
  * Changed files come from `--files-from` (one path per line) or `git diff --name-only <base> <head>` (default
  * HEAD^1 HEAD, the last merge). Rules: nothing when no file under src/ changed and no `smoke` or `smoke:<group>`
- * label is set; otherwise `core`, plus every
+ * label is set; otherwise `core` (or, for a sim-only change without the plain `smoke` label, where every changed src/ path is
+ * under src/sims/<id>/, the home wall spec `@home-wall` in its place), plus every
  * `smoke:<group>` label, plus every group scripts/smoke-map.txt assigns to a changed path, plus the group of each
  * changed smoke spec (its tag); every group when the plain `smoke` label is present. Markdown, docs/ folders,
  * Node-only CLI code (src/sims/*\/cli/) and unit tests (*.test.ts) never select a group beyond core.
@@ -34,16 +35,28 @@ export function loadSelectionInputs(root) {
   return { map, specGroup }
 }
 
-/** Map lines `pattern => group group` (comments and blank lines skipped) as `{ re, groups }`. */
+/**
+ * Map lines `pattern => group group` (comments and blank lines skipped) as `{ re, groups, scope }`. A `[folder/]`
+ * line scopes the lines after it to paths under that folder (until the next `[...]`; `[]` ends the scope), so a
+ * Terminal Twin pattern never matches another sim's file of the same name.
+ */
 export function parseMap(text) {
-  return text
-    .split('\n')
-    .filter((l) => l.trim() && !l.trim().startsWith('#'))
-    .map((l) => {
-      const at = l.lastIndexOf(' => ')
-      return { re: new RegExp(l.slice(0, at)), groups: l.slice(at + 4).trim().split(/\s+/) }
-    })
+  let scope = ''
+  const out = []
+  for (const raw of text.split('\n')) {
+    const l = raw.trim()
+    if (!l || l.startsWith('#')) continue
+    const s = /^\[(.*)\]$/.exec(l)
+    if (s) { scope = s[1]; continue }
+    const at = l.lastIndexOf(' => ')
+    out.push({ re: new RegExp(l.slice(0, at)), groups: l.slice(at + 4).trim().split(/\s+/), scope })
+  }
+  return out
 }
+
+/** The pseudo-group a sim-only change runs in place of `core`: the home wall spec, tagged `@home-wall`. */
+export const HOME_WALL = 'home-wall'
+const SIM_FOLDER = /^src\/sims\/[^/]+\//
 
 const IGNORED = /\.md$|(^|\/)docs\/|^src\/sims\/[^/]+\/cli\/|\.test\.ts$/
 const SPEC = /\.smoke\.ts$/
@@ -58,7 +71,9 @@ export function selectGroups({ labels, files, map, specGroup }) {
   if (!labelled && !files.some((f) => f.startsWith('src/'))) return { groups: [], warnings, why: 'no file under src/ changed: no smoke run' }
   const reasons = new Map(GROUPS.map((g) => [g, []]))
   const add = (g, why) => reasons.get(g).push(why)
-  add('core', 'always')
+  const srcFiles = files.filter((f) => f.startsWith('src/'))
+  const simOnly = !labels.includes('smoke') && srcFiles.length > 0 && srcFiles.every((f) => SIM_FOLDER.test(f))
+  if (!simOnly) add('core', 'always')
   if (labels.includes('smoke')) for (const g of GROUPS) add(g, 'label smoke')
   for (const l of labels) {
     const m = /^smoke:(.+)$/.exec(l)
@@ -72,13 +87,16 @@ export function selectGroups({ labels, files, map, specGroup }) {
       if (g) add(g, `spec ${f}`)
       continue
     }
-    for (const { re, groups } of map) {
-      if (!re.test(f)) continue
+    for (const { re, groups, scope } of map) {
+      if (!f.startsWith(scope ?? '') || !re.test(f)) continue
       for (const g of groups.includes('all') ? GROUPS : groups) add(g, `path ${f}`)
     }
   }
   const groups = GROUPS.filter((g) => reasons.get(g).length).map((group) => ({ group, reasons: [...new Set(reasons.get(group))] }))
-  return { groups, warnings, why: `${groups.length} of ${GROUPS.length} groups` }
+  const why = `${groups.length} of ${GROUPS.length} groups`
+  if (!simOnly || reasons.get('core').length) return { groups, warnings, why }
+  const home = { group: HOME_WALL, reasons: ['sim-only: every changed src/ path is inside a sim folder (src/sims/<id>/)'] }
+  return { groups: [home, ...groups], warnings, why: `sim-only change: home wall spec instead of core; ${why}` }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

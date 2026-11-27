@@ -4,7 +4,7 @@
  */
 import { expect, test } from '@playwright/test'
 
-test('a tile opens its game, and that game is featured with Continue on the way back', { tag: '@core' }, async ({ page }) => {
+test('a tile opens its game, and that game is featured with Continue on the way back', { tag: ['@core', '@home-wall'] }, async ({ page }) => {
   await page.goto('/')
   const tiles = page.locator('.wall > .tile')
   await expect(tiles).toHaveCount(4)
