@@ -1,0 +1,116 @@
+<script setup lang="ts">
+import type { QueueItem } from '../../types/presentation'
+
+defineProps<{
+  queue: QueueItem[]
+  score: string
+  combo: string
+  /** The open bonus window, or null. */
+  bonus: { id: number; text: string } | null
+}>()
+</script>
+
+<template>
+  <div class="band">
+    <ol
+      class="queue"
+      data-testid="ys-queue"
+      aria-label="Next six containers"
+    >
+      <li
+        v-for="(item, i) in queue"
+        :key="i"
+        :style="{ background: item.colour }"
+        :class="{ empty: item.id === null }"
+      >
+        {{ item.label }}
+        <span
+          v-if="item.bonus"
+          class="star"
+          aria-label="bonus"
+        >★</span>
+      </li>
+    </ol>
+    <span
+      v-if="bonus"
+      class="bonus"
+      data-testid="ys-bonus-window"
+    >★ #{{ bonus.id }} {{ bonus.text }}</span>
+    <dl class="score">
+      <div>
+        <dt>SCORE</dt>
+        <dd data-testid="ys-score">
+          {{ score }}
+        </dd>
+      </div>
+      <div>
+        <dt>COMBO</dt>
+        <dd data-testid="ys-combo">
+          {{ combo }}
+        </dd>
+      </div>
+    </dl>
+  </div>
+</template>
+
+<style scoped>
+.band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 6px;
+  background: #142530;
+  color: #e7eef2;
+}
+.queue {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.queue li {
+  position: relative;
+  min-width: 1.9em;
+  padding: 2px 0;
+  border-radius: 4px;
+  color: #0d1b24;
+  font-weight: 800;
+  font-size: 0.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.queue li.empty {
+  color: #9fb0b8;
+}
+.star {
+  position: absolute;
+  top: -0.55em;
+  right: -0.3em;
+  color: #ffda75;
+  font-size: 0.7rem;
+  text-shadow: 0 0 2px #634016;
+}
+.bonus {
+  color: #ffda75;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.score {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 0 auto;
+  text-align: right;
+}
+dt {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+</style>

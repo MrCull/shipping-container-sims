@@ -43,6 +43,22 @@ export interface ContainerView {
   selected: boolean
   /** The next container to collect. */
   next: boolean
+  /** Sequence colour slot 0..5 (position after the next required container), or null for grey. */
+  slot: number | null
+  /** Body colour (hex): the slot's sequence colour, or grey. */
+  colour: string
+  /** Gold star medallion: a bonus container still worth its bonus (also when buried or grey). */
+  bonus: boolean
+  /** Outlined: only the selection. The current container never has a border. */
+  border: boolean
+}
+
+/** One of the six HUD queue positions; `id` null is an empty slot past the last container. */
+export interface QueueItem {
+  id: number | null
+  label: string
+  colour: string
+  bonus: boolean
 }
 
 /** The incoming status band and the receipt bay status. The band always takes its space, truck or not. */
@@ -60,6 +76,8 @@ export interface ReceiptCargoView {
   id: number
   label: string
   selected: boolean
+  /** A bonus container (gold star medallion). */
+  bonus: boolean
 }
 
 export interface ViewModel {
@@ -76,7 +94,11 @@ export interface ViewModel {
   /** Where the bobbing red arrow points: the receipt truck at deadline 0 (until it is selected), else null. */
   arrow: 'receipt' | null
   hitRegions: HitRegion[]
-  hud: { title: string; loaded: string; rehandles: string }
+  hud: { title: string; loaded: string; rehandles: string; score: string; combo: string }
+  /** The next six collection positions. */
+  queue: QueueItem[]
+  /** The open bonus window, or null. */
+  bonus: { id: number; text: string } | null
   clocks: ClocksView
   hint: string
   complete: boolean

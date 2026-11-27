@@ -5,6 +5,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import YardHud from './components/ui/YardHud.vue'
+import YardQueue from './components/ui/YardQueue.vue'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
 import type { Rect } from './types/presentation'
@@ -82,6 +83,12 @@ onBeforeUnmount(() => {
       :clocks="view.clocks"
       :credit-pulse="store.creditPulse"
     />
+    <YardQueue
+      :queue="view.queue"
+      :score="view.hud.score"
+      :combo="view.hud.combo"
+      :bonus="view.bonus"
+    />
     <div
       class="incoming"
       :class="view.incoming.status"
@@ -135,6 +142,19 @@ onBeforeUnmount(() => {
       >
         {{ store.announcement }}
       </p>
+      <div
+        v-if="store.bonusPulse > 0"
+        :key="store.bonusPulse"
+        class="burst"
+        data-testid="ys-bonus-burst"
+        :style="{
+          left: `${view.layout.collection.x + view.layout.collection.w / 2}px`,
+          top: `${view.layout.collection.y}px`,
+        }"
+      >
+        <span class="ring" />
+        <span class="float">+250 · +5s</span>
+      </div>
       <p
         v-if="webglFailed"
         class="fallback"
@@ -278,6 +298,65 @@ onBeforeUnmount(() => {
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   opacity: 0.75;
+}
+.burst {
+  position: absolute;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.burst .ring {
+  position: absolute;
+  left: -30px;
+  top: -10px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff2bd 0%, #f7cb66 40%, rgb(211 155 49 / 0%) 70%);
+  animation: burst 0.7s ease-out forwards;
+}
+.burst .float {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: #ffc85c;
+  font-weight: 800;
+  text-shadow: 0 1px 2px #0d1b24;
+  animation: rise 1.2s ease-out forwards;
+}
+@keyframes burst {
+  from {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 1;
+    margin-top: 0;
+  }
+  to {
+    opacity: 0;
+    margin-top: -40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .burst .ring {
+    animation: none;
+    opacity: 0;
+  }
+  .burst .float {
+    animation: fade 1.2s step-end forwards;
+  }
+  @keyframes fade {
+    to {
+      opacity: 0;
+    }
+  }
 }
 .fallback {
   position: absolute;

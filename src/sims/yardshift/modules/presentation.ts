@@ -12,12 +12,45 @@ import type {
   HitTarget,
   IncomingView,
   Layout,
+  QueueItem,
   Rect,
   UiEvent,
   UiState,
   ViewModel,
   Viewport,
 } from '../types/presentation'
+
+/** Colours of the next six collection positions: mint, blue, purple, yellow, pink, lime (V20). */
+export const SEQUENCE_COLOURS = ['#54ddb0', '#58b3ef', '#b19af5', '#f7ce53', '#ee8bb7', '#a5d36e'] as const
+/** Containers farther than six positions away. */
+export const GREY = '#84949c'
+/** Queue slot past the last container. */
+export const EMPTY_SLOT = '#526773'
+
+/** Colour slot of container `id`: its position after the next required one, 0..5, or null (grey). */
+export function colourSlot(state: ShiftState, id: number): number | null {
+  const pos = id - state.next
+  return pos >= 0 && pos < SEQUENCE_COLOURS.length ? pos : null
+}
+
+function colourOf(state: ShiftState, id: number): string {
+  const slot = colourSlot(state, id)
+  return slot === null ? GREY : SEQUENCE_COLOURS[slot]!
+}
+
+/** A bonus container still worth its bonus: a later one, or the current one while its window is open. */
+export function showsBonus(state: ShiftState, id: number): boolean {
+  if (!state.level.bonusIds.includes(id)) return false
+  return id !== state.next || state.bonusMs > 0
+}
+
+function queueFor(state: ShiftState): QueueItem[] {
+  return SEQUENCE_COLOURS.map((_, i): QueueItem => {
+    const id = state.next + i
+    if (id > state.level.count) return { id: null, label: '–', colour: EMPTY_SLOT, bonus: false }
+    return { id, label: String(id), colour: colourOf(state, id), bonus: showsBonus(state, id) }
+  })
+}
 
 const SIDE = 16
 const BAY_GAP = 12
@@ -165,6 +198,10 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
         label: String(id),
         selected: ui.selection === si && tier === stack.length - 1,
         next: id === state.next,
+        slot: colourSlot(state, id),
+        colour: colourOf(state, id),
+        bonus: showsBonus(state, id),
+        border: ui.selection === si && tier === stack.length - 1,
       }),
     ),
   )
@@ -178,7 +215,10 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
         : ui.selection === null
           ? []
           : legalDestinations(state, ui.selection),
-    receiptCargo: cargo === undefined ? null : { id: cargo, label: String(cargo), selected: receiptSelected },
+    receiptCargo:
+      cargo === undefined
+        ? null
+        : { id: cargo, label: String(cargo), selected: receiptSelected, bonus: state.level.bonusIds.includes(cargo) },
     incoming: incomingView(state),
     dimYard: attention,
     arrow: attention ? 'receipt' : null,
@@ -187,7 +227,11 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
       title: `Shift ${state.level.number} · ${state.level.name}`,
       loaded: `${state.collected}/${state.level.count}`,
       rehandles: `${state.rehandles}/${state.level.maxRehandles}`,
+      score: String(state.score),
+      combo: `×${state.combo}`,
     },
+    queue: queueFor(state),
+    bonus: state.bonusMs > 0 ? { id: state.next, text: `${(state.bonusMs / 1000).toFixed(1)}s` } : null,
     clocks: clocksView(state),
     hint: hintFor(state, ui),
     complete: state.status === 'complete',

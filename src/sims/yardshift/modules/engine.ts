@@ -37,6 +37,29 @@ const TIMEOUT_MESSAGE = 'Time ran out.'
 const BLOCKED_MESSAGE = 'No legal move left: the yard is blocked.'
 const BLOCKED_RECEIPT_MESSAGE = 'The mandatory receipt has no legal space: the yard is blocked.'
 
+/** Score for a receipt. */
+export const RECEIPT_POINTS = 100
+/** Bonus container collected within its window: extra points and shift time. */
+export const BONUS_POINTS = 250
+export const BONUS_SHIFT_MS = 5000
+/** Shift time for a truck operation (collect or receive) done before overtime. */
+export const QUICK_SERVICE_MS = 350
+
+/** Collection score at `combo` (after counting this collection): 100, 150, 200, 250, then 300. */
+export function collectPoints(combo: number): number {
+  return 100 + 50 * (Math.min(combo, 5) - 1)
+}
+
+/** Rehandle cost (negative score): 25 + 5 x stack distance. */
+export function rehandlePoints(from: number, to: number): number {
+  return -(25 + 5 * Math.abs(from - to))
+}
+
+/** Shift time a chained collection adds at `combo`: none for the first, then min(2 s, combo x 0.4 s). */
+export function comboShiftMs(combo: number): number {
+  return combo > 1 ? Math.min(2000, combo * 400) : 0
+}
+
 /** The next-truck allowance, ms, after `operations` truck operations have been completed. */
 export function truckAllowanceMs(level: LevelDef, operations: number): number {
   return Math.round(level.truckSeconds[Math.min(operations, 2)]! * 1000)
@@ -70,8 +93,18 @@ export function initialState(level: LevelDef): ShiftState {
     truckAllowanceMs: truckAllowanceMs(level, 0),
     overtime: false,
     pauses: [],
+    score: 0,
+    combo: 0,
+    bestCombo: 0,
+    golds: 0,
+    bonusMs: bonusWindowMs(level, 1),
     failure: null,
   }), [])
+}
+
+/** The window, ms, that opens when `id` becomes the next required container (0 when it is not a bonus). */
+function bonusWindowMs(level: LevelDef, id: number): number {
+  return level.bonusIds.includes(id) && id <= level.count ? Math.round(level.bonusWindowSeconds * 1000) : 0
 }
 
 /** The container the waiting incoming truck carries, or undefined when no truck waits. */
@@ -185,7 +218,48 @@ export function applyAction(state: ShiftState, action: ShiftAction): { state: Sh
   if (action.type === 'pause' || action.type === 'resume') {
     return { state: withPause(state, action.reason, action.type === 'pause'), events: [] }
   }
-  return withClocks(state, action, applyMove(state, action))
+  return withClocks(state, action, withScore(state, action, applyMove(state, action)))
+}
+
+/**
+ * Score, combo, golds, bonus window and shift-time rewards of a move, judged against the state before it (the bonus
+ * and quick service are evaluated when the action starts). Receipts do not touch the bonus window.
+ */
+function withScore(
+  before: ShiftState,
+  action: Exclude<ShiftAction, { type: 'pause' | 'resume' }>,
+  moved: { state: ShiftState; events: ShiftEvent[] },
+): { state: ShiftState; events: ShiftEvent[] } {
+  const s = moved.state
+  const events = moved.events
+  const quick = before.truckMs > 0 ? QUICK_SERVICE_MS : 0
+  let next: ShiftState
+  if (action.type === 'rehandle') {
+    next = { ...s, combo: 0, score: before.score + rehandlePoints(action.from, action.to) }
+  } else if (action.type === 'receive') {
+    next = { ...s, combo: 0, score: before.score + RECEIPT_POINTS, shiftMs: before.shiftMs + quick }
+  } else {
+    const combo = before.combo + 1
+    const id = before.next
+    const awarded = before.bonusMs > 0
+    const bonusMs = bonusWindowMs(before.level, s.next)
+    next = {
+      ...s,
+      combo,
+      bestCombo: Math.max(before.bestCombo, combo),
+      score: before.score + collectPoints(combo) + (awarded ? BONUS_POINTS : 0),
+      golds: before.golds + (awarded ? 1 : 0),
+      shiftMs: before.shiftMs + quick + comboShiftMs(combo) + (awarded ? BONUS_SHIFT_MS : 0),
+      bonusMs,
+    }
+    const extra: ShiftEvent[] = []
+    if (awarded) extra.push({ type: 'bonus-awarded', id, points: BONUS_POINTS, ms: BONUS_SHIFT_MS })
+    if (bonusMs > 0) extra.push({ type: 'bonus-window', id: s.next, ms: bonusMs })
+    // Before 'completed', which `arrive` appends last.
+    const at = events.findIndex((e) => e.type === 'completed')
+    events.splice(at < 0 ? events.length : at, 0, ...extra)
+  }
+  return { state: next, events }
 }
 
 /** Overtime-start/end events for a change of the next-truck clock. */
@@ -230,8 +304,11 @@ export function advance(state: ShiftState, dtMs: number): { state: ShiftState; e
   const over = Math.max(0, dt - state.truckMs)
   const shiftMs = Math.max(0, state.shiftMs - dt - (state.level.overtimeMultiplier - 1) * over)
   const truckMs = Math.max(0, state.truckMs - dt)
-  let next: ShiftState = { ...state, shiftMs, truckMs, overtime: truckMs === 0 }
+  // The bonus window waits while a receipt is forced (pauses already stop the whole tick).
+  const bonusMs = state.deadline === 0 ? state.bonusMs : Math.max(0, state.bonusMs - dt)
+  let next: ShiftState = { ...state, shiftMs, truckMs, overtime: truckMs === 0, bonusMs }
   const events = overtimeEvents(state, next)
+  if (state.bonusMs > 0 && bonusMs === 0) events.push({ type: 'bonus-missed', id: state.next })
   if (shiftMs === 0) {
     next = { ...next, status: 'failed', failure: { reason: 'timeout', message: TIMEOUT_MESSAGE } }
     events.push({ type: 'failed', reason: 'timeout' })

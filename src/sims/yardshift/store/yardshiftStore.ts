@@ -39,6 +39,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   /** The brief arrival announcement, or empty; `announceLeftMs` counts it down in `frame`. */
   const announcement = ref('')
   let announceLeftMs = 0
+  /** Bumped on every bonus award, so the view can replay the gold burst and "+250 · +5s" float. */
+  const bonusPulse = ref(0)
   let lastFrame: number | null = null
   let reducedMotion = false
 
@@ -56,6 +58,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     shift.onEvent((e) => {
       if (e.type === 'time-credit') creditPulse.value++
       if (e.type === 'arrival') announce(e.id, e.moves)
+      if (e.type === 'bonus-awarded') bonusPulse.value++
     })
   }
   watchEvents()
@@ -177,6 +180,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     move,
     creditPulse,
     announcement,
+    bonusPulse,
     loadLevel,
     dispatch,
     tapTarget,
