@@ -102,6 +102,20 @@ function labelTexture(text: string, colour: string, bonus: boolean, cache: Map<s
   return tex
 }
 
+/** Warning red of the static urgency glow (reduced motion), V20's arrow red. */
+const URGENT_GLOW = '#e9483d'
+
+/**
+ * Shake offset in CSS px for a risk 0..1 at time `now` (V20): amplitude 0.65 + 3.35 x risk, x frequency
+ * 0.009 + 0.041 x risk per ms, y at a fifth of the amplitude. Render offset only: hit regions never move.
+ */
+function shakeOffset(risk: number, now: number, seed: number): { dx: number; dy: number } {
+  if (risk <= 0) return { dx: 0, dy: 0 }
+  const amp = 0.65 + 3.35 * risk
+  const f = 0.009 + 0.041 * risk
+  return { dx: amp * Math.sin(now * f + seed), dy: amp * 0.2 * Math.cos(now * f * 1.3 + seed) }
+}
+
 function disposeGroup(group: THREE.Group): void {
   group.traverse((o) => {
     if (o instanceof THREE.Mesh) {
@@ -199,6 +213,15 @@ export function useYardScene(
     const receiptBed = groundAt(layout.receipt.x + layout.receipt.w / 2, layout.receipt.y + layout.receipt.h * 0.55, width, height)
     const bedY = ch * 0.5 + ch / 2
 
+    const now = performance.now()
+    /** Shake (a render offset) or, under reduced motion, a static red glow. */
+    const urgency = (mesh: THREE.Mesh, mats: THREE.MeshStandardMaterial[], u: { shake: number; urgent: boolean }, seed: number) => {
+      const { dx, dy } = shakeOffset(u.shake, now, seed)
+      mesh.position.x += dx / PX_PER_UNIT
+      mesh.position.y += dy / PX_PER_UNIT
+      if (u.urgent) for (const mat of mats) mat.emissive.set(URGENT_GLOW).multiplyScalar(0.35)
+    }
+
     for (const c of vm.containers) {
       if (c === moving) continue
       const col = layout.columns[c.stack]
@@ -211,6 +234,7 @@ export function useYardScene(
       // BoxGeometry faces: +x, -x, +y (top), -y, +z (front, toward the camera), -z.
       const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
       mesh.position.set(base.x, ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * 0.25 : 0), base.z)
+      urgency(mesh, [body, label], c, c.id)
       dynamic.add(mesh)
     }
 
@@ -221,6 +245,7 @@ export function useYardScene(
       const label = new THREE.MeshStandardMaterial({ map: labelTexture(cargo.label, colour, cargo.bonus, textures), roughness: 0.7 })
       const mesh = box(cw, ch, cd, [body, body, label, body, label, body])
       mesh.position.set(receiptBed.x, bedY + (cargo.selected ? ch * 0.25 : 0), receiptBed.z)
+      urgency(mesh, [body, label], cargo, cargo.id)
       dynamic.add(mesh)
     }
 

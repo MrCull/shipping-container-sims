@@ -19,7 +19,7 @@ function tapAll(targets: (HitTarget | null)[]) {
   for (const target of targets) {
     const r = input(ui, { type: 'tap', target }, shift.state)
     ui = r.ui
-    if (r.action) {
+    if (r.action && r.action.type !== 'undo') {
       actions.push(r.action)
       shift.dispatch(r.action)
     }

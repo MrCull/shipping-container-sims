@@ -9,10 +9,13 @@ import { LEVELS, levelByNumber } from '../modules/levels'
 import { createShift, exposedNextStack, MAX_STEP_MS, rejectionFor, waitingArrival } from '../modules/engine'
 import { craneDurationMs, hitTest, input, moveSpan, present } from '../modules/presentation'
 import type { DispatchResult, Shift, ShiftAction, ShiftState } from '../types/engine'
-import type { HitTarget, UiState, Viewport } from '../types/presentation'
+import type { HitTarget, UiAction, UiEvent, UiState, Viewport } from '../types/presentation'
 
 /** `CraneMove.from` for a receipt: the crane lifts the cargo off the receipt truck. */
 export const RECEIPT_TRUCK = -2
+/** A pointer that moves farther than this (CSS px) from where it went down starts a drag (V20: 6 logical px). */
+export const DRAG_THRESHOLD_PX = 6
+
 /** How long the arrival announcement shows, ms (brief; it does not pause the clocks or block input). */
 export const ANNOUNCE_MS = 1600
 
@@ -43,6 +46,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   const bonusPulse = ref(0)
   let lastFrame: number | null = null
   let reducedMotion = false
+  /** The pointer that went down and has not come up yet: where, on what, and whether it became a drag. */
+  let pointer: { x: number; y: number; target: HitTarget | null; dragging: boolean } | null = null
 
   function sync(): void {
     state.value = shift.state
@@ -75,7 +80,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     move.value = null
     lastFrame = null
     sync()
-    ui.value = { selection: null }
+    ui.value = { selection: null, reducedMotion }
+    pointer = null
     message.value = ''
     announcement.value = ''
     announceLeftMs = 0
@@ -150,12 +156,68 @@ export const useYardshiftStore = defineStore('yardshift', () => {
 
   function setReducedMotion(on: boolean): void {
     reducedMotion = on
+    ui.value = { ...ui.value, reducedMotion: on }
+  }
+
+  /** Undo is #386's engine action; until the engine has it, U only says so. */
+  function undo(): void {
+    message.value = 'Undo is not available yet.'
+  }
+
+  /** Apply what `input` resolved: a move plays as a crane animation, pause and resume apply at once. */
+  function apply(action: UiAction): void {
+    if (action.type === 'undo') undo()
+    else if (action.type === 'pause' || action.type === 'resume') dispatch(action)
+    else startMove(action)
+  }
+
+  /** Forward one raw UI event to `input`. */
+  function send(event: UiEvent): void {
+    const r = input(ui.value, event, state.value)
+    ui.value = r.ui
+    if (r.action) apply(r.action)
   }
 
   function tapTarget(target: HitTarget | null): void {
-    const r = input(ui.value, { type: 'tap', target }, state.value)
-    ui.value = r.ui
-    if (r.action) startMove(r.action)
+    send({ type: 'tap', target })
+  }
+
+  /** A key press (`KeyboardEvent.key`). */
+  function key(k: string): void {
+    send({ type: 'key', key: k })
+  }
+
+  function pointerDown(x: number, y: number): void {
+    pointer = { x, y, target: hitTest(view.value.hitRegions, x, y), dragging: false }
+  }
+
+  function pointerMove(x: number, y: number): void {
+    const p = pointer
+    if (!p) return
+    const over = hitTest(view.value.hitRegions, x, y)
+    if (p.dragging) {
+      send({ type: 'drag-move', over })
+      return
+    }
+    if (p.target && Math.hypot(x - p.x, y - p.y) > DRAG_THRESHOLD_PX) {
+      p.dragging = true
+      send({ type: 'drag-start', from: p.target })
+      send({ type: 'drag-move', over })
+    }
+  }
+
+  /** Pointer up: a drop when a drag started, else a tap where the pointer came up. */
+  function pointerUp(x: number, y: number): void {
+    const p = pointer
+    pointer = null
+    const target = hitTest(view.value.hitRegions, x, y)
+    if (p?.dragging) send({ type: 'drag-end', target })
+    else send({ type: 'tap', target })
+  }
+
+  function pointerCancel(): void {
+    if (pointer?.dragging) send({ type: 'drag-end', target: null })
+    pointer = null
   }
 
   /** A tap at play-surface coordinates (CSS px). */
@@ -185,6 +247,11 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     dispatch,
     tapTarget,
     tapAt,
+    key,
+    pointerDown,
+    pointerMove,
+    pointerUp,
+    pointerCancel,
     setViewport,
     restart,
     frame,
