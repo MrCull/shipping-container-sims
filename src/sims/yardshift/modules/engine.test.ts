@@ -3,7 +3,15 @@ import { createShift } from './engine'
 import { TUTORIAL } from './levels'
 import type { LevelDef, ShiftAction } from '../types/engine'
 
-const tiny: LevelDef = { number: 99, name: 'Tiny', stacks: [[1, 2], []], capacity: 2, count: 2, maxRehandles: 1 }
+const tiny: LevelDef = {
+  ...TUTORIAL,
+  number: 99,
+  name: 'Tiny',
+  stacks: [[1, 2], []],
+  capacity: 2,
+  count: 2,
+  maxRehandles: 1,
+}
 
 function rejectionOf(level: LevelDef, setup: ShiftAction[], action: ShiftAction) {
   const shift = createShift(level)
@@ -38,7 +46,10 @@ describe('Yardshift engine', () => {
   it('rehandles the top container onto a stack with room', () => {
     const shift = createShift(TUTORIAL)
     const r = shift.dispatch({ type: 'rehandle', from: 1, to: 3 })
-    expect(r.ok && r.events).toEqual([{ type: 'rehandled', id: 4, from: 1, to: 3 }])
+    expect(r.ok && r.events).toEqual([
+      { type: 'rehandled', id: 4, from: 1, to: 3 },
+      { type: 'time-credit', ms: 1000 },
+    ])
     expect(shift.state.stacks).toEqual([[1], [2], [3], [4]])
     expect(shift.state.rehandles).toBe(1)
   })
@@ -97,11 +108,14 @@ describe('Yardshift engine', () => {
     expect(shift.state.stacks.every((s) => s.length === 0)).toBe(true)
     expect(seen.filter((t) => t === 'completed')).toHaveLength(1)
     expect(shift.dispatch({ type: 'collect' }).ok).toBe(false)
-    expect(shift.events).toHaveLength(6)
+    expect(shift.events).toHaveLength(7) // four collections, one rehandle and its time credit, completed
   })
 
-  it('tick is a no-op until the clocks arrive', () => {
+  it('tick is a no-op once the shift is over', () => {
     const shift = createShift(TUTORIAL)
+    shift.dispatch({ type: 'collect' })
+    shift.dispatch({ type: 'rehandle', from: 1, to: 3 })
+    for (let i = 0; i < 3; i++) shift.dispatch({ type: 'collect' })
     const before = shift.state
     expect(shift.tick(100)).toBe(before)
   })

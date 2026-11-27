@@ -16,9 +16,26 @@ export interface LevelDef {
   count: number
   /** Hard cap on rehandles; collections stay legal at the cap. */
   maxRehandles: number
+  /** Shift clock length in seconds. */
+  shiftSeconds: number
+  /**
+   * Next-truck allowances in seconds: the first truck operation, the second, then every later one. The tutorial is
+   * 30/20/15; other levels are first x 1, 0.5 and 0.28 (`truckSecondsFrom` in modules/levels.ts).
+   */
+  truckSeconds: readonly [number, number, number]
+  /** Total shift drain while the next-truck clock is at 0 (3, the tutorial 2). */
+  overtimeMultiplier: number
 }
 
-export type ShiftStatus = 'playing' | 'complete'
+export type ShiftStatus = 'playing' | 'complete' | 'failed'
+
+/**
+ * Why the clocks are frozen. Each reason is held and released on its own; the clocks run only when none is held.
+ * `intro` (the intro modal), `player` (the pause menu), `animation` (a crane move is playing), `hidden` (the tab).
+ */
+export type PauseReason = 'intro' | 'player' | 'animation' | 'hidden'
+
+export type FailureReason = 'timeout'
 
 /** Read-only shift state. A new object after every accepted action; never mutated in place. */
 export interface ShiftState {
@@ -30,6 +47,20 @@ export interface ShiftState {
   readonly collected: number
   readonly rehandles: number
   readonly status: ShiftStatus
+  /** Truck operations completed (collections now, receipts from #384); picks the next-truck allowance. */
+  readonly operations: number
+  /** Shift time left, ms, never negative. */
+  readonly shiftMs: number
+  /** Next-truck time left, ms, never negative. 0 means overtime. */
+  readonly truckMs: number
+  /** The allowance the next-truck clock was last reset to, ms. */
+  readonly truckAllowanceMs: number
+  /** True while the next-truck clock is at 0: the shift drains at the level's overtime multiplier. */
+  readonly overtime: boolean
+  /** Pause reasons currently held; clocks run only when empty. */
+  readonly pauses: readonly PauseReason[]
+  /** Set when status is 'failed'. */
+  readonly failure: { readonly reason: FailureReason; readonly message: string } | null
 }
 
 /**
@@ -39,6 +70,10 @@ export interface ShiftState {
 export type ShiftAction =
   | { type: 'collect'; from?: number }
   | { type: 'rehandle'; from: number; to: number }
+  /** Hold a pause reason (clocks freeze). While `animation` is held, moves are rejected as `crane-busy`. */
+  | { type: 'pause'; reason: PauseReason }
+  /** Release a pause reason. */
+  | { type: 'resume'; reason: PauseReason }
 
 export type RejectReason =
   | 'shift-over'
@@ -49,6 +84,7 @@ export type RejectReason =
   | 'same-stack'
   | 'stack-full'
   | 'rehandle-cap'
+  | 'crane-busy'
 
 export interface Rejection {
   readonly reason: RejectReason
@@ -60,6 +96,13 @@ export type ShiftEvent =
   | { type: 'collected'; id: number; from: number }
   | { type: 'rehandled'; id: number; from: number; to: number }
   | { type: 'completed' }
+  /** The next-truck clock hit 0. */
+  | { type: 'overtime-start' }
+  /** The next-truck clock left 0 (a truck operation reset it, or a rehandle credited +1 s). */
+  | { type: 'overtime-end' }
+  /** A valid rehandle added time to the next-truck clock. */
+  | { type: 'time-credit'; ms: number }
+  | { type: 'failed'; reason: FailureReason }
 
 export type DispatchResult =
   | { ok: true; state: ShiftState; events: ShiftEvent[] }
@@ -68,7 +111,10 @@ export type DispatchResult =
 export interface Shift {
   readonly state: ShiftState
   dispatch(action: ShiftAction): DispatchResult
-  /** Advance the injected clock. Clocks arrive in #383; a no-op for now. */
+  /**
+   * Advance the injected clock by `dtMs` (capped at `MAX_STEP_MS`). A no-op while any pause reason is held or the
+   * shift is over.
+   */
   tick(dtMs: number): ShiftState
   /** Every event so far, oldest first. */
   readonly events: readonly ShiftEvent[]

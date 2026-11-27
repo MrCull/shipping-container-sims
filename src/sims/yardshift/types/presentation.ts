@@ -53,6 +53,29 @@ export interface ViewModel {
   destinations: number[]
   hitRegions: HitRegion[]
   hud: { title: string; loaded: string; rehandles: string }
+  clocks: ClocksView
   hint: string
   complete: boolean
+  /** The failure message once the shift has failed, else null. */
+  failed: string | null
+  /** A crane move is animating: input is ignored until it ends. */
+  busy: boolean
+}
+
+export interface ClockView {
+  label: string
+  /** Display text, never negative ("2:05", "4.2s"). */
+  text: string
+  /** Bar fill, 0..1. */
+  fraction: number
+  /** Drawn red. */
+  red: boolean
+  /** Shaking (overtime). */
+  shake: boolean
+}
+
+export interface ClocksView {
+  shift: ClockView
+  truck: ClockView
+  overtime: boolean
 }

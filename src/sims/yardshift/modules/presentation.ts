@@ -6,6 +6,7 @@
 import { exposedNextStack, rejectionFor } from './engine'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type {
+  ClocksView,
   ContainerView,
   HitRegion,
   HitTarget,
@@ -71,9 +72,60 @@ export function legalDestinations(state: ShiftState, from: number): number[] {
 
 function hintFor(state: ShiftState, ui: UiState): string {
   if (state.status === 'complete') return 'Yard cleared!'
+  if (state.failure) return state.failure.message
   if (ui.selection !== null) return `Choose a destination for #${topOf(state, ui.selection)}`
   if (exposedNextStack(state) >= 0) return `Tap #${state.next} to load the truck.`
   return `Uncover #${state.next}: tap a top container, then a stack.`
+}
+
+/** Truck clock reads low below this share of its allowance (V20). */
+const TRUCK_LOW = 0.35
+/** Shift clock reads red below this many ms (V20). */
+const SHIFT_LOW_MS = 9_000
+
+function minSec(ms: number): string {
+  const total = Math.ceil(Math.max(0, ms) / 1000)
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
+/** Both clocks for the HUD. The next-truck bar is value over max(allowance, value), so it never overflows. */
+export function clocksView(state: ShiftState): ClocksView {
+  const { overtime } = state
+  const truckMs = Math.max(0, state.truckMs)
+  const shiftTotal = state.level.shiftSeconds * 1000
+  return {
+    overtime,
+    shift: {
+      label: 'SHIFT LEFT',
+      text: minSec(state.shiftMs),
+      fraction: shiftTotal > 0 ? Math.min(1, Math.max(0, state.shiftMs / shiftTotal)) : 0,
+      red: overtime || state.shiftMs < SHIFT_LOW_MS,
+      shake: overtime,
+    },
+    truck: {
+      label: overtime ? `OVERTIME ×${state.level.overtimeMultiplier}` : 'NEXT TRUCK',
+      text: `${(truckMs / 1000).toFixed(1)}s`,
+      fraction: truckMs / Math.max(state.truckAllowanceMs, truckMs, 1),
+      red: overtime || truckMs < state.truckAllowanceMs * TRUCK_LOW,
+      shake: overtime,
+    },
+  }
+}
+
+/** Crane move length in ms for a horizontal travel of `dxPx` CSS pixels: 330 + |dx| x 0.38 (V20, about 330 to 460). */
+export function craneDurationMs(dxPx: number): number {
+  return 330 + Math.abs(dxPx) * 0.38
+}
+
+/** Screen x (CSS px) of where a move starts and ends: a stack column centre or the collection bay centre. */
+export function moveSpan(layout: Layout, action: ShiftAction, state: ShiftState): { fromX: number; toX: number } | null {
+  const centre = (r: Rect | undefined) => (r ? r.x + r.w / 2 : 0)
+  if (action.type === 'collect') {
+    const from = action.from ?? exposedNextStack(state)
+    return { fromX: centre(layout.columns[from]), toX: centre(layout.collection) }
+  }
+  if (action.type === 'rehandle') return { fromX: centre(layout.columns[action.from]), toX: centre(layout.columns[action.to]) }
+  return null
 }
 
 export function present(state: ShiftState, ui: UiState, viewport: Viewport): ViewModel {
@@ -102,8 +154,11 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
       loaded: `${state.collected}/${state.level.count}`,
       rehandles: `${state.rehandles}/${state.level.maxRehandles}`,
     },
+    clocks: clocksView(state),
     hint: hintFor(state, ui),
     complete: state.status === 'complete',
+    failed: state.failure?.message ?? null,
+    busy: state.pauses.includes('animation'),
   }
 }
 
@@ -117,6 +172,8 @@ const CLEAR: UiState = { selection: null }
 /** Resolve a UI event to the next UI state and at most one engine action. The engine still judges legality. */
 export function input(ui: UiState, event: UiEvent, state: ShiftState): InputResult {
   const { target } = event
+  // A tap while the crane animates is dropped, not queued: it can never turn into a second move.
+  if (state.pauses.includes('animation')) return { ui }
   if (state.status !== 'playing' || target === null) return { ui: CLEAR }
   if (target.kind === 'receipt') return { ui }
   if (target.kind === 'collection') {
