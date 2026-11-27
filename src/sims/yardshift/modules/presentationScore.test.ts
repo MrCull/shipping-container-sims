@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
-import { TUTORIAL } from './levels'
+import { levelByNumber, TUTORIAL } from './levels'
 import { GREY, present, SEQUENCE_COLOURS } from './presentation'
 import type { LevelDef, Shift } from '../types/engine'
 import type { UiState, Viewport } from '../types/presentation'
@@ -113,4 +113,24 @@ describe('Yardshift score HUD', () => {
     shift.dispatch({ type: 'collect' })
     expect(view(shift).hud).toMatchObject({ score: '250', combo: '×2' })
   })
+
+  it('heavy containers carry the H flag, buried or grey, and on the receipt truck', () => {
+    const shift = createShift(levelByNumber(13)!)
+    const v = view(shift)
+    const heavy = new Set(levelByNumber(13)!.heavy)
+    for (const c of v.containers) expect(c.heavy).toBe(heavy.has(c.id))
+    // Buried heavy (#1 under #6 and #10) and grey heavy (far down the order) both keep the flag.
+    expect(v.containers.find((c) => c.id === 1)).toMatchObject({ heavy: true, tier: 0 })
+    expect(v.containers.find((c) => c.id === 9)).toMatchObject({ heavy: true, slot: null })
+    expect(v.receiptCargo).toMatchObject({ id: 13, heavy: true })
+  })
+
+  it('an exposed bonus container glints; buried, or under reduced motion, it stays still', () => {
+    const shift = createShift({ ...deep, stacks: [[2, 1], [3, 4], [5, 6], [9, 8, 7], []] })
+    const glints = (ui: UiState) => present(shift.state, ui, PHONE).containers.filter((c) => c.glint).map((c) => c.id)
+    expect(glints(NONE)).toEqual([6])
+    expect(present(shift.state, NONE, PHONE).containers.find((c) => c.id === 3)).toMatchObject({ bonus: true, glint: false })
+    expect(glints({ selection: null, reducedMotion: true })).toEqual([])
+  })
 })
+

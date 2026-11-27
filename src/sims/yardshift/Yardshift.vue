@@ -296,14 +296,16 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
+<style src="./styles/palette.css"></style>
+
 <style scoped>
 .yardshift {
   flex: 1;
   min-height: 0;
   position: relative;
   overflow: hidden;
-  background: #101c27;
-  color: #e7eef2;
+  background: var(--color-bg);
+  color: var(--color-text);
   user-select: none;
 }
 .band {
@@ -335,20 +337,20 @@ onBeforeUnmount(() => {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  background: #26443e;
+  background: var(--ys-green-dark);
   white-space: nowrap;
   overflow: hidden;
 }
 .incoming.optional {
-  background: #72451d;
+  background: var(--ys-gold-dark);
 }
 .incoming.mandatory {
-  background: #a83229;
+  background: var(--ys-red-dark);
 }
 .dim {
   position: absolute;
   pointer-events: none;
-  background: rgb(8 19 29 / 45%);
+  background: var(--ys-scrim);
 }
 .arrow {
   position: absolute;
@@ -356,7 +358,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  color: #e9483d;
+  color: var(--ys-red);
   font-size: 1.6rem;
   line-height: 1;
   text-shadow: 0 2px 4px rgb(0 0 0 / 50%);
@@ -378,7 +380,7 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 6px 12px;
   border-radius: 6px;
-  background: #72451d;
+  background: var(--ys-gold-dark);
   font-size: 0.85rem;
   white-space: nowrap;
   pointer-events: none;
@@ -389,7 +391,7 @@ onBeforeUnmount(() => {
   opacity: 0.9;
 }
 .bay-status.mandatory {
-  color: #ff8776;
+  color: var(--ys-red-light);
   font-weight: 700;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -417,7 +419,7 @@ onBeforeUnmount(() => {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff2bd 0%, #f7cb66 40%, rgb(211 155 49 / 0%) 70%);
+  background: radial-gradient(circle, var(--ys-gold-light) 0%, var(--ys-gold-mid) 40%, rgb(211 155 49 / 0%) 70%);
   animation: burst 0.7s ease-out forwards;
 }
 .burst .float {
@@ -425,9 +427,9 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  color: #ffc85c;
+  color: var(--ys-gold);
   font-weight: 800;
-  text-shadow: 0 1px 2px #0d1b24;
+  text-shadow: 0 1px 2px var(--ys-ink);
   animation: rise 1.2s ease-out forwards;
 }
 @keyframes burst {
@@ -474,7 +476,7 @@ onBeforeUnmount(() => {
   align-items: center;
   margin: 0;
   padding: 2px 16px;
-  background: #142530;
+  background: var(--ys-panel);
   font-size: 0.85rem;
   line-height: 1.2;
 }
@@ -483,14 +485,14 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 0 16px;
-  background: #142530;
+  background: var(--ys-panel);
 }
 .controls button {
   padding: 6px 12px;
-  border: 1px solid #3c5363;
+  border: 1px solid var(--ys-line);
   border-radius: 6px;
-  background: #1d3442;
-  color: #e7eef2;
+  background: var(--ys-panel-raised);
+  color: var(--color-text);
   font-weight: 700;
   cursor: pointer;
 }
@@ -503,6 +505,6 @@ onBeforeUnmount(() => {
 }
 .undo-reason {
   font-size: 0.7rem;
-  color: #ff8776;
+  color: var(--ys-red-light);
 }
 </style>

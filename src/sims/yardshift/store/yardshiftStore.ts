@@ -75,10 +75,9 @@ export const useYardshiftStore = defineStore('yardshift', () => {
 
   /** Run one engine step (a dispatch or a tick) and fire its cues once. */
   function step<T>(run: () => T): T {
-    const before = shift.state
     stepEvents = []
     const result = run()
-    emitCues(cuesForStep(before, shift.state, stepEvents))
+    emitCues(cuesForStep(shift.state, stepEvents))
     stepEvents = []
     return result
   }

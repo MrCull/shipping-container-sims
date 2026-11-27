@@ -61,8 +61,8 @@ defineProps<{
   justify-content: space-between;
   gap: 6px 12px;
   padding: 8px 16px;
-  background: #142530;
-  color: #e7eef2;
+  background: var(--ys-panel);
+  color: var(--color-text);
 }
 .brand {
   display: flex;
@@ -70,7 +70,7 @@ defineProps<{
   min-width: 0;
 }
 .wordmark {
-  color: #ffc85c;
+  color: var(--ys-gold);
   font-weight: 800;
   letter-spacing: 0.12em;
   font-size: 0.95rem;
@@ -109,7 +109,7 @@ dd {
   display: block;
   height: 3px;
   margin-top: 2px;
-  background: #26404f;
+  background: var(--ys-track);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -117,13 +117,13 @@ dd {
   display: block;
   height: 100%;
   margin-left: auto;
-  background: #54ddb0;
+  background: var(--ys-seq-0);
 }
 .clock.red dd {
-  color: #ff8776;
+  color: var(--ys-red-light);
 }
 .clock.red .bar span {
-  background: #ff8776;
+  background: var(--ys-red-light);
 }
 .clock.shake dd {
   animation: shake 0.25s linear infinite;
@@ -132,7 +132,7 @@ dd {
   position: absolute;
   right: 0;
   top: -0.2em;
-  color: #54ddb0;
+  color: var(--ys-seq-0);
   font-size: 0.75rem;
   animation: float-up 0.9s ease-out forwards;
   pointer-events: none;

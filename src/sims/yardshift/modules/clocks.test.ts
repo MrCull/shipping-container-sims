@@ -3,7 +3,7 @@
  * reasons and the crane-busy guard. Tests go through `createShift` and `dispatch`/`tick` only.
  */
 import { describe, expect, it } from 'vitest'
-import { createShift, MAX_STEP_MS } from './engine'
+import { createShift, MAX_STEP_MS, SHIFT_LOW_SECONDS, TRUCK_LOW_SHARE } from './engine'
 import { TUTORIAL, truckSecondsFrom } from './levels'
 import type { LevelDef, PauseReason, Shift, ShiftEvent } from '../types/engine'
 
@@ -183,4 +183,26 @@ describe('Yardshift clocks', () => {
     expect(shift.dispatch({ type: 'collect' }).ok).toBe(true)
     expect(shift.state).toMatchObject({ collected: 1, shiftMs: 40_000 + 350 })
   })
+
+  it('emits shift-low once per threshold at 9, 5, 3, 2 and 1 s, never per tick', () => {
+    expect(SHIFT_LOW_SECONDS).toEqual([9, 5, 3, 2, 1])
+    const shift = createShift({ ...timed, shiftSeconds: 12, truckSeconds: [60, 60, 60] })
+    const seen = collecting(shift)
+    run(shift, 15_000)
+    const lows = seen.filter((e) => e.type === 'shift-low')
+    expect(lows).toEqual([9, 5, 3, 2, 1].map((seconds) => ({ type: 'shift-low', seconds })))
+  })
+
+  it('emits truck-low once when the next-truck clock crosses 35% of its allowance', () => {
+    expect(TRUCK_LOW_SHARE).toBe(0.35)
+    const shift = createShift(timed)
+    const seen = collecting(shift)
+    run(shift, 7_700)
+    expect(seen.filter((e) => e.type === 'truck-low')).toEqual([])
+    run(shift, 200) // 12 s x 0.35 = 4.2 s left at 7.8 s
+    expect(seen.filter((e) => e.type === 'truck-low')).toEqual([{ type: 'truck-low' }])
+    run(shift, 6_000)
+    expect(seen.filter((e) => e.type === 'truck-low')).toHaveLength(1)
+  })
 })
+

@@ -238,9 +238,12 @@ function urgencyFor(state: ShiftState, ui: UiState, current: boolean): { shake: 
   return ui.reducedMotion ? { shake: 0, urgent: risk >= URGENT_RISK } : { shake: risk, urgent: false }
 }
 
-/** Crane move length in ms for a horizontal travel of `dxPx` CSS pixels: 330 + |dx| x 0.38 (V20, about 330 to 460). */
+/** The longest crane move (story 20: about 330 to 460 ms), so a wide desktop yard never drags. */
+export const CRANE_MAX_MS = 460
+
+/** Crane move length in ms for a horizontal travel of `dxPx` CSS pixels: 330 + |dx| x 0.38 (V20), at most 460. */
 export function craneDurationMs(dxPx: number): number {
-  return 330 + Math.abs(dxPx) * 0.38
+  return Math.min(CRANE_MAX_MS, 330 + Math.abs(dxPx) * 0.38)
 }
 
 /** Screen x (CSS px) of where a move starts and ends: a stack column centre or the collection bay centre. */
@@ -273,6 +276,9 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
         slot: colourSlot(state, id),
         colour: colourOf(state, id),
         bonus: showsBonus(state, id),
+        heavy: state.level.heavy.includes(id),
+        // Story 54: an exposed bonus container glints and rocks (render only); still under reduced motion.
+        glint: !ui.reducedMotion && tier === stack.length - 1 && showsBonus(state, id),
         border: ui.selection === si && tier === stack.length - 1,
         // At deadline 0 the receipt cargo is the current container, not the next one in the yard.
         ...urgencyFor(state, ui, id === state.next && state.deadline !== 0),
@@ -297,6 +303,7 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
             label: String(cargo),
             selected: receiptSelected,
             bonus: state.level.bonusIds.includes(cargo),
+            heavy: state.level.heavy.includes(cargo),
             ...urgencyFor(state, ui, state.deadline === 0),
           },
     incoming: incomingView(state),

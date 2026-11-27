@@ -59,8 +59,8 @@ defineProps<{
   align-items: center;
   gap: 10px;
   padding: 4px 16px 6px;
-  background: #142530;
-  color: #e7eef2;
+  background: var(--ys-panel);
+  color: var(--color-text);
 }
 .queue {
   display: flex;
@@ -74,25 +74,25 @@ defineProps<{
   min-width: 1.9em;
   padding: 2px 0;
   border-radius: 4px;
-  color: #0d1b24;
+  color: var(--ys-ink);
   font-weight: 800;
   font-size: 0.8rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 .queue li.empty {
-  color: #9fb0b8;
+  color: var(--color-text-muted);
 }
 .star {
   position: absolute;
   top: -0.55em;
   right: -0.3em;
-  color: #ffda75;
+  color: var(--ys-gold-bright);
   font-size: 0.7rem;
-  text-shadow: 0 0 2px #634016;
+  text-shadow: 0 0 2px var(--ys-gold-deep);
 }
 .bonus {
-  color: #ffda75;
+  color: var(--ys-gold-bright);
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;

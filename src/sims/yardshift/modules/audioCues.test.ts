@@ -1,5 +1,5 @@
 /**
- * Yardshift audio cues (#388): the pure mapping from engine steps (state before, state after, events) to cues. Each
+ * Yardshift audio cues (#388): the pure mapping from engine steps (the state after a step and its events) to cues. Each
  * outcome fires its cue exactly once, never per frame: tests drive real shifts through `dispatch` and `tick` and
  * collect the cues of every step.
  */
@@ -31,10 +31,9 @@ function recorder(level: LevelDef): { shift: Shift; cues: Cue[]; act(a: ShiftAct
   let batch: ShiftEvent[] = []
   shift.onEvent((e) => batch.push(e))
   function step(f: () => void): void {
-    const before = shift.state
     batch = []
     f()
-    cues.push(...cuesForStep(before, shift.state, batch))
+    cues.push(...cuesForStep(shift.state, batch))
   }
   return {
     shift,
@@ -131,14 +130,14 @@ describe('Yardshift audio cues', () => {
   it('an arrival fires the arrival alarm with the truck sample once', () => {
     const before = createShift(levelByNumber(5)!).state
     const after = { ...before, deadline: 3 }
-    const cues = cuesForStep(before, after, [{ type: 'arrival', id: 11, moves: 3 }])
+    const cues = cuesForStep(after, [{ type: 'arrival', id: 11, moves: 3 }])
     expect(names(cues)).toEqual(['arrival'])
     expect(cues[0]!.sample).toBe('truck')
   })
 
   it('maps completion, blocked, bonus window, award and miss to one cue each', () => {
     const s = createShift(timed).state
-    const map = (e: ShiftEvent): CueName[] => names(cuesForStep(s, s, [e]))
+    const map = (e: ShiftEvent): CueName[] => names(cuesForStep(s, [e]))
     expect(map({ type: 'completed' })).toEqual(['win'])
     expect(map({ type: 'failed', reason: 'blocked' })).toEqual(['blocked'])
     expect(map({ type: 'failed', reason: 'timeout' })).toEqual(['timeout'])
@@ -165,7 +164,7 @@ describe('Yardshift audio cues', () => {
 
   it('the bonus window chord rises', () => {
     const s = createShift(timed).state
-    const [cue] = cuesForStep(s, s, [{ type: 'bonus-window', id: 3, ms: 1200 }])
+    const [cue] = cuesForStep(s, [{ type: 'bonus-window', id: 3, ms: 1200 }])
     const pitches = cue!.tones.map((t) => t.f1)
     expect(pitches).toEqual([...pitches].sort((a, b) => a - b))
   })
@@ -189,7 +188,7 @@ describe('Yardshift audio cues', () => {
       rejectionCue(),
       comboCue(5),
       ...craneCues(0, 1),
-      ...cuesForStep(s, s, [{ type: 'completed' }, { type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }]),
+      ...cuesForStep(s, [{ type: 'completed' }, { type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }]),
     ]
     for (const cue of all) for (const t of cue.tones) {
         expect(t.vol).toBeGreaterThan(0)

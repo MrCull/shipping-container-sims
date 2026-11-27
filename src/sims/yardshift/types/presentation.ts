@@ -67,6 +67,10 @@ export interface ContainerView {
   colour: string
   /** Gold star medallion: a bonus container still worth its bonus (also when buried or grey). */
   bonus: boolean
+  /** Heavy cargo (`level.heavy`): an "H" badge on the faces, also when buried or grey. */
+  heavy: boolean
+  /** A bonus container on top of its stack glints and rocks (render only); false under reduced motion. */
+  glint: boolean
   /** Outlined: only the selection. The current container never has a border. */
   border: boolean
   /** Shake risk 0..1 (amplitude and frequency grow with it); always 0 under reduced motion. */
@@ -100,6 +104,8 @@ export interface ReceiptCargoView {
   selected: boolean
   /** A bonus container (gold star medallion). */
   bonus: boolean
+  /** Heavy cargo: an "H" badge. */
+  heavy: boolean
   /** As `ContainerView.shake` and `urgent`: the cargo is the current container at deadline 0. */
   shake: number
   urgent: boolean

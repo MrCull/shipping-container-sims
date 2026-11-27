@@ -17,6 +17,14 @@ const SAMPLE_URLS: Record<SampleName, string> = {
 /** Envelope floor: exponential ramps cannot reach 0. */
 const SILENT = 0.0001
 
+/** Disconnects a one-shot source and the nodes behind it when it ends, so finished cues leave no graph behind. */
+export function releaseOnEnded(src: AudioScheduledSourceNode, ...nodes: AudioNode[]): void {
+  src.onended = () => {
+    src.disconnect()
+    for (const n of nodes) n.disconnect()
+  }
+}
+
 export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void): void {
   const audio = useAudioStore()
   let ctx: AudioContext | null = null
@@ -59,6 +67,7 @@ export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void
     env.gain.exponentialRampToValueAtTime(t.vol, start + 0.008)
     env.gain.exponentialRampToValueAtTime(SILENT, start + t.dur)
     osc.connect(env).connect(out)
+    releaseOnEnded(osc, env)
     osc.start(start)
     osc.stop(start + t.dur + 0.01)
   }
@@ -71,6 +80,7 @@ export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void
     src.buffer = buffer
     env.gain.value = soundGain
     src.connect(env).connect(out)
+    releaseOnEnded(src, env)
     src.start()
   }
 

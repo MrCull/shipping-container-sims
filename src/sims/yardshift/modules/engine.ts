@@ -216,6 +216,9 @@ function isComplete(state: ShiftState): boolean {
 /** Counts down the waiting truck's deadline, then activates the next truck (so a triggering move never counts). */
 function afterMove(state: ShiftState, events: ShiftEvent[]): ShiftState {
   const counted = state.deadline === null ? state : { ...state, deadline: Math.max(0, state.deadline - 1) }
+  if (state.deadline !== null && state.deadline > 1 && counted.deadline === 1) {
+    events.push({ type: 'deadline-one', id: waitingArrival(counted)! })
+  }
   if (state.deadline !== null && state.deadline > 0 && counted.deadline === 0) {
     events.push({ type: 'deadline-zero', id: waitingArrival(counted)! })
   }
@@ -243,9 +246,37 @@ export function applyAction(state: ShiftState, action: ShiftAction): { state: Sh
   if (action.type === 'pause' || action.type === 'resume') {
     return { state: withPause(state, action.reason, action.type === 'pause'), events: [] }
   }
-  if (action.type === 'undo') return applyUndo(state)
+  if (action.type === 'undo') {
+    const undone = applyUndo(state)
+    return { state: undone.state, events: [...undone.events, ...thresholdEvents(state, undone.state)] }
+  }
   const moved = withClocks(state, action, withScore(state, action, applyMove(state, action)))
-  return { state: { ...moved.state, undoSnapshot: { ...state, undoSnapshot: null } }, events: moved.events }
+  return {
+    state: { ...moved.state, undoSnapshot: { ...state, undoSnapshot: null } },
+    events: [...moved.events, ...thresholdEvents(state, moved.state)],
+  }
+}
+
+/** Shift seconds left at which `shift-low` fires, each once per crossing. */
+export const SHIFT_LOW_SECONDS = [9, 5, 3, 2, 1] as const
+/** The next-truck clock is low below this share of its allowance (V20: the truck text turns red). */
+export const TRUCK_LOW_SHARE = 0.35
+
+/**
+ * Clock threshold crossings between two states of one step: `shift-low` for each of `SHIFT_LOW_SECONDS` crossed going
+ * down (not at 0, which is the timeout), `truck-low` when the same allowance's clock crosses `TRUCK_LOW_SHARE`.
+ */
+function thresholdEvents(before: ShiftState, after: ShiftState): ShiftEvent[] {
+  const events: ShiftEvent[] = []
+  for (const seconds of SHIFT_LOW_SECONDS) {
+    const ms = seconds * 1000
+    if (before.shiftMs > ms && after.shiftMs <= ms && after.shiftMs > 0) events.push({ type: 'shift-low', seconds })
+  }
+  const low = after.truckAllowanceMs * TRUCK_LOW_SHARE
+  if (before.truckAllowanceMs === after.truckAllowanceMs && before.truckMs > low && after.truckMs <= low && after.truckMs > 0) {
+    events.push({ type: 'truck-low' })
+  }
+  return events
 }
 
 /**
@@ -369,7 +400,7 @@ export function advance(state: ShiftState, dtMs: number): { state: ShiftState; e
   // The bonus window waits while a receipt is forced (pauses already stop the whole tick).
   const bonusMs = state.deadline === 0 ? state.bonusMs : Math.max(0, state.bonusMs - dt)
   let next: ShiftState = { ...state, shiftMs, truckMs, overtime: truckMs === 0, bonusMs }
-  const events = overtimeEvents(state, next)
+  const events = [...thresholdEvents(state, next), ...overtimeEvents(state, next)]
   if (state.bonusMs > 0 && bonusMs === 0) events.push({ type: 'bonus-missed', id: state.next })
   if (shiftMs === 0) {
     next = { ...next, status: 'failed', failure: { reason: 'timeout', message: TIMEOUT_MESSAGE } }
