@@ -7,6 +7,7 @@
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import type { ViewModel } from '../types/presentation'
+import type { CraneMove } from '../store/yardshiftStore'
 
 /** CSS pixels per world unit. */
 const PX_PER_UNIT = 40
@@ -26,6 +27,25 @@ const COLOURS = {
   collectionTruck: 0xd8e1e3,
   receiptTruck: 0xd99b40,
   cab: 0x2b3a44,
+  gantry: 0x3f7fb5,
+  cable: 0x1a1f24,
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t))
+
+/**
+ * Crane phases by progress u (V20): travel to the source, lower, lift (the box rides the hook from u 0.30), travel,
+ * lower, then release and rise (the box sits on the destination from u 0.88). Returns the hook position along the
+ * travel (0 source, 1 destination, relative to rest at the start), the hook height share (0 down, 1 up) and whether
+ * the box is on the hook.
+ */
+function cranePhase(u: number): { leg: 'toSource' | 'carry' | 'release'; t: number; lift: number; carrying: boolean } {
+  if (u < 0.16) return { leg: 'toSource', t: u / 0.16, lift: 1, carrying: false }
+  if (u < 0.3) return { leg: 'carry', t: 0, lift: 1 - (u - 0.16) / 0.14, carrying: false }
+  if (u < 0.46) return { leg: 'carry', t: 0, lift: (u - 0.3) / 0.16, carrying: true }
+  if (u < 0.72) return { leg: 'carry', t: (u - 0.46) / 0.26, lift: 1, carrying: true }
+  if (u < 0.88) return { leg: 'carry', t: 1, lift: 1 - (u - 0.72) / 0.16, carrying: true }
+  return { leg: 'release', t: 1, lift: (u - 0.88) / 0.12, carrying: false }
 }
 
 function labelTexture(text: string, cache: Map<string, THREE.CanvasTexture>): THREE.CanvasTexture {
@@ -59,7 +79,11 @@ function disposeGroup(group: THREE.Group): void {
   group.clear()
 }
 
-export function useYardScene(canvasRef: Ref<HTMLCanvasElement | null>, view: Ref<ViewModel>) {
+export function useYardScene(
+  canvasRef: Ref<HTMLCanvasElement | null>,
+  view: Ref<ViewModel>,
+  move: Ref<CraneMove | null>,
+) {
   const webglFailed = ref(false)
   let renderer: THREE.WebGLRenderer | null = null
   const scene = new THREE.Scene()
@@ -70,6 +94,8 @@ export function useYardScene(canvasRef: Ref<HTMLCanvasElement | null>, view: Ref
   const textures = new Map<string, THREE.CanvasTexture>()
   const raycaster = new THREE.Raycaster()
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+  /** Where the trolley rests between moves (world x, z); null until the first build. */
+  let rest: { x: number; z: number } | null = null
 
   scene.add(new THREE.HemisphereLight(0xdfefff, 0x1a2630, 1.6))
   const sun = new THREE.DirectionalLight(0xffffff, 1.8)
@@ -126,7 +152,12 @@ export function useYardScene(canvasRef: Ref<HTMLCanvasElement | null>, view: Ref
       dynamic.add(pad)
     })
 
+    const m = move.value
+    const moving = m ? vm.containers.find((c) => c.stack === m.from && c.tier === (vm.containers.filter((o) => o.stack === m.from).length - 1)) : undefined
+    const stackTop = (stack: number) => vm.containers.filter((o) => o.stack === stack).length
+
     for (const c of vm.containers) {
+      if (c === moving) continue
       const col = layout.columns[c.stack]
       if (!col) continue
       const base = groundAt(col.x + col.w / 2, baseY, width, height)
@@ -138,6 +169,57 @@ export function useYardScene(canvasRef: Ref<HTMLCanvasElement | null>, view: Ref
       mesh.position.set(base.x, ch / 2 + c.tier * ch * 1.04 + (c.selected ? ch * 0.25 : 0), base.z)
       dynamic.add(mesh)
     }
+
+    // Gantry: a beam across the yard on two legs, a trolley and a hook cable; a crane move animates them.
+    const topY = (vm.capacity + 1.2) * ch * 1.04
+    const left = groundAt(layout.yard.x, baseY, width, height)
+    const right = groundAt(layout.yard.x + layout.yard.w, baseY, width, height)
+    const collect = groundAt(layout.collection.x + layout.collection.w / 2, layout.collection.y + layout.collection.h * 0.55, width, height)
+    const colBase = (i: number) => {
+      const col = layout.columns[i]!
+      return groundAt(col.x + col.w / 2, baseY, width, height)
+    }
+    rest ??= { x: left.x + (right.x - left.x) / 2, z: left.z }
+    let hook = { x: rest.x, z: rest.z, y: topY }
+    if (m && moving) {
+      const src = colBase(m.from)
+      const dst = m.to >= 0 ? colBase(m.to) : collect
+      const srcY = ch / 2 + moving.tier * ch * 1.04
+      const dstY = m.to >= 0 ? ch / 2 + stackTop(m.to) * ch * 1.04 : ch * 0.5 + ch / 2
+      const p = cranePhase(m.progress)
+      let boxPos: { x: number; y: number; z: number }
+      if (p.leg === 'toSource') {
+        hook = { x: lerp(rest.x, src.x, p.t), z: lerp(rest.z, src.z, p.t), y: topY }
+        boxPos = { x: src.x, y: srcY, z: src.z }
+      } else {
+        const x = lerp(src.x, dst.x, p.t)
+        const z = lerp(src.z, dst.z, p.t)
+        const lowY = (p.t < 1 ? srcY : dstY) + ch / 2
+        hook = { x, z, y: lerp(lowY, topY, p.lift) }
+        boxPos = p.leg === 'release' ? { x: dst.x, y: dstY, z: dst.z } : p.carrying ? { x, y: hook.y - ch / 2, z } : { x: src.x, y: srcY, z: src.z }
+      }
+      if (m.progress >= 0.999) rest = { x: dst.x, z: dst.z }
+      const colour = COLOURS.next
+      const mat = new THREE.MeshStandardMaterial({ color: moving.next ? colour : COLOURS.other, roughness: 0.7 })
+      const lab = new THREE.MeshStandardMaterial({ color: moving.next ? colour : COLOURS.other, map: labelTexture(moving.label, textures), roughness: 0.7 })
+      const boxMesh = box(cw, ch, cd, [mat, mat, lab, mat, lab, mat])
+      boxMesh.position.set(boxPos.x, boxPos.y, boxPos.z)
+      dynamic.add(boxMesh)
+    }
+    const gantryMat = new THREE.MeshStandardMaterial({ color: COLOURS.gantry, roughness: 0.5 })
+    const beamLen = Math.abs(right.x - left.x) + cw
+    const beam = box(beamLen, ch * 0.3, cd * 0.3, gantryMat)
+    beam.position.set((left.x + right.x) / 2, topY + ch * 0.6, hook.z)
+    const legL = box(ch * 0.25, topY + ch * 0.6, ch * 0.25, gantryMat)
+    legL.position.set(left.x - cw * 0.5, (topY + ch * 0.6) / 2, hook.z)
+    const legR = legL.clone()
+    legR.position.x = right.x + cw * 0.5
+    const trolley = box(cw * 0.6, ch * 0.35, cd * 0.6, new THREE.MeshStandardMaterial({ color: 0xe9b849 }))
+    trolley.position.set(hook.x, topY + ch * 0.6, hook.z)
+    const cableLen = Math.max(0.01, topY + ch * 0.6 - hook.y)
+    const cable = box(0.04, cableLen, 0.04, new THREE.MeshStandardMaterial({ color: COLOURS.cable }))
+    cable.position.set(hook.x, hook.y + cableLen / 2, hook.z)
+    dynamic.add(beam, legL, legR, trolley, cable)
 
     const bays: [typeof layout.collection, number, number, number][] = [
       [layout.collection, COLOURS.collectionBay, COLOURS.collectionTruck, -1],
@@ -183,7 +265,7 @@ export function useYardScene(canvasRef: Ref<HTMLCanvasElement | null>, view: Ref
     render()
   })
 
-  const stop = watch(view, render)
+  const stop = watch([view, move], render)
 
   onBeforeUnmount(() => {
     stop()

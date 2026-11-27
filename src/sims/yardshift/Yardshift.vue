@@ -16,11 +16,23 @@ store.loadLevel(1)
 const surface = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const view = computed(() => store.view)
-const { webglFailed } = useYardScene(canvas, view)
+const move = computed(() => store.move)
+const { webglFailed } = useYardScene(canvas, view, move)
 
 let observer: ResizeObserver | null = null
 let uninstallDevApi: (() => void) | null = null
 let unmounted = false
+let raf = 0
+
+/** The frame loop: the store advances the crane move and the clocks (each step capped at 100 ms). */
+function loop(now: number): void {
+  store.frame(now)
+  raf = requestAnimationFrame(loop)
+}
+
+function onVisibility(): void {
+  store.setHidden(document.hidden)
+}
 
 function measure(): void {
   const el = surface.value
@@ -34,6 +46,10 @@ function onPointerUp(e: PointerEvent): void {
 }
 
 onMounted(async () => {
+  store.setReducedMotion(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+  store.setHidden(document.hidden)
+  document.addEventListener('visibilitychange', onVisibility)
+  raf = requestAnimationFrame(loop)
   measure()
   observer = new ResizeObserver(measure)
   if (surface.value) observer.observe(surface.value)
@@ -45,6 +61,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  cancelAnimationFrame(raf)
+  document.removeEventListener('visibilitychange', onVisibility)
   observer?.disconnect()
   uninstallDevApi?.()
 })
@@ -56,6 +74,8 @@ onBeforeUnmount(() => {
       :title="view.hud.title"
       :loaded="view.hud.loaded"
       :rehandles="view.hud.rehandles"
+      :clocks="view.clocks"
+      :credit-pulse="store.creditPulse"
     />
     <div
       ref="surface"
@@ -88,6 +108,21 @@ onBeforeUnmount(() => {
     >
       {{ store.message || view.hint }}
     </footer>
+    <div
+      v-if="view.failed"
+      class="complete"
+      data-testid="ys-failed"
+    >
+      <h2>SHIFT OVER</h2>
+      <p>{{ view.failed }}</p>
+      <button
+        type="button"
+        class="again"
+        @click="store.restart()"
+      >
+        Retry shift
+      </button>
+    </div>
     <div
       v-if="view.complete"
       class="complete"

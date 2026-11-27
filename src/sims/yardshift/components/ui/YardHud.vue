@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import type { ClocksView } from '../../types/presentation'
+
 defineProps<{
   title: string
   loaded: string
   rehandles: string
+  clocks: ClocksView
+  /** Bumped on every +1 s time credit; replays the "+1s" float. */
+  creditPulse: number
 }>()
 </script>
 
@@ -13,6 +18,25 @@ defineProps<{
       <span class="title">{{ title }}</span>
     </div>
     <dl class="stats">
+      <div
+        v-for="(clock, key) in { shift: clocks.shift, truck: clocks.truck }"
+        :key="key"
+        class="clock"
+        :class="{ red: clock.red, shake: clock.shake }"
+        :data-testid="`ys-clock-${key}`"
+      >
+        <dt>{{ clock.label }}</dt>
+        <dd>
+          {{ clock.text }}
+          <span
+            v-if="key === 'truck' && creditPulse > 0"
+            :key="creditPulse"
+            class="credit"
+            data-testid="ys-credit"
+          >+1s</span>
+        </dd>
+        <span class="bar"><span :style="{ width: `${clock.fraction * 100}%` }" /></span>
+      </div>
       <div>
         <dt>LOADED</dt>
         <dd data-testid="ys-loaded">
@@ -32,9 +56,10 @@ defineProps<{
 <style scoped>
 .hud {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px 12px;
   padding: 8px 16px;
   background: #142530;
   color: #e7eef2;
@@ -59,20 +84,89 @@ defineProps<{
 }
 .stats {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   margin: 0;
 }
 .stats div {
   text-align: right;
 }
 dt {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   letter-spacing: 0.08em;
   opacity: 0.7;
+  white-space: nowrap;
 }
 dd {
+  position: relative;
   margin: 0;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+.clock {
+  min-width: 4.4em;
+}
+.bar {
+  display: block;
+  height: 3px;
+  margin-top: 2px;
+  background: #26404f;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.bar span {
+  display: block;
+  height: 100%;
+  margin-left: auto;
+  background: #54ddb0;
+}
+.clock.red dd {
+  color: #ff8776;
+}
+.clock.red .bar span {
+  background: #ff8776;
+}
+.clock.shake dd {
+  animation: shake 0.25s linear infinite;
+}
+.credit {
+  position: absolute;
+  right: 0;
+  top: -0.2em;
+  color: #54ddb0;
+  font-size: 0.75rem;
+  animation: float-up 0.9s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+@keyframes float-up {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clock.shake dd {
+    animation: none;
+    text-decoration: underline;
+  }
+  .credit {
+    animation: none;
+    opacity: 0;
+  }
 }
 </style>
