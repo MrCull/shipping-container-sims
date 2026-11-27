@@ -21,7 +21,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #388 | Y8 audio cues and crane sounds | #384, #385 | merged in branch (c2454ec) | |
 | #389 | Y9 phone layout, cover, sim guide | #386, #387 | merged in branch (1542a3d) | |
 | #390 | Y10 background music | #388 | merged in branch (0d739ef) | |
-| #391 | Y11 smoke suite and regressions | all | open | |
+| #391 | Y11 smoke suite and regressions | all | in progress | session 1 |
 
 ## Open points
 
@@ -36,3 +36,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - #386: undo also allowed after a "Yard blocked" failure (V20), never after timeout; a hidden tab freezes clocks but does not open the pause menu; tutorial smoke spec now 10.5 to 11.1 s.
 - #388: no sound was listened to in a browser (owner checks audio quality in the phase 2 playtest); added overtime-end and undo cues not in V20.
 - #390 added a fourth smoke spec (yardshift-music.smoke.ts); the spec says exactly three, so the review fix folds it into a unit test or an existing spec. Music licence: available-media records none (same as other sims); owner to confirm before a public release.
+- #389: gantry overflow fixed; SimPage hides the header sim name below 480 px and uses 100dvh (all sims, phone). Visual follow-ups for phase 2: at deadline 0 the arrow overlaps the top of the receipt cargo (inside the bay); on desktop the bay labels overlap the truck cargo.
