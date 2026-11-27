@@ -270,7 +270,7 @@ the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no int
 `styles/palette.css` (loaded by `Yardshift.vue`, scoped to `.yardshift`) holds the sim's own palette as `--ys-*`
 properties: the six sequence colours, grey, gold, arrival orange, red and the panel shades. Background, text and muted
 text use the shared tokens of `src/assets/main.css`. Components use those or `--ys-*`, never hex
-(`modules/palette.test.ts`, which also keeps `--ys-seq-*` and `--ys-grey` equal to `SEQUENCE_COLOURS` and `GREY`). The
+(`scripts/check-no-hex-colours.mjs` in verify); `modules/palette.test.ts` keeps `--ys-seq-*` and `--ys-grey` equal to `SEQUENCE_COLOURS` and `GREY`. The
 WebGL scene keeps its colours in TS.
 
 ## Dev hook
