@@ -125,4 +125,89 @@ describe('Yardshift engine', () => {
     shift.dispatch({ type: 'collect' })
     expect(TUTORIAL.stacks[0]).toEqual([1])
   })
+
+  describe('heavy cargo', () => {
+    // 3 and 4 are heavy; 1 and 2 are not.
+    const heavy: LevelDef = { ...tiny, stacks: [[4], [1], [2, 3], []], count: 4, capacity: 3, maxRehandles: 9, heavy: [3, 4] }
+
+    it('goes onto an empty stack or another heavy container', () => {
+      const shift = createShift(heavy)
+      expect(shift.dispatch({ type: 'rehandle', from: 2, to: 3 }).ok).toBe(true)
+      expect(shift.dispatch({ type: 'rehandle', from: 3, to: 0 }).ok).toBe(true)
+      expect(shift.state.stacks[0]).toEqual([4, 3])
+    })
+
+    it('is rejected on a non-heavy container with its own reason, changing nothing', () => {
+      const rejection = rejectionOf(heavy, [], { type: 'rehandle', from: 2, to: 1 })
+      expect(rejection?.reason).toBe('heavy')
+      expect(rejection?.message).toMatch(/heavy/i)
+    })
+
+    it('does not restrict light cargo', () => {
+      const shift = createShift({ ...heavy, stacks: [[4], [1, 2], [3], []] })
+      expect(shift.dispatch({ type: 'rehandle', from: 1, to: 0 }).ok).toBe(true)
+    })
+
+    it('applies to receipts too', () => {
+      const level: LevelDef = { ...heavy, stacks: [[1], [2]], count: 3, arrivals: [{ after: 0, id: 3, moves: 2 }] }
+      const rejection = rejectionOf(level, [], { type: 'receive', to: 0 })
+      expect(rejection?.reason).toBe('heavy')
+    })
+  })
+
+  describe('receipts (rule core used by the solver; gameplay in #384)', () => {
+    const level: LevelDef = {
+      ...tiny,
+      stacks: [[1], [2], []],
+      count: 4,
+      capacity: 2,
+      maxRehandles: 5,
+      arrivals: [
+        { after: 0, id: 3, moves: 2 },
+        { after: 1, id: 4, moves: 1 },
+      ],
+    }
+
+    it('activates a truck at the start, counts other moves down and blocks everything at 0', () => {
+      const shift = createShift(level)
+      expect(shift.state).toMatchObject({ receipts: 0, deadline: 2 })
+      expect(shift.dispatch({ type: 'rehandle', from: 1, to: 2 }).ok).toBe(true)
+      expect(shift.state.deadline).toBe(1)
+      expect(shift.dispatch({ type: 'collect' }).ok).toBe(true)
+      expect(shift.state.deadline).toBe(0)
+      expect(rejectionOf(level, [{ type: 'rehandle', from: 1, to: 2 }, { type: 'collect' }], { type: 'collect' })?.reason).toBe(
+        'receive-first',
+      )
+    })
+
+    it('serving a truck activates the next eligible one with its full allowance', () => {
+      const shift = createShift(level)
+      shift.dispatch({ type: 'collect' })
+      const r = shift.dispatch({ type: 'receive', to: 0 })
+      expect(r.ok && r.events).toEqual([
+        { type: 'received', id: 3, to: 0 },
+        { type: 'arrival', id: 4, moves: 1 },
+      ])
+      expect(shift.state).toMatchObject({ receipts: 1, deadline: 1 })
+    })
+
+    it('rejects a receipt with no truck waiting', () => {
+      expect(rejectionOf({ ...level, arrivals: [] }, [], { type: 'receive', to: 2 })?.reason).toBe('no-truck')
+    })
+
+    it('completes only when every truck is served and the yard is empty', () => {
+      const shift = createShift(level)
+      const plan: ShiftAction[] = [
+        { type: 'collect' },
+        { type: 'receive', to: 0 },
+        { type: 'collect' },
+        { type: 'receive', to: 2 },
+        { type: 'collect', from: 0 },
+      ]
+      for (const a of plan) expect(shift.dispatch(a).ok).toBe(true)
+      expect(shift.state.status).toBe('playing')
+      expect(shift.dispatch({ type: 'collect', from: 2 }).ok).toBe(true)
+      expect(shift.state.status).toBe('complete')
+    })
+  })
 })

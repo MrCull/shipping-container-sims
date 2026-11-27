@@ -9,6 +9,7 @@ import type { LevelDef, PauseReason, Shift, ShiftEvent } from '../types/engine'
 
 /** Four exposed-in-order collections and room to rehandle; first truck 12 s, shift 40 s, overtime 3x. */
 const timed: LevelDef = {
+  ...TUTORIAL,
   number: 98,
   name: 'Timed',
   stacks: [[1], [2], [3], [4], []],

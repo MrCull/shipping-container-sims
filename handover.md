@@ -12,7 +12,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #379 | Scoped verify and verify:all | #377 | merged in branch (c7830c6) | |
 | #380 | CI unit tests use the selection | #379 | merged in branch (4ad3c15) | |
 | #381 | Y1 tracer: tutorial won by taps | #377 | merged in branch (47105c7) | |
-| #382 | Y2 13 levels, heavy rule, solver | #381 | in progress | session 1 |
+| #382 | Y2 13 levels, heavy rule, solver | #381 | merged in branch (99f4614) | |
 | #383 | Y3 clocks, overtime, crane animation | #381 | in progress | session 1 |
 | #384 | Y4 incoming trucks and receipts | #382, #383 | open | |
 | #385 | Y5 score, combo, queue colours, bonus | #383 | open | |
@@ -29,3 +29,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - box-empire and container-stack have no unit tests, so they are not vitest projects (`simIdsWithTests()` in `scripts/vitest-projects.mjs`).
 - Implementers run `pnpm run verify <integration-branch>`: with no base, verify compares with `origin/main` and covers the whole branch.
 - Y1 seam: `input(ui, event, state)` takes state as a third argument (needed to tell a collect tap from a select tap); `window.__ys.hitRegions()` gives page coordinates for smoke taps. PR needs `smoke:yardshift`.
+- #382 put receipt rules in the engine early (solver needs them): levels 4, 6, 8, 9, 10, 13 start with a waiting truck the UI cannot serve until #384. Tutorial fixture rehandles #4 before collecting #1 (optimal, not the coached order).

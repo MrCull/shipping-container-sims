@@ -1,0 +1,27 @@
+{
+  "level": 7,
+  "minRehandles": 9,
+  "actions": [
+    {"type":"rehandle","from":0,"to":4},
+    {"type":"rehandle","from":3,"to":4},
+    {"type":"rehandle","from":3,"to":4},
+    {"type":"rehandle","from":1,"to":3},
+    {"type":"rehandle","from":0,"to":3},
+    {"type":"rehandle","from":2,"to":3},
+    {"type":"rehandle","from":0,"to":3},
+    {"type":"collect","from":0},
+    {"type":"rehandle","from":2,"to":0},
+    {"type":"collect","from":2},
+    {"type":"rehandle","from":1,"to":2},
+    {"type":"collect","from":1},
+    {"type":"collect","from":4},
+    {"type":"collect","from":4},
+    {"type":"collect","from":4},
+    {"type":"collect","from":0},
+    {"type":"collect","from":3},
+    {"type":"collect","from":3},
+    {"type":"collect","from":2},
+    {"type":"collect","from":3},
+    {"type":"collect","from":3}
+  ]
+}
