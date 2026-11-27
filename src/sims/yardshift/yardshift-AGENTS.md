@@ -159,7 +159,18 @@ rehandle the ones in the way, clear the yard. Behavioural baseline: the V20 prot
 - Samples in `assets/audio/` (mono 64 kbit/s, trimmed with a fade out from `available-media/sound-samples`):
   `crane-pick.mp3` (first 0.6 s of `container-loaded-to-ship.mp3`), `crane-land.mp3` (first 0.7 s of
   `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and
-  receipt). Music is #390's.
+  receipt).
+- **Music (#390):** `composables/useYardMusic.ts` (mounted by `Yardshift.vue`) loops one `Audio` element through
+  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.3 in `modules/music.ts`), so the master and music
+  sliders and mute change it live. `musicPlaying(state)` (pure, `modules/music.test.ts`): plays while the shift status
+  is `playing` with no pause but `animation`; the intro, pause menu, level picker, a hidden tab and the end of the
+  shift pause it. Unmount stops it and releases the element; the menu music stops when the home page unmounts. A
+  blocked autoplay retries on the next pointer or key press.
+- Track: `assets/audio/music-light-piano.mp3`, `available-media/sound-samples/background-gaming-light-piano.mp3`
+  (60 s loop, the one candidate no other sim uses) re-encoded to 80 kbit/s stereo with metadata stripped (600 KB).
+  Source and licence: the repo's pre-sourced `available-media/` set; `available-media/README.md` records no source
+  or licence for the sound samples (as for the music in Stowage Master and Contenga), so confirm one before a
+  public release.
 
 ## Levels
 
@@ -195,6 +206,7 @@ coordinates so smoke tests tap real points.
   `modules/receiptsView.test.ts`, `modules/levels.test.ts`, `modules/scoring.test.ts`,
   `modules/presentationScore.test.ts`, `modules/inputCoaching.test.ts`, `modules/undo.test.ts`,
   `modules/progress.test.ts`, `modules/screens.test.ts`, `modules/audioCues.test.ts`, `store/yardshiftStoreAudio.test.ts`,
+  `modules/music.test.ts`,
   `modules/solver.test.ts` (every fixture replayed through the engine, and the solver
   re-proving every level), `modules/stars.test.ts`. The whole suite runs in about 0.5 s; no test over 15 ms.
   Run `pnpm test:sim yardshift`. **Budget: the whole Yardshift suite under 5 s, no test over 1 s** (spec #374).

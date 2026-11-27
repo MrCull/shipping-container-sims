@@ -11,6 +11,7 @@ import { LEVELS } from './modules/levels'
 import { unlockAllRequested } from './modules/progress'
 import { undoView } from './modules/screens'
 import { useYardAudio } from './composables/useYardAudio'
+import { useYardMusic } from './composables/useYardMusic'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
 import type { Rect } from './types/presentation'
@@ -33,6 +34,7 @@ const view = computed(() => store.view)
 const move = computed(() => store.move)
 const { webglFailed } = useYardScene(canvas, view, move)
 useYardAudio(store.onCue)
+useYardMusic(() => store.state)
 
 let observer: ResizeObserver | null = null
 let uninstallDevApi: (() => void) | null = null
