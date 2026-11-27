@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { selectUnitScope, projectsFor, selectForEvent, summaryMarkdown } from './unit-select.mjs'
+import { selectUnitScope, projectsFor, selectForEvent, summaryMarkdown, nodeTestedScripts, UNIT_IMPORTED_SCRIPTS } from './unit-select.mjs'
 
 const why = (r, path) => r.reasons.find((x) => x.path === path)?.why
 
@@ -153,4 +153,63 @@ test("CLI one-sim PR: only that sim's project", () => {
   const r = run('--json', '--event', 'pull_request', '--files-from', join(d, 'files.txt'))
   assert.equal(r.status, 0, r.stderr)
   assert.deepEqual(JSON.parse(r.stdout).projects, ['terminal-twin'])
+})
+
+// #396: paths that only affect browser smoke tests, or scripts covered by their own `node --test` file in verify:checks.
+const NODE_TESTED = nodeTestedScripts(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+
+test('smoke-only paths select no unit tests, with a reason', () => {
+  for (const f of [
+    'scripts/smoke-map.txt',
+    'src/tests/browser/home-wall.smoke.ts',
+    'src/sims/terminal-twin/tests/browser/bay-viewer.smoke.ts',
+    'src/sims/yardshift/tests/browser/yardshift.smoke.ts',
+    'src/tests/browser/someHelper.ts',
+  ]) {
+    const r = selectUnitScope([f], { nodeTested: NODE_TESTED })
+    assert.equal(r.scope, 'none', f)
+    assert.match(why(r, f), /no unit tests \(smoke/, f)
+  }
+})
+
+test('a sim browser helper that a unit test reads keeps its sim', () => {
+  assert.deepEqual(selectUnitScope(['src/sims/terminal-twin/tests/browser/renderBudget.budget.ts']).scope, ['terminal-twin'])
+})
+
+test('a smoke spec next to sim code still selects the sim for the code', () => {
+  const r = selectUnitScope(['src/sims/terminal-twin/tests/browser/bay-viewer.smoke.ts', 'src/sims/terminal-twin/modules/a.ts'])
+  assert.deepEqual(r.scope, ['terminal-twin'])
+})
+
+test('nodeTestedScripts reads the node --test files in verify:checks', () => {
+  const pkg = JSON.stringify({ scripts: { 'verify:checks': 'node a.mjs && node --test scripts/test-smoke-select.mjs scripts/test-foo.mjs && pnpm run lint' } })
+  assert.deepEqual(nodeTestedScripts(pkg).sort(), ['scripts/foo.mjs', 'scripts/smoke-select.mjs', 'scripts/test-foo.mjs', 'scripts/test-smoke-select.mjs'])
+  assert.ok(NODE_TESTED.includes('scripts/smoke-select.mjs'))
+})
+
+test('a script with its own node --test file in verify:checks selects no unit tests', () => {
+  for (const f of ['scripts/smoke-select.mjs', 'scripts/test-smoke-select.mjs', 'scripts/unit-select.mjs']) {
+    const r = selectUnitScope([f], { nodeTested: NODE_TESTED })
+    assert.equal(r.scope, 'none', f)
+    assert.match(why(r, f), /node --test/, f)
+  }
+})
+
+test('scripts that vitest config or unit tests import still select all, even with a node --test file', () => {
+  const r = selectUnitScope(['scripts/vitest-projects.mjs'], { nodeTested: NODE_TESTED })
+  assert.equal(r.scope, 'all')
+  assert.match(why(r, 'scripts/vitest-projects.mjs'), /imported by vitest/)
+  assert.equal(selectUnitScope(['scripts/bg.sh'], { nodeTested: NODE_TESTED }).scope, 'all')
+  assert.equal(selectUnitScope(['scripts/smoke-select.mjs']).scope, 'all', 'without the node-tested list a script stays all')
+})
+
+test('every scripts/ file the vitest config or a unit test imports is in UNIT_IMPORTED_SCRIPTS', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const ls = spawnSync('git', ['ls-files', 'vitest.config.ts', 'src/**/*.test.ts'], { cwd: root, encoding: 'utf8' }).stdout
+  const imported = new Set()
+  for (const f of ls.split('\n').filter(Boolean)) {
+    for (const m of readFileSync(join(root, f), 'utf8').matchAll(/from\s+['"][^'"]*?(scripts\/[^'"]+)['"]/g)) imported.add(m[1])
+  }
+  for (const s of imported) assert.ok(UNIT_IMPORTED_SCRIPTS.includes(s), `${s} is imported by a unit test or vitest config`)
+  assert.ok(imported.has('scripts/vitest-projects.mjs'))
 })
