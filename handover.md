@@ -20,7 +20,7 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 | #387 | Y7 drag, keyboard, urgency, coaching | #384 | merged in branch (9d56b4f) | |
 | #388 | Y8 audio cues and crane sounds | #384, #385 | merged in branch (c2454ec) | |
 | #389 | Y9 phone layout, cover, sim guide | #386, #387 | in progress | session 1 |
-| #390 | Y10 background music | #388 | open | |
+| #390 | Y10 background music | #388 | in progress | session 1 |
 | #391 | Y11 smoke suite and regressions | all | open | |
 
 ## Open points
@@ -34,3 +34,4 @@ the container was replaced). Ticket branches are `tt/<N>-<slug>`, merged with `s
 - #384: arrival announcement does not pause clocks (spec allows either); tutorial smoke spec runs 10 to 11.6 s, over its 10 s target (Y11 to trim).
 - #387: U emits `{type: "undo"}` (`UiAction` in types/presentation.ts); until #386 the store shows "Undo is not available yet". #386 must wire the store `undo()` to `dispatch`. No drag or keyboard smoke spec yet (Y11 may add one).
 - #386: undo also allowed after a "Yard blocked" failure (V20), never after timeout; a hidden tab freezes clocks but does not open the pause menu; tutorial smoke spec now 10.5 to 11.1 s.
+- #388: no sound was listened to in a browser (owner checks audio quality in the phase 2 playtest); added overtime-end and undo cues not in V20.
