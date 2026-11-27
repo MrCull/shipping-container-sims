@@ -8,7 +8,8 @@ import { computed, ref, shallowRef } from 'vue'
 import { LEVELS, levelByNumber } from '../modules/levels'
 import { createShift, exposedNextStack, MAX_STEP_MS, rejectionFor, waitingArrival } from '../modules/engine'
 import { craneDurationMs, hitTest, input, moveSpan, present } from '../modules/presentation'
-import type { DispatchResult, Shift, ShiftAction, ShiftState } from '../types/engine'
+import { craneCues, craneStartCue, cuesForStep, PICK_AT, rejectionCue, type Cue } from '../modules/audioCues'
+import type { DispatchResult, Shift, ShiftAction, ShiftEvent, ShiftState } from '../types/engine'
 import type { HitTarget, UiAction, UiEvent, UiState, Viewport } from '../types/presentation'
 import { loadProgress, recordCompletion, saveProgress, type Progress } from '../modules/progress'
 import { minRehandlesFor, starsFor } from '../modules/stars'
@@ -57,6 +58,30 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   const overlay = ref<Overlay>(null)
   /** The pointer that went down and has not come up yet: where, on what, and whether it became a drag. */
   let pointer: { x: number; y: number; target: HitTarget | null; dragging: boolean } | null = null
+  /** Audio cue listeners (#388); each engine step's cues are sent once, when the step happens. */
+  const cueListeners = new Set<(cue: Cue) => void>()
+  /** Events the engine emitted during the current step. */
+  let stepEvents: ShiftEvent[] = []
+
+  function emitCues(cues: readonly Cue[]): void {
+    for (const cue of cues) for (const listener of cueListeners) listener(cue)
+  }
+
+  /** Listen to audio cues; returns an unsubscribe function. */
+  function onCue(listener: (cue: Cue) => void): () => void {
+    cueListeners.add(listener)
+    return () => cueListeners.delete(listener)
+  }
+
+  /** Run one engine step (a dispatch or a tick) and fire its cues once. */
+  function step<T>(run: () => T): T {
+    const before = shift.state
+    stepEvents = []
+    const result = run()
+    emitCues(cuesForStep(before, shift.state, stepEvents))
+    stepEvents = []
+    return result
+  }
 
   function sync(): void {
     state.value = shift.state
@@ -70,6 +95,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
 
   function watchEvents(): void {
     shift.onEvent((e) => {
+      stepEvents.push(e)
       if (e.type === 'time-credit') creditPulse.value++
       if (e.type === 'arrival') announce(e.id, e.moves)
       if (e.type === 'bonus-awarded') bonusPulse.value++
@@ -165,7 +191,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   }
 
   function dispatch(action: ShiftAction): DispatchResult {
-    const r = shift.dispatch(action)
+    const r = step(() => shift.dispatch(action))
+    if (!r.ok) emitCues([rejectionCue()])
     sync()
     message.value = r.ok ? '' : r.rejection.message
     return r
@@ -177,7 +204,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
    */
   function startMove(action: ShiftAction): void {
     if (move.value || rejectionFor(shift.state, action) !== null || reducedMotion) {
-      dispatch(action)
+      // Reduced motion: no animation, so the landing sounds with the move.
+      if (dispatch(action).ok) emitCues(craneCues(PICK_AT, 1))
       return
     }
     const span = moveSpan(view.value.layout, action, shift.state)
@@ -190,6 +218,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     const to = action.type === 'rehandle' || action.type === 'receive' ? action.to : -1
     shift.dispatch({ type: 'pause', reason: 'animation' })
     sync()
+    emitCues([craneStartCue()])
     move.value = { action, from, to, durationMs: craneDurationMs(span ? span.toX - span.fromX : 0), progress: 0 }
   }
 
@@ -212,12 +241,13 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     const m = move.value
     if (m) {
       const progress = Math.min(1, m.progress + dt / m.durationMs)
+      emitCues(craneCues(m.progress, progress))
       if (progress >= 1) finishMove()
       else move.value = { ...m, progress }
       return
     }
     if (dt > 0 && shift.state.status === 'playing') {
-      shift.tick(dt)
+      step(() => shift.tick(dt))
       sync()
     }
   }
@@ -323,6 +353,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     creditPulse,
     announcement,
     bonusPulse,
+    onCue,
     loadLevel,
     dispatch,
     tapTarget,

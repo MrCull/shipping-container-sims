@@ -10,6 +10,7 @@ import YardScreens from './components/modals/YardScreens.vue'
 import { LEVELS } from './modules/levels'
 import { unlockAllRequested } from './modules/progress'
 import { undoView } from './modules/screens'
+import { useYardAudio } from './composables/useYardAudio'
 import { useYardScene } from './composables/useYardScene'
 import { useYardshiftStore } from './store/yardshiftStore'
 import { NO_INSETS, screenLayout, type Insets } from './modules/screenLayout'
@@ -38,6 +39,7 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 const view = computed(() => store.view)
 const move = computed(() => store.move)
 const { webglFailed } = useYardScene(canvas, view, move)
+useYardAudio(store.onCue)
 
 let observer: ResizeObserver | null = null
 let uninstallDevApi: (() => void) | null = null
