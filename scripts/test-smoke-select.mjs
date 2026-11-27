@@ -50,7 +50,7 @@ test('labels win over the no-src rule: smoke runs every group, smoke:<group> run
   assert.deepEqual(names(pick(['smoke:camera'], [])), ['core', 'camera'])
 })
 
-test('CLI-only, Markdown and unit-test changes in a sim run the home wall spec only', () => {
+test('CLI-only and unit-test changes in a sim run the home wall spec only (they can break the build)', () => {
   const r = pick([], [
     'src/sims/terminal-twin/cli/run.ts',
     'src/sims/terminal-twin/cli/assets/truckModel.ts',
@@ -59,6 +59,22 @@ test('CLI-only, Markdown and unit-test changes in a sim run the home wall spec o
   ])
   assert.deepEqual(names(r), ['home-wall'])
   assert.deepEqual(names(pick([], ['src/utils/format.test.ts'])), ['core'])
+})
+
+test('Markdown and docs/ paths under src/ select no smoke (spec #375 story 6)', () => {
+  const r = pick([], [
+    'src/sims/terminal-twin/terminal-twin-AGENTS.md',
+    'src/sims/terminal-twin/docs/engine.md',
+    'src/sims/terminal-twin/docs/diagram.png',
+    'src/sims/yardshift/docs/notes.txt',
+  ])
+  assert.deepEqual(names(r), [])
+  assert.match(r.why, /no file under src\//)
+  assert.deepEqual(names(pick(['smoke:camera'], ['src/sims/terminal-twin/docs/engine.md'])), ['core', 'camera'])
+})
+
+test('docs next to shared src/ code do not turn a sim-only change into core', () => {
+  assert.deepEqual(names(pick([], ['src/sims/stowage-master/modules/scoring.ts', 'src/docs/notes.md'])), ['home-wall'])
 })
 
 test('the pinch-gesture module maps to camera, which holds the phone pinch spec', () => {

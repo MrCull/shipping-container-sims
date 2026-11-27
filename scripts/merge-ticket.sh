@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Merge a finished ticket branch into the current integration branch and verify it.
-# Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] tt/<N>-<slug>
+# Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] <prefix>/<N>-<slug> (tt/, yardshift/, any sim)
 # Output goes to the terminal and to .merge-ticket.log; the last line is "EXIT <code>", so a background run
 # is finished when `tail -1 .merge-ticket.log` shows it. --push pushes the integration branch after a verified merge.
 # Smoke specs do not run here: CI runs them after each pushed merge (docs/agents/implementing.md, step 3).
@@ -32,8 +32,8 @@ branch="${1:?usage: scripts/merge-ticket.sh <ticket-branch>}"
 # warning, not a failure: the merge itself is green. No handover.md at all is silent.
 mark_handover() { # mark_handover <ticket-branch> <merge-sha>
   local n file=handover.md
-  if [[ "$1" =~ ^tt/([0-9]+)- ]]; then n="${BASH_REMATCH[1]}"; else
-    echo "handover: $1 is not tt/<N>-<slug>; handover.md not updated" >&2; return 0
+  if [[ "$1" =~ ^[^/]+/([0-9]+)- ]]; then n="${BASH_REMATCH[1]}"; else
+    echo "handover: $1 is not <prefix>/<N>-<slug>; handover.md not updated" >&2; return 0
   fi
   [ -f "$file" ] || return 0 # a run that fits in one session has no handover.md: nothing to mark, nothing to warn
   if ! awk -F'|' -v n="#$n" '$2 ~ "^ *" n " *$" {found = 1} END {exit !found}' "$file"; then

@@ -5,12 +5,13 @@
  *   node scripts/smoke-select.mjs [--labels a,b] [--base <ref>] [--head <ref>] [--files-from FILE] [--grep]
  *
  * Changed files come from `--files-from` (one path per line) or `git diff --name-only <base> <head>` (default
- * HEAD^1 HEAD, the last merge). Rules: nothing when no file under src/ changed and no `smoke` or `smoke:<group>`
- * label is set; otherwise `core` (or, for a sim-only change without the plain `smoke` label, where every changed src/ path is
+ * HEAD^1 HEAD, the last merge). Rules: nothing when no file under src/ changed (Markdown and docs/ folders do not
+ * count) and no `smoke` or `smoke:<group>` label is set; otherwise `core` (or, for a sim-only change without the plain `smoke` label, where every changed src/ path is
  * under src/sims/<id>/, the home wall spec `@home-wall` in its place), plus every
  * `smoke:<group>` label, plus every group scripts/smoke-map.txt assigns to a changed path, plus the group of each
- * changed smoke spec (its tag); every group when the plain `smoke` label is present. Markdown, docs/ folders,
- * Node-only CLI code (src/sims/*\/cli/) and unit tests (*.test.ts) never select a group beyond core.
+ * changed smoke spec (its tag); every group when the plain `smoke` label is present. Markdown and docs/ folders select
+ * nothing; Node-only CLI code (src/sims/*\/cli/) and unit tests (*.test.ts) select core (or the home wall spec in a
+ * sim folder) and nothing beyond it, since they can still break the build.
  *
  * Output: one line per group, `<group>  <reason>; <reason>`, or with `--grep` one Playwright grep pattern
  * (`@core|@camera`, empty when nothing runs): `pnpm run test:smoke --grep "$(node scripts/smoke-select.mjs --grep)"`.
@@ -58,6 +59,9 @@ export function parseMap(text) {
 export const HOME_WALL = 'home-wall'
 const SIM_FOLDER = /^src\/sims\/[^/]+\//
 
+/** Markdown and docs/ folders: never part of the build, so they select no smoke at all (spec #375 story 6). */
+const DOCS = /\.md$|(^|\/)docs\//
+/** Docs, plus Node-only CLI code and unit tests: those can break the build, so they keep `core` or the home wall spec. */
 const IGNORED = /\.md$|(^|\/)docs\/|^src\/sims\/[^/]+\/cli\/|\.test\.ts$/
 const SPEC = /\.smoke\.ts$/
 
@@ -68,10 +72,10 @@ const SPEC = /\.smoke\.ts$/
 export function selectGroups({ labels, files, map, specGroup }) {
   const warnings = []
   const labelled = labels.some((l) => l === 'smoke' || l.startsWith('smoke:'))
-  if (!labelled && !files.some((f) => f.startsWith('src/'))) return { groups: [], warnings, why: 'no file under src/ changed: no smoke run' }
+  const srcFiles = files.filter((f) => f.startsWith('src/') && !DOCS.test(f))
+  if (!labelled && !srcFiles.length) return { groups: [], warnings, why: 'no file under src/ changed (Markdown and docs/ ignored): no smoke run' }
   const reasons = new Map(GROUPS.map((g) => [g, []]))
   const add = (g, why) => reasons.get(g).push(why)
-  const srcFiles = files.filter((f) => f.startsWith('src/'))
   const simOnly = !labels.includes('smoke') && srcFiles.length > 0 && srcFiles.every((f) => SIM_FOLDER.test(f))
   if (!simOnly) add('core', 'always')
   if (labels.includes('smoke')) for (const g of GROUPS) add(g, 'label smoke')

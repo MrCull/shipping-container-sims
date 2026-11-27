@@ -4,8 +4,13 @@
  *
  *   node scripts/unit-select.mjs [--run] [--json] [--files-from FILE] [base] [-- extra vitest args]
  *
- * Rule, first match per path, the scope is the union over paths (spec #375):
+ * Rule, first match per path, the scope is the union over paths (spec #375, #396):
  *   - Markdown and any `docs/` folder: ignored.
+ *   - smoke-only paths (`scripts/smoke-map.txt`, any `*.smoke.ts`, `src/tests/browser/**`): no unit tests (smoke-select
+ *     picks them up). A sim's other `tests/browser/` helpers keep the sim: a unit test reads `renderBudget.budget.ts`.
+ *   - `scripts/` files the vitest config or a unit test imports (`UNIT_IMPORTED_SCRIPTS`): all.
+ *   - a script with its own `node --test scripts/test-<name>.mjs` in `verify:checks`, and that test file: no unit tests
+ *     (verify runs the node test whatever the scope; `nodeTestedScripts`).
  *   - `src/sims/<id>/**`: sim `<id>` (Node-only CLI code under a sim included; a new sim folder needs no edit).
  *   - anything else under `src/`, `package.json`, the lockfile, vite/vitest/tsconfig/eslint/playwright config,
  *     `scripts/`, `.github/`: all.
@@ -34,12 +39,43 @@ import { simIdsWithTests } from './vitest-projects.mjs'
 
 const IGNORED = /\.md$|(^|\/)docs\//
 const SIM = /^src\/sims\/([^/]+)\//
+/** Paths only browser smoke tests use (#396): the smoke map, any `*.smoke.ts`, and the shared smoke helpers. */
+const SMOKE_ONLY = /^scripts\/smoke-map\.txt$|\.smoke\.ts$|^src\/tests\/browser\//
+
+/**
+ * The `scripts/` files the vitest config or a unit test imports: these select `all` even when they have their own
+ * `node --test` file. `scripts/test-unit-select.mjs` fails when a new import is missing here.
+ */
+export const UNIT_IMPORTED_SCRIPTS = ['scripts/vitest-projects.mjs', 'scripts/vitest-projects.d.mts']
+
+/**
+ * The scripts covered by a `node --test scripts/test-<name>.mjs` in package.json's `verify:checks`: each test file and
+ * its `scripts/<name>.mjs`. `verify` runs those tests whatever the scope, so such a script selects no unit tests. Pure.
+ * @param {string} packageJsonText
+ * @returns {string[]}
+ */
+export function nodeTestedScripts(packageJsonText) {
+  const checks = JSON.parse(packageJsonText).scripts?.['verify:checks'] ?? ''
+  const out = []
+  for (const cmd of checks.split('&&')) {
+    const words = cmd.trim().split(/\s+/)
+    if (words[0] !== 'node' || words[1] !== '--test') continue
+    for (const w of words.slice(2)) {
+      const m = /^scripts\/test-(.+\.mjs)$/.exec(w)
+      if (m) out.push(w, `scripts/${m[1]}`)
+    }
+  }
+  return out
+}
 const CONFIG =
   /^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$|(^|\/)(vite|vitest|playwright)\.config\.[cm]?[jt]s$|(^|\/)tsconfig[^/]*\.json$|(^|\/)eslint\.config\.[cm]?[jt]s$/
 
 /** Why one path selects what it does: `{ sim }`, `{ all }` or nothing. */
-function classify(path) {
+function classify(path, nodeTested) {
   if (IGNORED.test(path)) return { why: path.endsWith('.md') ? 'ignored (Markdown)' : 'ignored (docs/ folder)' }
+  if (SMOKE_ONLY.test(path)) return { why: 'no unit tests (smoke-only: browser smoke tests use it, smoke-select picks it up)' }
+  if (UNIT_IMPORTED_SCRIPTS.includes(path)) return { all: true, why: 'all (imported by vitest config or a unit test)' }
+  if (nodeTested.includes(path)) return { why: 'no unit tests (its node --test file runs in verify:checks)' }
   const m = SIM.exec(path)
   if (m) return { sim: m[1], why: `sim ${m[1]}` }
   if (path.startsWith('src/')) return { all: true, why: 'all (shared src/ code)' }
@@ -53,14 +89,16 @@ function classify(path) {
 /**
  * The unit-test scope for a list of changed paths (repo-relative, `/`-separated). Pure.
  * @param {string[]} files
+ * @param {{ nodeTested?: string[] }} [opts] `nodeTested`: scripts covered by verify:checks (`nodeTestedScripts`);
+ *   without it every `scripts/` path selects all.
  * @returns {{ scope: 'all' | 'none' | string[], reasons: { path: string, why: string }[] }}
  */
-export function selectUnitScope(files) {
+export function selectUnitScope(files, { nodeTested = [] } = {}) {
   const sims = new Set()
   let all = false
   const reasons = []
   for (const path of files) {
-    const c = classify(path)
+    const c = classify(path, nodeTested)
     if (c.sim) sims.add(c.sim)
     if (c.all) all = true
     reasons.push({ path, why: c.why })
@@ -89,8 +127,8 @@ export function projectsFor(scope, simsWithTests) {
  * @param {string} event the GitHub event name
  * @param {string[]} files
  */
-export function selectForEvent(event, files) {
-  if (event === 'pull_request') return selectUnitScope(files)
+export function selectForEvent(event, files, opts) {
+  if (event === 'pull_request') return selectUnitScope(files, opts)
   return { scope: 'all', reasons: [{ path: `(event ${event})`, why: `all (a ${event} run tests every project)` }] }
 }
 
@@ -178,7 +216,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(2)
   }
 
-  const { scope, reasons } = event ? selectForEvent(event, files) : selectUnitScope(files)
+  const opts = { nodeTested: nodeTestedScripts(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) }
+  const { scope, reasons } = event ? selectForEvent(event, files, opts) : selectUnitScope(files, opts)
   const { projects, skipped } = projectsFor(scope, simIdsWithTests(root))
   if (summary) appendFileSync(summary, summaryMarkdown({ scope, projects, skipped, reasons }))
   const out = json ? console.error : console.log

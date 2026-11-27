@@ -20,7 +20,7 @@ test('a PR touching only the bay viewer runs the home wall spec and vessel, and 
   assert.equal(p.grep, '@home-wall|@vessel')
   const body = commentBody(p)
   assert.ok(body.startsWith(COMMENT_MARKER))
-  assert.match(body, /1 of 10 groups ran, plus the home wall spec in place of `core` \(sim-only change\)/)
+  assert.match(body, new RegExp(`1 of ${GROUPS.length} groups ran, plus the home wall spec in place of \`core\` \\(sim-only change\\)`))
   assert.match(body, /\| `home-wall` \| sim-only \| sim-only: every changed src\/ path is inside a sim folder/)
   assert.match(body, /\| `vessel` \| path \| path `src\/sims\/terminal-twin\/components\/BayViewer\.vue` \|/)
 })
