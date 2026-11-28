@@ -906,12 +906,13 @@ export function useYardCanvas(
     bay(g, layout.receipt, urgentBay ? C['receipt-urgent'] : C['receipt-bay'], urgentBay ? C.urgent : C['receipt-line'], stall(receiptTruck))
     // The collection truck: bounces when it takes a box, drives off with it and comes back empty.
     const collecting = fx.find((f): f is Extract<Fx, { kind: 'collect' }> => f.kind === 'collect')
-    // It drives off along the road strip, out past the left edge (clipped to the road), and comes back empty.
-    const driveOff = layout.collection.x - geo.road.x + layout.collection.w
-    const motion = collecting ? collectMotion(fxProgress(collecting, now), driveOff) : { x: 0, y: 0, carrying: false }
+    // It drives off left along the road strip, out past the road's edge, and comes back empty into its bay from the
+    // right; clipped to the road up to the bay's right edge, so it never shows over the receipt bay.
+    const roadLeft = { x: geo.road.x, y: geo.road.y, w: layout.collection.x + layout.collection.w - geo.road.x, h: geo.road.h }
+    const motion = collecting ? collectMotion(fxProgress(collecting, now), roadLeft.w) : { x: 0, y: 0, carrying: false }
     g.save()
     g.beginPath()
-    g.rect(geo.road.x, geo.road.y, geo.road.w, geo.road.h)
+    g.rect(roadLeft.x, roadLeft.y, roadLeft.w, roadLeft.h)
     g.clip()
     g.translate(motion.x, motion.y)
     truckFacing(g, layout.collection, geo, 'left', C['cab-white'], C['cab-teal'])

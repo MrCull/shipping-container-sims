@@ -237,6 +237,7 @@ onBeforeUnmount(() => {
         v-if="store.announcement"
         class="announce"
         data-testid="ys-announce"
+        :style="{ top: `${view.layout.yard.y + 22}px` }"
       >
         {{ store.announcement }}
       </p>
