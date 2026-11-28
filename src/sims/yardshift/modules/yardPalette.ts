@@ -42,8 +42,8 @@ export const YARD_COLOURS = {
   'casting': '#20282f',
   'dust': '#efe7d6',
   'gold-shine': '#fffbe8',
-  'gold-body': '#eba832',
-  'gold-deep': '#a2631b',
+  'gold-body': '#ffd84a',
+  'gold-deep': '#f0b428',
   'receipt-cargo': '#d3dadf',
 } as const
 

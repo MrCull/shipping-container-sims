@@ -105,7 +105,7 @@ defineProps<{
 .queue li.gold {
   background:
     linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 45%) 42%, transparent 54%),
-    linear-gradient(var(--ys-yard-gold-shine), var(--ys-yard-gold-body) 45%, var(--ys-yard-gold-deep));
+    linear-gradient(var(--ys-yard-gold-body) 20%, var(--ys-yard-gold-shine) 32%, var(--ys-yard-gold-body) 44%, var(--ys-yard-gold-deep));
   box-shadow:
     inset 0 4px 0 rgb(255 255 255 / 38%),
     inset 0 -5px 0 var(--chip),

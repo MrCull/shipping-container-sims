@@ -197,23 +197,25 @@ function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold
   g.fillStyle = gold ? C['gold-deep'] : tone(-0.3)
   g.fill()
   if (gold) {
-    // Metallic gold: a bright cream top edge, rich amber gold and a deep bronze foot, distinct from every sequence colour.
+    // Bright metallic gold (owner round 5: never brown): a light gold face with a white highlight band across its upper
+    // third and a warm gold shade at the foot, distinct from every sequence colour.
     const body = g.createLinearGradient(0, y, 0, y + h)
-    body.addColorStop(0, C['gold-shine'])
-    body.addColorStop(0.22, C['gold-body'])
-    body.addColorStop(0.55, C['gold-body'])
-    body.addColorStop(0.7, C['gold-deep'])
-    body.addColorStop(1, C['medal-rim'])
+    body.addColorStop(0, C['gold-body'])
+    body.addColorStop(0.2, C['gold-body'])
+    body.addColorStop(0.3, C['gold-shine'])
+    body.addColorStop(0.4, C['gold-body'])
+    body.addColorStop(0.75, C['gold-body'])
+    body.addColorStop(1, C['gold-deep'])
     g.fillStyle = body
   } else g.fillStyle = front
   g.fillRect(x, y, w, h)
   // A few soft ribs across the front, short of the door end.
   const ribs = Math.max(3, Math.min(6, Math.round((w - door) / 11)))
   const step = (w - door) / (ribs + 1)
-  g.fillStyle = gold ? 'rgb(120 76 18 / 20%)' : tone(-0.12)
+  g.fillStyle = gold ? 'rgb(214 150 20 / 30%)' : tone(-0.12)
   for (let i = 1; i <= ribs; i++) g.fillRect(Math.round(x + i * step), y + rail + 1, 1.5, h - 2 * rail - 2)
   // End face ribs, two of them.
-  g.strokeStyle = gold ? 'rgb(120 76 18 / 25%)' : tone(-0.4)
+  g.strokeStyle = gold ? 'rgb(255 255 255 / 45%)' : tone(-0.4)
   g.lineWidth = 1
   g.beginPath()
   for (const f of [0.33, 0.66]) {
@@ -223,7 +225,7 @@ function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold
   g.stroke()
   // Door end: two subtle locking bars.
   const dxp = x + w - door
-  g.strokeStyle = gold ? 'rgb(120 76 18 / 35%)' : tone(-0.2)
+  g.strokeStyle = gold ? 'rgb(214 150 20 / 40%)' : tone(-0.2)
   g.lineWidth = 1.5
   g.beginPath()
   for (const f of [0.35, 0.72]) {
