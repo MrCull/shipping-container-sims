@@ -27,8 +27,10 @@ test('a win shows the result, and progress and the next level survive a reload',
   await page.reload()
   await page.waitForFunction(() => window.__ys !== undefined)
   // The route now asks where to start (owner round 6): continuing opens the highest unlocked level's intro.
-  await expect(page.getByTestId('ys-continue')).toHaveText('Continue at level 2 ›')
-  await expect(page.getByTestId('ys-start-over')).toHaveText('Start from level 1')
+  // Owner round 7: "Start from level 1" is the first and primary button, then "Continue at level N", then Levels.
+  const choice = page.getByTestId('ys-screen-start').locator('.buttons button')
+  await expect(choice).toHaveText(['Start from level 1 ›', 'Continue at level 2', 'Levels'])
+  await expect(page.getByTestId('ys-start-over')).toHaveClass(/primary/)
   await page.getByTestId('ys-continue').click()
   await expect(page.getByTestId('ys-screen-intro')).toContainText('2.')
   await page.getByTestId('ys-levels').click()

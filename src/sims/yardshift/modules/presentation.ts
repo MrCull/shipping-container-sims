@@ -455,7 +455,8 @@ export function input(ui: UiState, event: UiEvent, state: ShiftState): InputResu
     if (!ui.drag || target === null || sameTarget(ui.drag.from, target) || target.kind === 'receipt') {
       return { ui: cleared(ui) }
     }
-    return tap({ ...cleared(ui), selection: ui.selection }, target, state)
+    // A drop stays explicit: dropping onto the next container's stack still means "place here".
+    return tap({ ...cleared(ui), selection: ui.selection }, target, state, false)
   }
   return tap(ui, event.target, state)
 }
@@ -464,7 +465,7 @@ function sameTarget(a: HitTarget, b: HitTarget): boolean {
   return a.kind === b.kind && (a.kind !== 'stack' || (b.kind === 'stack' && a.index === b.index))
 }
 
-function tap(ui: UiState, target: HitTarget | null, state: ShiftState): InputResult {
+function tap(ui: UiState, target: HitTarget | null, state: ShiftState, nextFirst = true): InputResult {
   const clear = cleared(ui)
   if (state.status !== 'playing' || target === null) return { ui: clear }
   if (target.kind === 'receipt') {
@@ -476,6 +477,12 @@ function tap(ui: UiState, target: HitTarget | null, state: ShiftState): InputRes
     return { ui: clear, action: ui.selection === null ? { type: 'collect' } : { type: 'collect', from: ui.selection } }
   }
   const j = target.index
+  // A tap or key on the stack whose top is the next container always collects it, whatever is selected (owner round
+  // 7: selecting a box, then tapping the next one, used to bury it). Not while the receipt is mandatory: placing it
+  // is the only legal move then. A drop (nextFirst false) still places.
+  if (nextFirst && state.deadline !== 0 && topOf(state, j) === state.next) {
+    return { ui: ui.selection === null ? ui : clear, action: { type: 'collect', from: j } }
+  }
   if (ui.selection === 'receipt') return { ui: clear, action: { type: 'receive', to: j } }
   if (ui.selection === j) return { ui: clear }
   if (ui.selection !== null) return { ui: clear, action: { type: 'rehandle', from: ui.selection, to: j } }

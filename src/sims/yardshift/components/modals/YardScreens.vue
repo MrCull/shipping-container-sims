@@ -42,17 +42,17 @@ function play(n: number): void {
           <button
             type="button"
             class="primary"
-            data-testid="ys-continue"
-            @click="store.continueAt()"
-          >
-            {{ store.startChoice.continueLabel }} ›
-          </button>
-          <button
-            type="button"
             data-testid="ys-start-over"
             @click="store.startFromOne()"
           >
-            {{ store.startChoice.restartLabel }}
+            {{ store.startChoice.restartLabel }} ›
+          </button>
+          <button
+            type="button"
+            data-testid="ys-continue"
+            @click="store.continueAt()"
+          >
+            {{ store.startChoice.continueLabel }}
           </button>
           <button
             type="button"

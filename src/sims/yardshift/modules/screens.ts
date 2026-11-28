@@ -126,7 +126,8 @@ export function pickerRows(levels: readonly LevelDef[], progress: Progress, unlo
 
 /**
  * Entering Yardshift (owner round 6): with only level 1 unlocked, or with the `?unlock=all` dev flag, level 1's intro;
- * otherwise level N (the highest unlocked) under a choice of "Continue at level N" or "Start from level 1".
+ * otherwise level N (the highest unlocked) under a choice of "Start from level 1" (first and primary, owner round 7)
+ * or "Continue at level N".
  */
 export function entryPlan(progress: Progress, levels: readonly LevelDef[], unlockAll: boolean): EntryPlan {
   const n = Math.min(levels.length, progress.unlocked)

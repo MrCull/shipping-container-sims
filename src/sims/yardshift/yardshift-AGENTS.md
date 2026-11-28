@@ -252,8 +252,8 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `pickerRows` (best stars, best score, locks), `undoView` (enabled, label, reason). Store `overlay`: `intro`, `pause`
   or `levels`; result and fail follow the shift status. Entry (owner round 6): `store.enter()` follows `entryPlan(progress,
   levels, unlockAll)`: only level 1 unlocked, or `?unlock=all`, opens level 1's intro; otherwise the highest unlocked
-  level N loads (held by the `intro` pause) under the `start` overlay, "Welcome back" with "Continue at level N"
-  (`continueAt`, its intro), "Start from level 1" (`startFromOne`) and Levels (closing the picker returns to the
+  level N loads (held by the `intro` pause) under the `start` overlay, "Welcome back" with "Start from level 1"
+  (`startFromOne`, first and primary, owner round 7), "Continue at level N" (`continueAt`, its intro) and Levels (closing the picker returns to the
   choice); `yardshiftStoreEntry.test.ts`;
   `store.loadLevel(n, { intro: true })` holds the `intro` pause until `startShift`. The control bar under the hint has
   Pause, Undo (reason shown at 3 s or less) and Restart (restart skips the intro). U calls `store.undo()`; Esc opens the pause menu, and closes it (or the level
@@ -268,6 +268,12 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   receipt and collection bays never resolve to each other by any input. U emits the engine's `{ type: 'undo' }`
   (`UiAction` is `ShiftAction`); Esc clears a selection or drag first, then
   sends `pause`/`resume` with reason `player`. Input is dropped while the crane animates.
+- Next first (owner round 7): a tap or stack key on the stack whose top is the next container always sends
+  `collect(from)` and clears the selection, even with another container or the receipt truck selected (selecting a
+  box and then tapping the next one used to bury it). Two exceptions: at deadline 0 the old resolution stays (placing
+  the receipt is the only legal move), and a drop stays explicit (dropping onto that stack still places there).
+  A tap on a stack whose top is not the next container (the next one buried) places the selection as before.
+  Tests: `modules/inputCoaching.test.ts`, "the exposed next container always collects".
 - Store: a pointer moving more than `DRAG_THRESHOLD_PX` (6) from where it went down starts a drag; otherwise
   pointer up is a tap. `Yardshift.vue` listens for game keys on `window` (not while typing in a field).
 - Urgency (`urgencyRisk(state, current)`, V20): every container takes the shift-end risk (0 above 9 s, 1 at 3 s);

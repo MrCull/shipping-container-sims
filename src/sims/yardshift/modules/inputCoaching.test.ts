@@ -253,3 +253,48 @@ describe('Yardshift coaching hints', () => {
     expect(vm.destinations).toEqual([3, 4])
   })
 })
+
+describe('Yardshift input: the exposed next container always collects (owner round 7)', () => {
+  const tutorial = createShift(TUTORIAL).state
+  // Level 4 after one rehandle: #1 is on top of stack 0 and truck #8 waits with 2 moves left (optional).
+  const l4Optional = levelState(4, [{ type: 'rehandle', from: 0, to: 4 }])
+  const l4Zero = levelState(4, L4_ZERO)
+
+  it('a tap on its stack collects even with another container selected, and clears the selection', () => {
+    const r = run(tutorial, taps(stack(1), stack(0)))
+    expect(r.actions).toEqual([{ type: 'collect', from: 0 }])
+    expect(r.ui.selection).toBeNull()
+  })
+
+  it('a tap on its stack collects with the optional receipt selected', () => {
+    expect(l4Optional.deadline).toBeGreaterThan(0)
+    const r = run(l4Optional, taps(RECEIPT_BAY, stack(0)))
+    expect(r.actions).toEqual([{ type: 'collect', from: 0 }])
+    expect(r.ui.selection).toBeNull()
+  })
+
+  it('a stack key collects with something selected', () => {
+    const r = run(tutorial, keys('2', '1'))
+    expect(r.actions).toEqual([{ type: 'collect', from: 0 }])
+    expect(r.ui.selection).toBeNull()
+    expect(run(l4Optional, keys('r', '1')).actions).toEqual([{ type: 'collect', from: 0 }])
+  })
+
+  it('a mandatory receipt still places onto the stack', () => {
+    expect(l4Zero.deadline).toBe(0)
+    expect(l4Zero.stacks[2]!.at(-1)).toBe(l4Zero.next)
+    expect(run(l4Zero, taps(RECEIPT_BAY, stack(2))).actions).toEqual([{ type: 'receive', to: 2 }])
+    expect(run(l4Zero, keys('r', '3')).actions).toEqual([{ type: 'receive', to: 2 }])
+  })
+
+  it('a drop onto its stack still places there', () => {
+    expect(run(tutorial, drag(stack(1), stack(0))).actions).toEqual([{ type: 'rehandle', from: 1, to: 0 }])
+    expect(run(l4Optional, drag(RECEIPT_BAY, stack(0))).actions).toEqual([{ type: 'receive', to: 0 }])
+  })
+
+  it("a buried next container keeps today's behaviour: its stack tap places the selection", () => {
+    // Level 2: [[2,5],[1,6],[3,4],[]], #1 is under #6.
+    const l2 = levelState(2)
+    expect(run(l2, taps(stack(0), stack(1))).actions).toEqual([{ type: 'rehandle', from: 0, to: 1 }])
+  })
+})
