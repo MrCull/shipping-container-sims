@@ -49,14 +49,16 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   it past `ASPECT_MAX` 1.45. `numberSize(box)` is `NUMBER_SHARE` (58 %) of the box height. `chevronAt(geo, layout,
   stack, height)` places the NEXT chevron just above the stack top, inside its column, under the road strip, with
   `CHEVRON_BOUNCE` (3 px) room each way. Owner round 5 (trucks above the yard): the road strip (`layout.road`, drawn
-  as asphalt with kerbs and dashed lane lines) runs across the top of the surface with both truck bays at its foot,
-  right over the stacks; there is no sky band. The gantry beam (`beamHFor`) spans the top, over the road, with the
+  as asphalt with kerbs and a dashed lane line) is just the two truck bays side by side under the beam, right over
+  the stacks; there is no sky band and never bare road. The gantry beam (`beamHFor`) spans the top, over the road, with the
   legs running down beside the bays and the full yard; the trolley rides the beam and its cables hang down across
   the road to the spreader. The yard has a `CAPTION_PX` (16 px) row at its top for "YARD 01" and "n FREE SLOTS",
   then the crane headroom: the carry height `carryY` sits just under the road (caption and spreader room), always at
-  least one box over a full stack; at rest the spreader hangs there. A collect lifts the box from its stack up to
-  the collection truck's trailer, a receive lowers the receipt cargo from its truck down into the yard (the same
-  `cranePhase` legs; the destination is simply above the carry height). `yardFit(colW, capacity, maxH)` gives the
+  least one box over a full stack. At rest the spreader parks just under the trolley (`parkY`, in the 6 px between
+  beam and road), so no cables hang through the bays; the cables pay out only during a move: down to the source,
+  then the box travels at `carryY`, or level with the truck when one end is a truck (`min(carryY, src.y, dst.y)`),
+  and after the release the spreader rises back to its park. A collect lifts the box from its stack up to the
+  collection truck's trailer, a receive lowers the receipt cargo from its truck down into the yard. `yardFit(colW, capacity, maxH)` gives the
   box height and the yard that fits it exactly. Each bay's truck (`truckIn(bay, geo, facing)`): tractor cab at the end it faces (the receipt truck faces
   right with its cab under `arrowBox`, the collection truck faces left), a heavy skeletal trailer, three axles, cargo
   a yard box scaled up to `MAX_CARGO_SCALE` 1.6, the cab up to 28 % of the bay width, the whole truck filling most of the bay width and centred
@@ -65,17 +67,18 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   every slot (the top one lifted too) lies inside its own column hit region and under the road, the box aspect stays
   1.3 to 1.45 (under 1.35 on a phone), the number 55 to 60 % of the box, the chevron inside its column clear of the
   stack top and the road at every stack height, the beam above both bays and the road (which holds both bays) above
-  the yard, the carried box clears a full stack and hangs 8 to 25 px under the road, each truck's cargo slot sits
+  the yard, the carried box clears a full stack and hangs 8 to 25 px under the road, the parked spreader sits
+  between the beam and the road, each truck's cargo slot sits
   above the carry height, under the beam and between the legs (the crane carries a box up to it), the legs touch no
   column, and each truck (both facings) lies inside its
   bay, fills most of its width, is vertically centred, has its cab ahead of the trailer and its wheels on the road,
   with the cargo on the trailer and the arrow over the receipt cab, clear of the cargo.
 - `layoutFor(stackCount, viewport, capacity)` (`present` passes the capacity), top to bottom (owner round 5): 2 % margin
-  and `BEAM_ROOM_PX` (20) for the beam, the road strip with both bays side by side at its foot, a 6 px gap, then the
-  yard down to the bottom margin. The bays take `BAY_SHARE` (22 %, at least 84 px) of the surface and the yard exactly
-  what `yardFit` needs. Height left on a tall phone goes first to the bays (up to `MAX_BAY_SHARE`, 24 %; the trucks
-  scale with them), then to more road above the bays (where the sky band was), so the trucks always sit right over
-  the stacks. The canvas always fills the whole play surface: no dark gaps (`playtestFixes.test.ts`). Hit regions
+  and `BEAM_ROOM_PX` (26) for the beam and the parked spreader, the road strip (just the two bays side by side), a
+  6 px gap, then the yard down to the bottom margin. The bays take `BAY_SHARE` (22 %, at least 84 px) of the surface
+  and the yard at least what `yardFit` needs. Height left on a tall phone goes first to the bays (up to
+  `MAX_BAY_SHARE`, 24 %; the trucks scale with them), then to the yard's concrete headroom (orchestrator review:
+  never to bare road above the bays). The canvas always fills the whole play surface: no dark gaps (`playtestFixes.test.ts`). Hit regions
   still come from the layout only and move with the bays; the road itself is paint, never a target. Without the
   capacity the bays sit right under the beam and the yard fills the rest. The arrival announcement pill sits at the
   top of the yard, clear of the bays.
@@ -94,7 +97,7 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   `bonus-miss` (the gold fades to the box's own colour with a poof), `reject` (a refused move shakes the tapped
   container sideways in red, `rejectX`). `sparkles` and `shineAt` drive the gold shine.
 - `composables/useYardCanvas.ts` only paints: the road strip (asphalt from the beam down, kerbs, a dashed lane line
-  along the trucks' wheels and one down any road above the bays), floor, dashed slot outlines up to capacity,
+  along the trucks' wheels), floor, dashed slot outlines up to capacity,
   "YARD 01" and "n FREE SLOT(S)" captions along the top of the concrete, the two bays painted over the road (dashed
   border, painted stall corner marks so an empty bay still reads as one, teal collection, slate receipt, red at
   deadline 0; labels "▲ COLLECTION" and "▼ RECEIPT"), illustrated trucks (rounded cab roof, windscreen and side
@@ -293,9 +296,9 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   in the receipt bay; plus singular and plural copy ("1 MOVE LEFT", "1 rehandle", "1 star bonus").
 - Scene: the gantry beam runs along the slanted row of stacks (first to last column, legs just outside) and moves
   across it with the trolley; the trolley rest point resets when the surface size or stack count changes.
-- Cover: `assets/cover.png` (re-cut in owner round 5) is a 640x360 cut of the phone level 3 capture (390x844 at 2x,
-  `loadLevel(3)` then the fixture's first move): the band from the foot of the road (both bays) down to the stack
-  numbers, centred on the page background to 16:9, 8-bit palette, about 30 KB.
+- Cover: `assets/cover.png` (re-cut in owner round 5) is the play surface of the desktop level 4 capture
+  (1280x800 at 1x, `loadLevel(4)`: crop x 200 to 1080, y 212 to 707, both trucks over the stacks) scaled to 640x360,
+  8-bit palette, about 30 KB.
 
 ## Audio cues (#388)
 

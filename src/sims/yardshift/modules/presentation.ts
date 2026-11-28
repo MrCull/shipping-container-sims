@@ -82,34 +82,30 @@ export const BAY_SHARE = 0.22
 export const MAX_BAY_SHARE = 0.24
 
 /** Room at the top of the surface for the gantry beam, which spans over the road strip (owner round 5). */
-export const BEAM_ROOM_PX = 20
+export const BEAM_ROOM_PX = 26
 /** Gap between the road strip and the yard below it. */
 const ROAD_GAP = 6
 
 /**
  * Screen layout of the play surface (owner round 5: trucks above the yard): the gantry beam's room at the top, the
- * road strip under it with the two truck bays side by side at its foot, then the yard band with one column per stack.
- * With the `capacity` (art pass 3), the yard is exactly as tall as full stacks plus crane headroom need (`yardFit`,
- * boxes sized from the column width) and sits on the bottom margin, the bays take `BAY_SHARE` (up to `MAX_BAY_SHARE`
- * when a tall phone leaves height over) right over it, and the rest of the height is more road above the bays (where
- * the sky band was), so the trucks always sit right over the stacks. Without it the bays sit under the beam and the
- * yard fills the rest.
+ * road strip under it (just the two truck bays side by side), then the yard band with one column per stack. With the
+ * `capacity` (art pass 3), the bays take `BAY_SHARE` (up to `MAX_BAY_SHARE` when a tall phone leaves height over) and
+ * the yard the rest: at least what full stacks plus crane headroom need (`yardFit`), spare height as concrete
+ * headroom, never as bare road. Without it the bays take their usual share.
  */
 export function layoutFor(stackCount: number, vp: Viewport, capacity?: number): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
   const roadTop = Math.round(vp.height * 0.02) + BEAM_ROOM_PX
   const yardBottom = Math.max(roadTop, vp.height - 8)
   let bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
-  let bayTop = roadTop
+  const bayTop = roadTop
   if (capacity !== undefined && stackCount > 0) {
     const total = yardBottom - roadTop
     bayH = Math.round(Math.min(total * 0.26, Math.max(84, total * BAY_SHARE)))
     const fit = yardFit(innerW / stackCount, capacity, total - bayH - ROAD_GAP)
     // Height over on a tall phone goes to the bays first (their trucks scale up with them) up to `MAX_BAY_SHARE`,
-    // then to the road above them. The canvas always fills the whole play surface: no dark gaps.
-    const spare = () => Math.max(0, total - bayH - ROAD_GAP - fit.h)
-    bayH += Math.min(Math.max(0, Math.round(total * MAX_BAY_SHARE) - bayH), spare())
-    bayTop = roadTop + spare()
+    // then to the yard's concrete headroom. The canvas always fills the whole play surface: no dark gaps.
+    bayH += Math.min(Math.max(0, Math.round(total * MAX_BAY_SHARE) - bayH), Math.max(0, total - bayH - ROAD_GAP - fit.h))
   }
   const bayBottom = Math.min(yardBottom, bayTop + bayH)
   const yardTop = Math.min(yardBottom, bayBottom + ROAD_GAP)

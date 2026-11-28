@@ -78,10 +78,10 @@ describe('Yardshift playtest fixes', () => {
       expect(fit.yard.y - (fit.collection.y + fit.collection.h)).toBeLessThanOrEqual(8)
       expect(fit.collection.h).toBeGreaterThanOrEqual(Math.min(84, vp.height * 0.2) - 1)
       expect(fit.collection.h).toBeLessThanOrEqual(Math.max(84, vp.height * 0.3) + 1)
-      // No dark gaps: the road starts under the beam room at the top, holds both bays at its foot (spare height is
-      // more road above them) and the yard ends at the bottom margin.
+      // No dark gaps and no bare road: the bays sit right under the beam room, the road is just the bays' strip, and
+      // spare height goes to the yard, which ends at the bottom margin.
       expect(fit.road.y).toBe(l.road.y)
-      expect(l.collection.y).toBe(l.road.y)
+      for (const lay of [l, fit]) expect(lay.collection.y).toBe(lay.road.y)
       for (const lay of [l, fit]) expect(lay.collection.y + lay.collection.h).toBe(lay.road.y + lay.road.h)
       expect(fit.yard.y + fit.yard.h).toBe(l.yard.y + l.yard.h)
     }

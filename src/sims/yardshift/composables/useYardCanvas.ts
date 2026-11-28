@@ -1002,7 +1002,8 @@ export function useYardCanvas(
     // The crane: the trolley rests where the last move ended; a move animates hook, spreader and box.
     const yardMid = layout.yard.x + layout.yard.w / 2
     let hookX = restX ?? yardMid
-    let hookY = geo.carryY - geo.dy
+    // At rest the spreader parks just under the trolley; the cables pay out only during a move.
+    let hookY = geo.parkY
     let gripping = false
     if (m && (moving || movingCargo)) {
       const paint: Paint = moving
@@ -1012,18 +1013,21 @@ export function useYardCanvas(
       const src = moving ? boxAt(geo, layout, m.from, moving.tier) : receiptTruck.cargo
       const dst = m.to >= 0 ? boxAt(geo, layout, m.to, stackHeight(m.to)) : collectTruck.cargo
       const p = cranePhase(m.progress)
+      // Travel height: over the stacks, or level with a truck when one end is a truck (up in the road strip).
+      const travelY = Math.min(geo.carryY, src.y, dst.y)
       let box: Box
       if (p.leg === 'toSource') {
         hookX = lerp(restX ?? yardMid, centreX(src), p.t)
+        hookY = lerp(geo.parkY, travelY - src.dy, p.t)
         box = src
       } else if (p.leg === 'release') {
         hookX = centreX(dst)
         box = dst
-        hookY = lerp(dst.y - dst.dy, geo.carryY - geo.dy, p.lift)
+        hookY = lerp(dst.y - dst.dy, geo.parkY, p.lift)
       } else {
         const sized = lerpBox(src, dst, p.t)
         const low = p.t < 1 ? src.y : dst.y
-        const y = lerp(low, geo.carryY, p.lift)
+        const y = lerp(low, travelY, p.lift)
         hookX = centreX(sized)
         box = p.carrying ? { ...sized, y } : src
         hookY = p.carrying ? y - sized.dy : y - src.dy

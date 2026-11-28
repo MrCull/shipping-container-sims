@@ -66,6 +66,9 @@ describe('Yardshift 2D yard geometry', () => {
           expect(g.carryY - g.dy - layout.yard.y, where).toBeGreaterThanOrEqual(8)
           // The crane lifts high, just under the road (captions and spreader room), so the lift up to a truck is short.
           expect(g.carryY - g.dy - layout.yard.y, where).toBeLessThanOrEqual(CAPTION_PX + 8 + 1)
+          // At rest the spreader parks just under the trolley, above the road (no cables down through the bays).
+          expect(g.parkY - 5, where).toBeGreaterThanOrEqual(g.gantry.beamY + g.gantry.beamH)
+          expect(g.parkY - 1, where).toBeLessThanOrEqual(g.road.y)
           // The legs run from the beam down the full yard.
           expect(g.gantry.footY).toBeGreaterThanOrEqual(g.groundY)
           // Boxes are sized from the column width first: on a phone they are as tall as the 1.3:1 shape allows.

@@ -43,8 +43,10 @@ export interface YardGeometry {
   /** How far a selected container lifts. */
   lift: number
   gantry: Gantry
-  /** Where the crane hook carries a box: the front face top while travelling, just under the road strip. */
+  /** Where the crane hook carries a box between stacks: the front face top while travelling, just under the road. */
   carryY: number
+  /** Hook height at rest (owner round 5): the spreader parks just under the trolley, above the road strip. */
+  parkY: number
 }
 
 /** Room under the ground line for the stack numbers. */
@@ -116,7 +118,8 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   // just under the HUD bands, and the hoist cables hang down across the road to the spreader; the crane lifts a box
   // from the yard up to a truck, and lowers a receipt from its truck down into the yard. No sky band.
   const road = layout.road
-  const beamY = Math.max(0, road.y - beamH - 2)
+  // Room under the beam for the parked spreader (4 px) above the road strip.
+  const beamY = Math.max(0, road.y - beamH - 8)
   const floor = { ...yard }
   const legW = Math.max(6, Math.min(12, yard.x - 4))
   const gantry: Gantry = {
@@ -127,7 +130,7 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
     beamH,
     footY: yard.y + yard.h - 4,
   }
-  return { road, floor, groundY, boxW, boxH, dx, dy, lift: boxH * LIFT, gantry, carryY }
+  return { road, floor, groundY, boxW, boxH, dx, dy, lift: boxH * LIFT, gantry, carryY, parkY: beamY + beamH + 7 }
 }
 
 /** The box of the container at `tier` (0 = bottom) of stack `stack`, raised by `lift` px. */
