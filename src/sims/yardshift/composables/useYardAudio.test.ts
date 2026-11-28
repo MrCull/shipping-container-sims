@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { installAudioUnlock, playTone, releaseOnEnded } from './useYardAudio'
 import { cuesForStep } from '../modules/audioCues'
 import { createShift } from '../modules/engine'
-import { TUTORIAL } from '../modules/levels'
+import { levelByNumber, TUTORIAL } from '../modules/levels'
 
 function fakeNode() {
   return { disconnect: vi.fn(), onended: null as null | (() => void) }
@@ -21,8 +21,15 @@ function fakeContext() {
   }
   const ac = {
     currentTime: 0,
+    sampleRate: 8000,
     createOscillator: () => node({ type: 'sine', frequency: param(), start: vi.fn(), stop: vi.fn() }),
     createGain: () => node({ gain: param() }),
+    createBuffer: (_channels: number, length: number) => {
+      const data = new Float32Array(length)
+      return { getChannelData: () => data }
+    },
+    createBufferSource: () => node({ buffer: null as unknown, start: vi.fn(), stop: vi.fn() }),
+    createBiquadFilter: () => node({ type: 'lowpass', Q: { value: 1 }, frequency: param() }),
   }
   return { ac: ac as unknown as BaseAudioContext, nodes }
 }
@@ -48,6 +55,21 @@ describe('Yardshift audio nodes', () => {
     for (const env of envs) expect(env.to).toEqual([bus])
     // Each envelope peaks at its tone's own relative gain; the bus applies gainFor(1, 'sfx').
     envs.forEach((env, i) => expect(env.gain!.exponentialRampToValueAtTime).toHaveBeenCalledWith(jackpot!.tones[i]!.vol, expect.any(Number)))
+    for (const n of nodes) if (n.onended) n.onended()
+    for (const n of nodes) expect(n.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('the arrival hiss plays band-passed noise into the sfx bus and releases every node when it ends', () => {
+    const { ac, nodes } = fakeContext()
+    const bus = { name: 'bus' } as unknown as AudioNode
+    const [arrival] = cuesForStep(createShift(levelByNumber(5)!).state, [{ type: 'arrival', id: 11, moves: 3 }])
+    const hiss = arrival!.tones.find((t) => t.type === 'noise')!
+    playTone(ac, bus, hiss)
+    const filter = nodes.find((n) => 'Q' in n) as unknown as { type: string; to: unknown[] }
+    expect(filter.type).toBe('bandpass')
+    const env = nodes.find((n) => n.gain)!
+    expect(filter.to).toEqual([env])
+    expect(env.to).toEqual([bus])
     for (const n of nodes) if (n.onended) n.onended()
     for (const n of nodes) expect(n.disconnect).toHaveBeenCalledTimes(1)
   })

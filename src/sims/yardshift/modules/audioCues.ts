@@ -3,13 +3,15 @@
  * once (one engine event, clock thresholds included), never per frame. Tones are V20's synth cues
  * (`tone(f0, f1, dur, vol, delay, type)`); `vol` is the sound's own gain at full volume, scaled by the shared `sfx`
  * channel through `gainFor` when played (composables/useYardAudio.ts). Samples are short clips in assets/audio/.
+ * Owner round 4 asked for louder effects: every tone and sample gain is `SFX_BOOST` times its design level.
  */
 import { SHIFT_LOW_SECONDS } from './engine'
 import { fixtureFor } from './fixtures'
 import { starsFor, type Stars } from './stars'
 import type { ShiftEvent, ShiftState } from '../types/engine'
 
-export type ToneType = 'sine' | 'triangle' | 'square' | 'sawtooth'
+/** `noise`: white noise through a band-pass filter swept f0 to f1 (the receipt truck's air-brake hiss). */
+export type ToneType = 'sine' | 'triangle' | 'square' | 'sawtooth' | 'noise'
 
 /** One oscillator: frequency f0 ramping to f1 over `dur` s, peak gain `vol` (0..1), starting `delay` s from now. */
 export interface Tone {
@@ -19,8 +21,11 @@ export interface Tone {
   vol: number
   delay: number
   type: ToneType
-  /** The layer a tone belongs to in a layered cue: the bonus coin arpeggio, its shimmer, or the score pop. */
-  role?: 'coin' | 'shimmer' | 'pop'
+  /**
+   * The layer a tone belongs to in a layered cue: the bonus coin cascade, its rising arpeggio, shimmer, power chord
+   * hit and score pop; the collect reward chime and the last collection's flourish; the arrival's hiss and horn.
+   */
+  role?: 'coin' | 'arpeggio' | 'shimmer' | 'power' | 'pop' | 'chime' | 'flourish' | 'hiss' | 'horn'
 }
 
 export type SampleName = 'pick' | 'land' | 'truck'
@@ -80,8 +85,22 @@ export const SHIFT_TICK_SECONDS = SHIFT_LOW_SECONDS
 /** The combo ladder stops rising here. */
 export const COMBO_LADDER_TOP = 8
 
+/**
+ * Owner round 4: "raise its sound effects". Every tone's `vol` and every sample's gain is its design level times
+ * this, still a relative sound gain scaled by the shared `'sfx'` channel through `gainFor` (the bus).
+ */
+export const SFX_BOOST = 1.5
+/** The loudest a cue's overlapping tones may sum to: the old 0.306 cap times `SFX_BOOST`. */
+export const CUE_PEAK_CAP = 0.306 * SFX_BOOST
+
+/** `vol` is the design level; the tone plays at `vol * SFX_BOOST`. */
 function tone(f0: number, f1: number, dur = 0.09, vol = 0.035, delay = 0, type: ToneType = 'sine'): Tone {
-  return { f0, f1, dur, vol, delay, type }
+  return { f0, f1, dur, vol: vol * SFX_BOOST, delay, type }
+}
+
+/** A sample's gain: its design level times `SFX_BOOST`, at most 1. */
+function sampleGain(level: number): number {
+  return Math.min(1, level * SFX_BOOST)
 }
 
 const FANFARE = [523.25, 659.25, 783.99, 1046.5, 1318.5]
@@ -99,23 +118,36 @@ export function pentatonicNote(step: number): number {
 }
 
 /**
- * The bonus collect's coin layer, laid over the fanfare chord: a short upward pop as the +250 float appears (the
- * float is the same `bonus-awarded` event, so it has no cue of its own), a quick rising pentatonic coin arpeggio
- * (E6 to E7, 30 ms apart, alternating triangle and sine, done before the chord swells), then a shimmer of high
- * detuned sine pairs that beat gently as the chord rings.
+ * The bonus collect (owner round 4: "epically when a bonus one gets done"), the most epic cue in the game, about
+ * 1.2 s, layered so each part has its own register and moment: a low thump and a short upward pop as the +250
+ * float appears (the float is the same `bonus-awarded` event, so it has no cue of its own); the rising fanfare
+ * arpeggio with its octave sparkle; a coin cascade (ten quick pentatonic coins rising E6 to D8, 32 ms apart,
+ * alternating triangle and sine); a short power chord hit (C3, G3, C4 sawtooth and triangle) under the held chord
+ * as the arpeggio lands; then a shimmer of high detuned sine pairs that beat gently as it rings out.
  */
-function coinLayer(): Tone[] {
-  const COIN_START = 0.02
-  const COIN_GAP = 0.03
-  const coins = [7, 8, 9, 10, 11, 12].map((step, i) =>
-    coin(pentatonicNote(step), 0.06, 0.013, COIN_START + i * COIN_GAP, i % 2 === 0 ? 'triangle' : 'sine'),
+function jackpotTones(): Tone[] {
+  const thump = tone(160, 43, 0.19, 0.07, 0, 'triangle')
+  const pop: Tone = { ...tone(pentatonicNote(10), pentatonicNote(13), 0.05, 0.01, 0.02), role: 'pop' }
+  const arpeggio = FANFARE.flatMap((f, i): Tone[] => [
+    { ...tone(f, f, 0.24, 0.03, i * 0.052, 'triangle'), role: 'arpeggio' },
+    { ...tone(2 * f, 2 * f, 0.13, 0.01, i * 0.052), role: 'arpeggio' },
+  ])
+  const COIN_START = 0.03
+  const COIN_GAP = 0.032
+  const coins = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((step, i) =>
+    coin(pentatonicNote(step), 0.06, 0.01, COIN_START + i * COIN_GAP, i % 2 === 0 ? 'triangle' : 'sine'),
   )
-  const shimmerAt = COIN_START + 6 * COIN_GAP
-  const shimmer = [pentatonicNote(15), pentatonicNote(15) + 7, pentatonicNote(17), pentatonicNote(17) - 9].map(
-    (f, i): Tone => ({ ...tone(f, f * 1.01, 0.36, 0.0045, shimmerAt + i * 0.03), role: 'shimmer' }),
+  const HIT_AT = 0.3
+  const power: Tone[] = [130.81, 196, 261.63].flatMap((f) => [
+    { ...tone(f, f * 0.985, 0.3, 0.012, HIT_AT, 'sawtooth'), role: 'power' },
+    { ...tone(f, f, 0.38, 0.014, HIT_AT, 'triangle'), role: 'power' },
+  ])
+  const chord = FANFARE.slice(0, 4).map((f) => tone(f, f, 0.5, 0.015, HIT_AT))
+  const shimmerAt = COIN_START + coins.length * COIN_GAP
+  const shimmer = [pentatonicNote(15), pentatonicNote(15) + 7, pentatonicNote(17), pentatonicNote(17) - 9, pentatonicNote(20), pentatonicNote(20) + 6].map(
+    (f, i): Tone => ({ ...tone(f, f * 1.01, 0.62, 0.004, shimmerAt + i * 0.04), role: 'shimmer' }),
   )
-  const pop: Tone = { ...tone(pentatonicNote(10), pentatonicNote(13), 0.05, 0.012, 0.02), role: 'pop' }
-  return [pop, ...coins, ...shimmer]
+  return [thump, pop, ...arpeggio, ...coins, ...power, ...chord, ...shimmer]
 }
 
 function coin(f: number, dur: number, vol: number, delay: number, type: ToneType): Tone {
@@ -184,24 +216,56 @@ export const LAND_AT = 0.88
 /** The sample cues a crane move crosses between two progress values: each fires once per move. */
 export function craneCues(before: number, after: number): Cue[] {
   const cues: Cue[] = []
-  if (before < PICK_AT && after >= PICK_AT) cues.push({ name: 'pick', tones: [], sample: 'pick', sampleGain: 0.6 })
-  if (before < LAND_AT && after >= LAND_AT) cues.push({ name: 'land', tones: [], sample: 'land', sampleGain: 0.7 })
+  if (before < PICK_AT && after >= PICK_AT) cues.push({ name: 'pick', tones: [], sample: 'pick', sampleGain: sampleGain(0.6) })
+  if (before < LAND_AT && after >= LAND_AT) cues.push({ name: 'land', tones: [], sample: 'land', sampleGain: sampleGain(0.7) })
   return cues
 }
 
 /** The low thud of a box landing on a trailer bed. */
 const CLUNK = tone(150, 60, 0.07, 0.035, 0, 'triangle')
 
+/** Pentatonic steps the collect chime climbs over one shift: the first collection starts on C5, the last on E6. */
+export const COLLECT_LADDER_SPAN = 7
+
+/** The collect chime's root step for the `k`th collection (1-based) of `count`, spread so every shift climbs the span. */
+export function collectLadderStep(k: number, count: number): number {
+  return count > 1 ? Math.round(((k - 1) * COLLECT_LADDER_SPAN) / (count - 1)) : COLLECT_LADDER_SPAN
+}
+
 /**
- * Collect: the trailer clunk, then a positive rising blip (C5 to G5). Receive: the clunk, then a settling falling
+ * The collect reward (owner round 4: "dopamine inducing sound for each container"): a bright rising three-note
+ * pentatonic chime (root, two and four steps up: a C6-type chord) whose root climbs with the collection index, so a
+ * shift plays a level-up ladder. The last collection adds a flourish: a quick run up the next octave into a held
+ * high bell.
+ */
+function collectChime(after: ShiftState): Tone[] {
+  const k = Math.min(after.next - 1, after.level.count)
+  const root = collectLadderStep(k, after.level.count)
+  const chime = [0, 2, 4].map((up, i): Tone => {
+    const f = pentatonicNote(root + up)
+    return { ...tone(f, f, i === 2 ? 0.18 : 0.09, 0.024 + i * 0.004, 0.06 + i * 0.045, i === 2 ? 'triangle' : 'sine'), role: 'chime' }
+  })
+  if (k < after.level.count) return chime
+  const RUN_AT = 0.25
+  const run = [10, 11, 12, 13, 14, 15].map((step, i): Tone => {
+    const f = pentatonicNote(step)
+    return { ...tone(f, f, 0.08, 0.016, RUN_AT + i * 0.035, 'triangle'), role: 'flourish' }
+  })
+  const bellAt = RUN_AT + 6 * 0.035
+  const bell = [pentatonicNote(15), pentatonicNote(15) + 5].map((f): Tone => ({ ...tone(f, f, 0.4, 0.012, bellAt), role: 'flourish' }))
+  return [...chime, ...run, ...bell]
+}
+
+/**
+ * Collect: the trailer clunk, then the reward chime (`collectChime`). Receive: the clunk, then a settling falling
  * pair (E5 to C5) with the truck engine sample, as the receipt truck pulls away empty.
  */
 function truckOperation(name: 'collect' | 'receive', after: ShiftState): Cue {
   if (name === 'receive') {
-    return { name, tones: [CLUNK, tone(659.25, 659.25, 0.08, 0.03, 0.06), tone(523.25, 523.25, 0.12, 0.03, 0.13)], sample: 'truck', sampleGain: 0.5 }
+    return { name, tones: [CLUNK, tone(659.25, 659.25, 0.08, 0.03, 0.06), tone(523.25, 523.25, 0.12, 0.03, 0.13)], sample: 'truck', sampleGain: sampleGain(0.5) }
   }
-  const tones = [CLUNK, tone(523.25, 523.25, 0.08, 0.03, 0.06), tone(783.99, 783.99, 0.12, 0.035, 0.13)]
-  if (after.operations < 3) tones.push(tone(480, 300, 0.13, 0.025, 0.26))
+  const tones = [CLUNK, ...collectChime(after)]
+  if (after.operations < 3) tones.push(tone(480, 300, 0.13, 0.02, 0.3))
   return { name, tones }
 }
 
@@ -221,6 +285,21 @@ function collectionTruck(after: ShiftState): Cue[] {
   ]
 }
 
+/**
+ * The receipt truck pulls in (owner round 4: "an appropriate noise when a receipt truck arrives"): the truck engine
+ * sample, an air-brake hiss as it stops (band-passed noise falling 3.2 to 1.6 kHz) and a two-tone horn, a high
+ * honk (F4 and A4) then a longer low one (D4 and F#4), brassy sawtooth over a triangle body.
+ */
+function arrivalCue(): Cue {
+  const hiss: Tone = { ...tone(3200, 1600, 0.42, 0.06, 0.3, 'noise'), role: 'hiss' }
+  const honk = (fs: number[], at: number, dur: number): Tone[] =>
+    fs.flatMap((f) => [
+      { ...tone(f, f, dur, 0.016, at, 'sawtooth'), role: 'horn' },
+      { ...tone(f, f, dur, 0.012, at, 'triangle'), role: 'horn' },
+    ])
+  return { name: 'arrival', tones: [hiss, ...honk([349.23, 440], 0.78, 0.18), ...honk([293.66, 369.99], 1.0, 0.32)], sample: 'truck', sampleGain: sampleGain(0.5) }
+}
+
 /** Shift tick pitch: rises as the seconds left fall (9 s is G5, 1 s is G6). */
 function tickPitch(seconds: number): number {
   return 783.99 * 2 ** ((9 - seconds) / 8)
@@ -235,15 +314,7 @@ function eventCues(e: ShiftEvent, after: ShiftState): Cue[] {
     case 'rehandled':
       return [{ name: 'rehandle', tones: [tone(550, 740, 0.09, 0.025)] }]
     case 'arrival':
-      // A truck horn: two honks of a square-wave minor third (D#4 and F#4), with the engine sample.
-      return [
-        {
-          name: 'arrival',
-          tones: [0, 0.2].flatMap((at, i) => [tone(311.13, 311.13, i ? 0.28 : 0.14, 0.022, at, 'square'), tone(369.99, 369.99, i ? 0.28 : 0.14, 0.022, at, 'square')]),
-          sample: 'truck',
-          sampleGain: 0.5,
-        },
-      ]
+      return [arrivalCue()]
     case 'deadline-one':
       return [{ name: 'deadline-one', tones: [tone(510, 390, 0.14, 0.05)] }]
     case 'truck-low':
@@ -278,12 +349,7 @@ function eventCues(e: ShiftEvent, after: ShiftState): Cue[] {
       return [
         {
           name: 'jackpot',
-          tones: [
-            tone(160, 43, 0.19, 0.08, 0, 'triangle'),
-            ...FANFARE.flatMap((f, i) => [tone(f, f, 0.24, 0.04, i * 0.052, 'triangle'), tone(2 * f, 2 * f, 0.13, 0.012, i * 0.052)]),
-            ...FANFARE.slice(0, 4).map((f) => tone(f, f, 0.42, 0.024, 0.25)),
-            ...coinLayer(),
-          ],
+          tones: jackpotTones(),
         },
       ]
     case 'bonus-missed':

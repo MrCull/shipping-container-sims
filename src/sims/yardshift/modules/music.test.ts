@@ -6,9 +6,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useYardshiftStore } from '../store/yardshiftStore'
 import { fixtureFor } from './fixtures'
-import { musicPlaying } from './music'
+import { MUSIC_GAIN, musicPlaying } from './music'
 
 describe('Yardshift music', () => {
+  it('sits at 60 % of its earlier level (owner round 4: quieter music under louder effects)', () => {
+    expect(MUSIC_GAIN).toBeCloseTo(0.3 * 0.6)
+  })
+
   beforeEach(() => setActivePinia(createPinia()))
 
   it('is silent on the intro and plays once the shift starts', () => {

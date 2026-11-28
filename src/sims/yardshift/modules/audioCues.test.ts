@@ -7,12 +7,16 @@ import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
 import { levelByNumber, TUTORIAL, truckSecondsFrom } from './levels'
 import {
+  COLLECT_LADDER_SPAN,
+  collectLadderStep,
   COMBO_LADDER_TOP,
+  CUE_PEAK_CAP,
   comboCue,
   craneCues,
   craneStartCue,
   cuesForStep,
   rejectionCue,
+  SFX_BOOST,
   SHIFT_TICK_SECONDS,
   uiCue,
   winCue,
@@ -198,11 +202,11 @@ describe('Yardshift audio cues', () => {
     for (let c = 2; c <= COMBO_LADDER_TOP; c++) expect(onPentatonic(comboCue(c).tones[0]!.f0)).toBe(true)
   })
 
-  it('a bonus collect layers a rising pentatonic coin arpeggio and a high shimmer over the chord', () => {
+  it('a bonus collect layers a rising pentatonic coin cascade and a high shimmer over the chord', () => {
     const [jackpot] = cuesForStep(createShift(timed).state, [{ type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }])
     const coins = jackpot!.tones.filter((t) => t.role === 'coin')
-    expect(coins.length).toBeGreaterThanOrEqual(4)
-    expect(coins.length).toBeLessThanOrEqual(6)
+    expect(coins.length).toBeGreaterThanOrEqual(8)
+    expect(coins.length).toBeLessThanOrEqual(12)
     for (const t of coins) {
       expect(['triangle', 'sine']).toContain(t.type)
       expect(onPentatonic(t.f0)).toBe(true)
@@ -217,8 +221,75 @@ describe('Yardshift audio cues', () => {
     for (const t of shimmer) expect(t.f0).toBeGreaterThan(2000)
     const detuned = shimmer.some((a) => shimmer.some((b) => a !== b && Math.abs(a.f0 - b.f0) > 0 && Math.abs(a.f0 - b.f0) < 20))
     expect(detuned).toBe(true)
-    // The existing fanfare chord (the character the owner likes) is still there underneath.
-    expect(jackpot!.tones.filter((t) => t.role === undefined).length).toBeGreaterThanOrEqual(14)
+    // The fanfare arpeggio and chord (the character the owner likes) are still there underneath.
+    expect(jackpot!.tones.filter((t) => t.role === 'arpeggio')).toHaveLength(10)
+    expect(jackpot!.tones.filter((t) => t.role === undefined).length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('a bonus collect is the most epic cue: 0.8 to 1.2 s, a rising arpeggio, a power chord hit, the most layers', () => {
+    const s = createShift(timed).state
+    const [jackpot] = cuesForStep(s, [{ type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }])
+    const end = (c: Cue) => Math.max(...c.tones.map((t) => t.delay + t.dur))
+    expect(end(jackpot!)).toBeGreaterThanOrEqual(0.8)
+    expect(end(jackpot!)).toBeLessThanOrEqual(1.2)
+    const arp = jackpot!.tones.filter((t) => t.role === 'arpeggio' && t.type === 'triangle')
+    for (let i = 1; i < arp.length; i++) expect(arp[i]!.f0).toBeGreaterThan(arp[i - 1]!.f0)
+    const power = jackpot!.tones.filter((t) => t.role === 'power')
+    expect(power.length).toBeGreaterThanOrEqual(3)
+    for (const t of power) expect(t.f0).toBeLessThan(300)
+    // It lands after the arpeggio starts and before the shimmer rings out.
+    expect(Math.min(...power.map((t) => t.delay))).toBeGreaterThan(0.15)
+    const others = [...allCues(), lastCollect(timed)].filter((c) => c.name !== 'jackpot')
+    for (const c of others) expect(jackpot!.tones.length, c.name).toBeGreaterThan(c.tones.length)
+    for (const c of others) expect(peakGain(jackpot!), c.name).toBeGreaterThanOrEqual(peakGain(c) - 1e-9)
+  })
+
+  it('each collect plays a rising three-note chime whose pitch climbs with the collection index (a level-up ladder)', () => {
+    const r = recorder(timed)
+    for (let i = 0; i < 4; i++) r.act({ type: 'collect' })
+    const roots = r.cues.filter((c) => c.name === 'collect').map((c) => c.tones.filter((t) => t.role === 'chime'))
+    expect(roots).toHaveLength(4)
+    for (const chime of roots) {
+      expect(chime).toHaveLength(3)
+      for (let i = 1; i < 3; i++) {
+        expect(chime[i]!.f0).toBeGreaterThan(chime[i - 1]!.f0)
+        expect(chime[i]!.delay).toBeGreaterThan(chime[i - 1]!.delay)
+      }
+      for (const t of chime) expect(onPentatonic(t.f0)).toBe(true)
+    }
+    for (let i = 1; i < roots.length; i++) expect(roots[i]![0]!.f0).toBeGreaterThan(roots[i - 1]![0]!.f0)
+    // Every shift climbs the whole span: the first collection starts at step 0, the last on the top.
+    for (const count of [4, 9, 16]) {
+      expect(collectLadderStep(1, count)).toBe(0)
+      expect(collectLadderStep(count, count)).toBe(COLLECT_LADDER_SPAN)
+      for (let k = 2; k <= count; k++) expect(collectLadderStep(k, count)).toBeGreaterThanOrEqual(collectLadderStep(k - 1, count))
+    }
+  })
+
+  it('the last collection of a shift adds a flourish: a quick rising run into a held high bell', () => {
+    const r = recorder(timed)
+    for (let i = 0; i < 3; i++) r.act({ type: 'collect' })
+    for (const c of r.cues) expect(c.tones.some((t) => t.role === 'flourish')).toBe(false)
+    const flourish = lastCollect(timed).tones.filter((t) => t.role === 'flourish')
+    expect(flourish.length).toBeGreaterThanOrEqual(5)
+    const run = flourish.slice(0, -2)
+    for (let i = 1; i < run.length; i++) expect(run[i]!.f0).toBeGreaterThan(run[i - 1]!.f0)
+    expect(Math.max(...flourish.map((t) => t.dur))).toBeGreaterThanOrEqual(0.3)
+  })
+
+  it('the receipt truck arrives with the truck sample, an air-brake hiss and a two-tone horn', () => {
+    const [arrival] = cuesForStep(levelState(5), [{ type: 'arrival', id: 11, moves: 3 }])
+    expect(arrival!.sample).toBe('truck')
+    const hiss = arrival!.tones.filter((t) => t.role === 'hiss')
+    expect(hiss).toHaveLength(1)
+    expect(hiss[0]!.type).toBe('noise')
+    expect(hiss[0]!.f1).toBeLessThan(hiss[0]!.f0)
+    const horn = arrival!.tones.filter((t) => t.role === 'horn')
+    const honks = [...new Set(horn.map((t) => t.delay))].sort((a, b) => a - b)
+    expect(honks).toHaveLength(2)
+    expect(honks[0]!).toBeGreaterThan(hiss[0]!.delay) // the brakes hiss as it stops, then it honks
+    const top = (at: number) => Math.max(...horn.filter((t) => t.delay === at).map((t) => t.f0))
+    expect(top(honks[1]!)).toBeLessThan(top(honks[0]!)) // high then low: two tones
   })
 
   it('a bonus window opens with a soft twinkle and a miss is a gentle short downward blip', () => {
@@ -228,7 +299,7 @@ describe('Yardshift audio cues', () => {
     for (const t of open!.tones) {
       expect(t.type).toBe('sine')
       expect(t.f0).toBeGreaterThan(1000)
-      expect(t.vol).toBeLessThanOrEqual(0.03)
+      expect(t.vol).toBeLessThanOrEqual(0.03 * SFX_BOOST)
     }
     const [miss] = cuesForStep(s, [{ type: 'bonus-missed', id: 3 }])
     for (const t of miss!.tones) {
@@ -239,7 +310,14 @@ describe('Yardshift audio cues', () => {
     expect(end).toBeLessThanOrEqual(0.25)
   })
 
-  it('no cue sums louder than the loudest cue before the bonus sounds (the old jackpot, 0.306)', () => {
+  it('the effects are 1.5x louder (owner round 4) and the peak cap rose with them', () => {
+    expect(SFX_BOOST).toBe(1.5)
+    expect(CUE_PEAK_CAP).toBeCloseTo(0.306 * 1.5)
+    expect(comboCue(3).tones[0]!.vol).toBeCloseTo(0.04 * SFX_BOOST)
+  })
+
+  // The cap was 0.306 (the old jackpot); owner round 4 asked for louder effects, so it is 0.306 x SFX_BOOST now.
+  it('no cue sums louder than the peak cap (0.306 x SFX_BOOST)', () => {
     const s = createShift(timed).state
     const events: ShiftEvent[] = [
       { type: 'completed' },
@@ -250,12 +328,12 @@ describe('Yardshift audio cues', () => {
       { type: 'bonus-missed', id: 3 },
     ]
     const all = [...events.flatMap((e) => cuesForStep(s, [e])), comboCue(COMBO_LADDER_TOP)]
-    for (const cue of all) expect(peakGain(cue), cue.name).toBeLessThanOrEqual(0.306)
-    // A bonus collect plays collect, combo and jackpot in one step: together they stay under 0.45.
+    for (const cue of all) expect(peakGain(cue), cue.name).toBeLessThanOrEqual(CUE_PEAK_CAP)
+    // A bonus collect plays collect, combo and jackpot in one step: together they stay under 0.45 x SFX_BOOST.
     const r = recorder(timed)
     r.act({ type: 'collect' })
     const collectStep = [...cuesForStep(r.shift.state, [{ type: 'collected', id: 2, from: 1 }]), comboCue(8), all[4]!]
-    expect(collectStep.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.45)
+    expect(collectStep.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.45 * SFX_BOOST)
   })
 
   it('the bonus window chord rises', () => {
@@ -303,6 +381,57 @@ function levelState(n: number): ShiftState {
   return createShift(levelByNumber(n)!).state
 }
 
+/** One of every cue: a first collection's step, every engine outcome, the combo, crane, deadline-two, win and UI cues. */
+function allCues(): Cue[] {
+  const s = createShift(timed).state
+  const r = recorder(timed)
+  r.act({ type: 'collect' })
+  const events: ShiftEvent[] = [
+    { type: 'received', id: 8, to: 0 },
+    { type: 'rehandled', id: 1, from: 0, to: 1 },
+    { type: 'arrival', id: 8, moves: 3 },
+    { type: 'deadline-one', id: 8 },
+    { type: 'deadline-zero', id: 8 },
+    { type: 'truck-low' },
+    { type: 'overtime-start' },
+    { type: 'overtime-end' },
+    { type: 'shift-low', seconds: 9 },
+    { type: 'bonus-window', id: 3, ms: 1200 },
+    { type: 'bonus-awarded', id: 3, points: 250, ms: 5000 },
+    { type: 'bonus-missed', id: 3 },
+    { type: 'undone', points: -25, ms: 3000 },
+    { type: 'failed', reason: 'timeout' },
+    { type: 'failed', reason: 'blocked' },
+  ]
+  const ui: UiSoundEvent[] = [
+    { type: 'selected', target: 1 },
+    { type: 'selected', target: 'receipt' },
+    { type: 'deselected' },
+    { type: 'paused' },
+    { type: 'resumed' },
+  ]
+  return [
+    ...r.cues,
+    rejectionCue(),
+    craneStartCue(),
+    comboCue(3),
+    ...craneCues(0, 1),
+    ...cuesForStep({ ...s, deadline: 2 }, [], { ...s, deadline: 3 }),
+    ...events.flatMap((e) => cuesForStep(s, [e])),
+    winCue(1),
+    winCue(2),
+    winCue(3),
+    ...ui.map(uiCue),
+  ]
+}
+
+/** The collect cue of a shift's last collection (it carries the flourish). */
+function lastCollect(level: LevelDef): Cue {
+  const r = recorder(level)
+  for (let i = 0; i < level.count; i++) r.act({ type: 'collect' })
+  return r.cues.filter((c) => c.name === 'collect').at(-1)!
+}
+
 describe('Yardshift sound coverage (art pass 3)', () => {
   const s = createShift(timed).state
 
@@ -315,7 +444,7 @@ describe('Yardshift sound coverage (art pass 3)', () => {
     expect(off!.tones[0]!.delay).toBeGreaterThan(0.2) // after the bounce, as the truck pulls away
     expect(arrive!.tones[0]!.delay).toBeGreaterThan(off!.tones[0]!.delay)
     expect(Math.min(...ding!.tones.map((t) => t.delay))).toBeGreaterThan(Math.min(...arrive!.tones.map((t) => t.delay)))
-    for (const t of ding!.tones) expect(t.vol).toBeLessThanOrEqual(0.015)
+    for (const t of ding!.tones) expect(t.vol).toBeLessThanOrEqual(0.015 * SFX_BOOST)
   })
 
   it('the last collection sends the truck off with no new truck or ding, then the fanfare', () => {
@@ -370,46 +499,8 @@ describe('Yardshift sound coverage (art pass 3)', () => {
     expect(uiCue({ type: 'resumed' }).name).toBe('resume')
   })
 
-  it('every outcome has its own sound, and none sums louder than the 0.306 cap', () => {
-    const r = recorder(timed)
-    r.act({ type: 'collect' })
-    const events: ShiftEvent[] = [
-      { type: 'received', id: 8, to: 0 },
-      { type: 'rehandled', id: 1, from: 0, to: 1 },
-      { type: 'arrival', id: 8, moves: 3 },
-      { type: 'deadline-one', id: 8 },
-      { type: 'deadline-zero', id: 8 },
-      { type: 'truck-low' },
-      { type: 'overtime-start' },
-      { type: 'overtime-end' },
-      { type: 'shift-low', seconds: 9 },
-      { type: 'bonus-window', id: 3, ms: 1200 },
-      { type: 'bonus-awarded', id: 3, points: 250, ms: 5000 },
-      { type: 'bonus-missed', id: 3 },
-      { type: 'undone', points: -25, ms: 3000 },
-      { type: 'failed', reason: 'timeout' },
-      { type: 'failed', reason: 'blocked' },
-    ]
-    const ui: UiSoundEvent[] = [
-      { type: 'selected', target: 1 },
-      { type: 'selected', target: 'receipt' },
-      { type: 'deselected' },
-      { type: 'paused' },
-      { type: 'resumed' },
-    ]
-    const all: Cue[] = [
-      ...r.cues,
-      rejectionCue(),
-      craneStartCue(),
-      comboCue(3),
-      ...craneCues(0, 1),
-      ...cuesForStep({ ...s, deadline: 2 }, [], { ...s, deadline: 3 }),
-      ...events.flatMap((e) => cuesForStep(s, [e])),
-      winCue(1),
-      winCue(2),
-      winCue(3),
-      ...ui.map(uiCue),
-    ]
+  it('every outcome has its own sound (the last collection flourish too), and none sums louder than the cap', () => {
+    const all = [...allCues(), lastCollect(timed)]
     const seen = new Map<string, string>()
     for (const cue of all) {
       const sig = signature(cue)
@@ -417,7 +508,7 @@ describe('Yardshift sound coverage (art pass 3)', () => {
       seen.set(sig, `${cue.name}${cue.detail ?? ''}`)
     }
     expect(new Set(all.map((c) => c.name)).size).toBe(31) // every CueName
-    for (const cue of all) expect(peakGain(cue), cue.name).toBeLessThanOrEqual(0.306)
+    for (const cue of all) expect(peakGain(cue), cue.name).toBeLessThanOrEqual(CUE_PEAK_CAP)
   })
 
   it('a collection step with combo and bonus stays under the step budget with the truck sounds added', () => {
@@ -425,6 +516,9 @@ describe('Yardshift sound coverage (art pass 3)', () => {
     r.act({ type: 'collect' })
     const jackpot = cuesForStep(s, [{ type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }])
     const step = [...cuesForStep(r.shift.state, [{ type: 'collected', id: 2, from: 1 }]), comboCue(8), ...jackpot]
-    expect(step.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.45)
+    expect(step.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.45 * SFX_BOOST)
+    // The last collection as a bonus (level 1's #4): flourish, truck off, jackpot and the fanfare in one step.
+    const last = [lastCollect(timed), comboCue(4), ...jackpot, winCue(3)]
+    expect(last.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.6 * SFX_BOOST)
   })
 })

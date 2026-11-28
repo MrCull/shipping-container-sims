@@ -298,21 +298,34 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `pentatonicNote(min(c, 8) - 1)`: D5 at 2 up to E6 at 8, so chains play a tune) and
   `craneCues(before, after)` (pick at progress `PICK_AT` 0.30, land at `LAND_AT` 0.88). Tones are V20's
   `tone(f0, f1, dur, vol, delay, type)` with `vol` a relative sound gain.
-- Bonus sounds (owner feedback: phone clicker game mini sounds): `jackpot` (on `bonus-awarded`) keeps the fanfare
-  chord and layers `coinLayer()` over it, tagged by `Tone.role`: a `pop` for the +250 float (same event, no cue of
-  its own), six quick `coin` notes rising E6 to E7 on the pentatonic, then a `shimmer` of high detuned sine pairs.
-  `bonus-window` is a soft twinkle (G6, C7, E7 sines with faint detuned twins); `bonus-missed` a gentle two-step
-  downward sine blip. Level budget: no cue's summed envelope peaks exceed 0.306 (the jackpot before this pass; its
-  low thump went 0.09 to 0.08 and its arpeggio 0.045 to 0.04 to make room), checked in `audioCues.test.ts`.
+- **Levels (owner round 4):** effects are louder and the music quieter. `tone()` and `sampleGain()` multiply every
+  design level by `SFX_BOOST` 1.5, still relative sound gains under the `'sfx'` bus (`gainFor`), so the sliders and
+  mute govern them; `MUSIC_GAIN` went 0.3 to 0.18. The per-cue peak cap is `CUE_PEAK_CAP` (the old 0.306 times
+  `SFX_BOOST`, about 0.46) and the step budgets (bonus collect step 0.45, last-collection bonus step with the
+  fanfare 0.6) are scaled the same way.
+- **Collect reward (owner round 4, "dopamine"):** every collect plays the trailer clunk then a bright rising
+  three-note pentatonic `chime` (root, +2, +4 steps) whose root climbs with the collection index,
+  `collectLadderStep(k, count)`: 0 (C5) on the first collection up to `COLLECT_LADDER_SPAN` 7 (E6) on the last,
+  spread over the level's count, so each shift plays a level-up ladder (non-decreasing; strictly rising up to 8
+  containers). The combo ladder still plays on top. The last collection of a shift adds a `flourish`: a quick
+  triangle run C7 to C8 into a held C8 bell pair.
+- Bonus sounds (owner feedback: phone clicker game mini sounds; round 4: "epically when a bonus one gets done"):
+  `jackpot` (on `bonus-awarded`) is the most epic cue (`audioCues.test.ts` checks it has the most tones, the highest
+  peak and lasts 0.8 to 1.2 s; it ends at about 1.17 s), layered by `Tone.role`: a low thump and a `pop` for the
+  +250 float (same event, no cue of its own), the rising fanfare `arpeggio` with octave sparkle, a `coin` cascade
+  of ten pentatonic notes E6 to D8 32 ms apart, a short `power` chord hit (C3, G3, C4 sawtooth plus triangle) at
+  0.3 s under the held chord, then a `shimmer` of six high detuned sine pairs ringing out. `bonus-window` is a soft
+  twinkle (G6, C7, E7 sines with faint detuned twins); `bonus-missed` a gentle two-step downward sine blip.
 - Store: `step()` wraps every dispatch and tick and sends its cues to `onCue` listeners; `startMove` sends the
   crane start, `frame` the pick and land crossings; reduced motion sends only the landing. Store-level UI events
   (`UiSoundEvent`, also sent to `onYardEvent` listeners, which ignore types they do not know): `selected`
   (`target` a stack or `'receipt'`) and `deselected` from `send` when the selection changes with no action (a
   selection a move clears leaves the sound to the move), `paused` from `pause()` and `resumed` from `resume()` when
   the player pause was held. Each fires once per outcome (`store/yardshiftStoreAudio.test.ts`).
-- **Sound table (art pass 3 audit).** Every outcome has its own sound; `audioCues.test.ts` checks no two cues share
-  pitches, timbre and rhythm, that every `CueName` is covered, and that none sums over the 0.306 peak cap.
-  `tone(f0>f1, dur, vol, delay, type)`, Hz and seconds; all through `gainFor(..., 'sfx')` via the bus.
+- **Sound table (art pass 3 audit, round 4).** Every outcome has its own sound; `audioCues.test.ts` checks no two
+  cues share pitches, timbre and rhythm (the last collection's flourish included), that every `CueName` is covered,
+  and that none sums over `CUE_PEAK_CAP`. `tone(f0>f1, dur, vol, delay, type)`, Hz and seconds; `type` `noise` is
+  white noise through a band-pass swept f0 to f1 (`playTone`); all through `gainFor(..., 'sfx')` via the bus.
 
   | Event (source) | Cue | How it is made |
   | --- | --- | --- |
@@ -322,12 +335,12 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   | Invalid tap (store `rejected`) | `invalid` | soft buzz: two short low square pulses, 150 and 140 Hz falling |
   | Crane accepts a move (`startMove`) | `crane-start` | triangle motor whine 92 to 140 Hz |
   | Crane pick and land (`frame` crossing `PICK_AT`, `LAND_AT`) | `pick`, `land` | samples `crane-pick.mp3`, `crane-land.mp3` |
-  | Collect (`collected`) | `collect` | trailer clunk (triangle 150 to 60 Hz) then a rising sine blip C5, G5; a low tail on the first two operations |
+  | Collect (`collected`) | `collect` | trailer clunk (triangle 150 to 60 Hz) then a rising three-note pentatonic chime whose root climbs C5 to E6 over the shift; a low tail on the first two operations; the last collection adds a run into a high bell |
   | Combo chain (`collected`, combo 2+) | `combo` | one pentatonic step per combo, D5 up to E6 |
   | Collection truck drives off (`collected`) | `truck-off` | quiet sawtooth rumble falling 120 to 70 Hz at 0.25 s |
   | New collection truck arrives (`collected`, not the last) | `truck-in` | sawtooth rumble rising 70 to 115 Hz at 0.84 s, brake squeak |
   | Next container ready (`collected`, not the last) | `next-ready` | very soft G6 sine ding at 1.38 s, as the new truck stops |
-  | Receipt truck arrives (`arrival`) | `arrival` | horn: two honks of a square minor third (D#4, F#4) with `truck.mp3` |
+  | Receipt truck arrives (`arrival`) | `arrival` | `truck.mp3`, an air-brake hiss at 0.3 s (noise band-passed 3.2 to 1.6 kHz) and a two-tone horn: F4 plus A4 at 0.78 s then a longer D4 plus F#4 at 1.0 s (sawtooth over triangle) |
   | Receipt placed (`received`) | `receive` | trailer clunk then a settling falling pair E5, C5, with `truck.mp3` |
   | Rehandle (`rehandled`) | `rehandle` | short rising sine 550 to 740 Hz |
   | Deadline 2 (moves-left drops to 2) | `deadline-two` | two soft triangle ticks at 620 Hz |
@@ -338,7 +351,7 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   | Overtime end (`overtime-end`) | `overtime-end` | sine rise 300 to 520 Hz |
   | Shift ticks at 9, 5, 3, 2, 1 s (`shift-low`) | `shift-tick` | short triangle tick rising G5 (9 s) to G6 (1 s) |
   | Bonus window opens (`bonus-window`) | `bonus-window` | twinkle: G6, C7, E7 sines with detuned twins |
-  | Bonus collected (`bonus-awarded`) | `jackpot` | fanfare chord with coin arpeggio, shimmer and pop |
+  | Bonus collected (`bonus-awarded`) | `jackpot` | the most epic cue, about 1.2 s: thump and pop, rising fanfare arpeggio, ten-coin cascade, power chord hit at 0.3 s under the held chord, detuned shimmer |
   | Bonus missed (`bonus-missed`) | `bonus-missed` | gentle two-step downward sine blip |
   | Undo (`undone`) | `undo` | rewind swoosh: triangle sweep 1400 to 260 Hz, then a short rising flick |
   | Pause (store `paused`) | `pause` | triangle E5 then A4 |
@@ -364,7 +377,7 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and
   receipt).
 - **Music (#390):** `composables/useYardMusic.ts` (mounted by `Yardshift.vue`) loops one `Audio` element through
-  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.3 in `modules/music.ts`), so the master and music
+  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.18 in `modules/music.ts`, 60 % of the earlier 0.3 since owner round 4), so the master and music
   sliders and mute change it live. `musicPlaying(state)` (pure, `modules/music.test.ts`): plays while the shift status
   is `playing` with no pause but `animation`; the intro, pause menu, level picker, a hidden tab and the end of the
   shift pause it. Unmount stops it and releases the element; the menu music stops when the home page unmounts. A
