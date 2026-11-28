@@ -23,16 +23,18 @@ import type {
 } from '../types/presentation'
 
 /**
- * Colours of the next six collection positions, a hue walk so the order reads at a glance (owner round 4): green,
- * teal, blue, indigo, purple, pink. Yellow, amber/gold, orange and red stay free for bonus, receipt and alerts.
+ * Colours of the next five collection positions in rainbow order, so the sequence reads like a spectrum (owner round
+ * 5): red, orange, green, blue, purple. Yellow stays out, so gold is only ever the active bonus; urgency is a white
+ * outline flashing red and the receipt cargo is steel, so neither reads as a sequence colour. Each keeps the dark
+ * number at 4.5:1 or more.
  */
-export const SEQUENCE_COLOURS = ['#5cc96b', '#38c3bd', '#5fb0f5', '#7a7fee', '#cb93f2', '#f27aae'] as const
-/** Containers farther than six positions away. */
+export const SEQUENCE_COLOURS = ['#ef5b52', '#f59a3a', '#4cc265', '#4b9cf0', '#a985ee'] as const
+/** Containers farther than five positions away. */
 export const GREY = '#84949c'
 /** Queue slot past the last container. */
 export const EMPTY_SLOT = '#526773'
 
-/** Colour slot of container `id`: its position after the next required one, 0..5, or null (grey). */
+/** Colour slot of container `id`: its position after the next required one, 0..4, or null (grey). */
 export function colourSlot(state: ShiftState, id: number): number | null {
   const pos = id - state.next
   return pos >= 0 && pos < SEQUENCE_COLOURS.length ? pos : null

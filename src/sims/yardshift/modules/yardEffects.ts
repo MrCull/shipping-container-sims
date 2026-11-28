@@ -52,7 +52,7 @@ export function vibrateX(risk: number, now: number, seed: number): number {
 export interface UrgencyStyle {
   /** Risk the container vibrates with (0: still). */
   vibrate: number
-  /** Red outline (pulsing under normal motion, static under reduced motion). */
+  /** Urgency outline: white flashing red under normal motion, static white with a red inner line under reduced motion (round 5). */
   red: boolean
   /** Soft glow of the calm current container. */
   glow: boolean
@@ -60,8 +60,8 @@ export interface UrgencyStyle {
 
 /**
  * How a container shows urgency (owner, art pass 2): the current container on a calm turn glows softly; when the next
- * truck clock is low (risk above the calm base) it vibrates with a red outline; in the last seconds of the shift every
- * container vibrates. Under reduced motion nothing moves: the static `urgent` flag gives the red outline.
+ * truck clock is low (risk above the calm base) it vibrates with the white and red urgency outline; in the last seconds of the shift every
+ * container vibrates. Under reduced motion nothing moves: the static `urgent` flag gives the static urgency outline.
  */
 export function urgencyStyle(c: { shake: number; urgent: boolean }, current: boolean, reducedMotion: boolean): UrgencyStyle {
   if (reducedMotion || c.urgent) return { vibrate: 0, red: c.urgent, glow: current && !c.urgent }

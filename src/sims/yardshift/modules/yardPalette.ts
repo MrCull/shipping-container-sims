@@ -22,13 +22,13 @@ export const YARD_COLOURS = {
   urgent: '#e9483d',
   'collection-bay': '#2c5759',
   'collection-line': '#8fd1c6',
-  'receipt-bay': '#8a5a2c',
-  'receipt-line': '#f2b36c',
+  'receipt-bay': '#4b5863',
+  'receipt-line': '#b4c2cc',
   'receipt-urgent': '#8f3a2e',
   chassis: '#2a3138',
   wheel: '#14181c',
   'cab-white': '#eef2f3',
-  'cab-orange': '#eda54e',
+  'cab-steel': '#6f93b0',
   glass: '#6f97ad',
   'medal-light': '#fff2bd',
   'medal-dark': '#d39b31',
@@ -44,6 +44,7 @@ export const YARD_COLOURS = {
   'gold-shine': '#fffbe8',
   'gold-body': '#eba832',
   'gold-deep': '#a2631b',
+  'receipt-cargo': '#d3dadf',
 } as const
 
 export type YardColour = keyof typeof YARD_COLOURS

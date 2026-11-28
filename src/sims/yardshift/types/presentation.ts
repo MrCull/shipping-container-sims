@@ -84,7 +84,7 @@ export interface ContainerView {
   urgent: boolean
 }
 
-/** One of the six HUD queue positions; `id` null is an empty slot past the last container. */
+/** One of the five HUD queue positions; `id` null is an empty slot past the last container. */
 export interface QueueItem {
   id: number | null
   label: string
@@ -138,7 +138,7 @@ export interface ViewModel {
   arrowAt: Rect | null
   hitRegions: HitRegion[]
   hud: { title: string; loaded: string; rehandles: string; score: string; combo: string }
-  /** The next six collection positions. */
+  /** The next five collection positions. */
   queue: QueueItem[]
   /**
    * The bouncing "NEXT" chevron over the next container's stack (`buried`: other boxes sit on it, so the chevron

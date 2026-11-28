@@ -7,14 +7,13 @@
  * the tests keep them equal.
  */
 .yardshift {
-  /* Sequence colours: the next six containers in order, a hue walk (green, teal, blue, indigo, purple, pink). */
-  --ys-seq-0: #5cc96b;
-  --ys-seq-1: #38c3bd;
-  --ys-seq-2: #5fb0f5;
-  --ys-seq-3: #7a7fee;
-  --ys-seq-4: #cb93f2;
-  --ys-seq-5: #f27aae;
-  /* Containers farther than six positions away. */
+  /* Sequence colours: the next five containers in rainbow order (red, orange, green, blue, purple). */
+  --ys-seq-0: #ef5b52;
+  --ys-seq-1: #f59a3a;
+  --ys-seq-2: #4cc265;
+  --ys-seq-3: #4b9cf0;
+  --ys-seq-4: #a985ee;
+  /* Containers farther than five positions away. */
   --ys-grey: #84949c;
 
   /* Bonus gold: medallion, bonus countdown, titles, selection. */
@@ -26,8 +25,7 @@
   --ys-gold-deep: #634016;
   --ys-selected: #ffcb60;
 
-  /* Receipts (arrival orange) and warnings (red). */
-  --ys-orange: #eda54e;
+  /* Warnings (red). */
   --ys-red: #e9483d;
   --ys-red-dark: #a83229;
   --ys-red-light: #ff8776;
@@ -62,13 +60,13 @@
   --ys-yard-urgent: #e9483d;
   --ys-yard-collection-bay: #2c5759;
   --ys-yard-collection-line: #8fd1c6;
-  --ys-yard-receipt-bay: #8a5a2c;
-  --ys-yard-receipt-line: #f2b36c;
+  --ys-yard-receipt-bay: #4b5863;
+  --ys-yard-receipt-line: #b4c2cc;
   --ys-yard-receipt-urgent: #8f3a2e;
   --ys-yard-chassis: #2a3138;
   --ys-yard-wheel: #14181c;
   --ys-yard-cab-white: #eef2f3;
-  --ys-yard-cab-orange: #eda54e;
+  --ys-yard-cab-steel: #6f93b0;
   --ys-yard-glass: #6f97ad;
   --ys-yard-medal-light: #fff2bd;
   --ys-yard-medal-dark: #d39b31;
@@ -84,4 +82,5 @@
   --ys-yard-gold-shine: #fffbe8;
   --ys-yard-gold-body: #eba832;
   --ys-yard-gold-deep: #a2631b;
+  --ys-yard-receipt-cargo: #d3dadf;
 }

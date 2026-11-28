@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
 import { levelByNumber, TUTORIAL } from './levels'
 import { GREY, present, SEQUENCE_COLOURS } from './presentation'
+import { YARD_COLOURS } from './yardPalette'
 import type { LevelDef, Shift } from '../types/engine'
 import type { UiState, Viewport } from '../types/presentation'
 
@@ -32,15 +33,25 @@ const view = (shift: Shift, ui: UiState = NONE) => present(shift.state, ui, PHON
 const byId = (shift: Shift, ui: UiState = NONE) => new Map(view(shift, ui).containers.map((c) => [c.id, c]))
 
 describe('Yardshift colours and queue', () => {
-  it('the palette is a hue walk: green, teal, blue, indigo, purple, pink, then grey (owner round 4)', () => {
-    expect(SEQUENCE_COLOURS).toEqual(['#5cc96b', '#38c3bd', '#5fb0f5', '#7a7fee', '#cb93f2', '#f27aae'])
+  it('the palette is five colours in rainbow order: red, orange, green, blue, purple, then grey (owner round 5)', () => {
+    expect(SEQUENCE_COLOURS).toEqual(['#ef5b52', '#f59a3a', '#4cc265', '#4b9cf0', '#a985ee'])
     expect(GREY).toBe('#84949c')
   })
 
-  it('the next six collection positions take the six colour slots; farther ones are grey, numbers always shown', () => {
+  it('every sequence colour and grey keeps the dark number readable (contrast at least 4.5:1)', () => {
+    const lum = (hex: string) =>
+      [16, 8, 0]
+        .map((s) => ((parseInt(hex.slice(1), 16) >> s) & 255) / 255)
+        .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+        .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i]!, 0)
+    const ink = lum(YARD_COLOURS['number-ink'])
+    for (const hex of [...SEQUENCE_COLOURS, GREY]) expect((lum(hex) + 0.05) / (ink + 0.05), hex).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('the next five collection positions take the five colour slots; farther ones are grey, numbers always shown', () => {
     const c = byId(createShift(deep))
-    for (let id = 1; id <= 6; id++) expect(c.get(id)).toMatchObject({ slot: id - 1, colour: SEQUENCE_COLOURS[id - 1] })
-    for (const id of [7, 8, 9]) expect(c.get(id)).toMatchObject({ slot: null, colour: GREY, label: String(id) })
+    for (let id = 1; id <= 5; id++) expect(c.get(id)).toMatchObject({ slot: id - 1, colour: SEQUENCE_COLOURS[id - 1] })
+    for (const id of [6, 7, 8, 9]) expect(c.get(id)).toMatchObject({ slot: null, colour: GREY, label: String(id) })
   })
 
   it('slots follow the next container as collections advance', () => {
@@ -48,25 +59,24 @@ describe('Yardshift colours and queue', () => {
     shift.dispatch({ type: 'collect' })
     const c = byId(shift)
     expect(c.get(2)!.slot).toBe(0)
-    expect(c.get(7)!.slot).toBe(5)
-    expect(c.get(8)!.slot).toBeNull()
+    expect(c.get(6)!.slot).toBe(4)
+    expect(c.get(7)!.slot).toBeNull()
   })
 
-  it('the HUD queue has six items matching the yard colours and bonus stars', () => {
+  it('the HUD queue has five items matching the yard colours and bonus stars', () => {
     const shift = createShift(deep)
     const vm = view(shift)
     const c = byId(shift)
-    expect(vm.queue).toHaveLength(6)
-    expect(vm.queue.map((q) => q.label)).toEqual(['1', '2', '3', '4', '5', '6'])
+    expect(vm.queue).toHaveLength(5)
+    expect(vm.queue.map((q) => q.label)).toEqual(['1', '2', '3', '4', '5'])
     vm.queue.forEach((q) => expect(q.colour).toBe(c.get(q.id!)!.colour))
-    expect(vm.queue.map((q) => q.bonus)).toEqual([false, false, true, false, false, true])
+    expect(vm.queue.map((q) => q.bonus)).toEqual([false, false, true, false, false])
   })
 
   it('queue positions past the last container are empty slots', () => {
     const level: LevelDef = { ...deep, stacks: [[2, 1], [3], []], count: 3, bonusIds: [] }
     const vm = view(createShift(level))
     expect(vm.queue.slice(3)).toEqual([
-      { id: null, label: '–', colour: '#526773', bonus: false, active: false },
       { id: null, label: '–', colour: '#526773', bonus: false, active: false },
       { id: null, label: '–', colour: '#526773', bonus: false, active: false },
     ])
@@ -131,7 +141,7 @@ describe('Yardshift score HUD', () => {
     // #6 is exposed but not next: badge only, no gold, no glint; its chip keeps its colour with a star.
     expect(v.containers.find((c) => c.id === 6)).toMatchObject({ bonus: true, bonusActive: false, glint: false })
     expect(v.containers.find((c) => c.id === 3)).toMatchObject({ bonus: true, bonusActive: false, glint: false })
-    expect(v.queue.map((q) => q.active)).toEqual([false, false, false, false, false, false])
+    expect(v.queue.map((q) => q.active)).toEqual([false, false, false, false, false])
     expect(v.queue[2]).toMatchObject({ bonus: true, active: false })
   })
 

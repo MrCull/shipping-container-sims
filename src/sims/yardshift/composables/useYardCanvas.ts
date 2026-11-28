@@ -77,8 +77,10 @@ interface Paint {
   next?: boolean
   heavy: boolean
   selected?: boolean
-  /** Red outline (pulsing unless `still`). */
+  /** Urgency outline: white, flashing red and white (owner round 5: never a plain red outline, red is a sequence colour). */
   red?: boolean
+  /** A bold tag on the box (the receipt cargo's "IN"), so incoming cargo never reads as a sequence container. */
+  tag?: string
   /** Soft glow of the calm current container (pulsing unless `still`). */
   glow?: boolean
   /** The active bonus moving: shine sweep, sparkles and bouncing star (never under reduced motion). */
@@ -363,11 +365,40 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
     g.stroke()
     g.restore()
   }
+  if (p.tag) {
+    // The receipt cargo's bold tag astride the top right edge (clear of the number and the top-left star badge): a
+    // dark plate with white letters.
+    const th = Math.max(10, Math.round(h * 0.28))
+    g.font = `900 ${Math.round(th * 0.78)}px system-ui, sans-serif`
+    const tw = g.measureText(p.tag).width + th * 0.6
+    const tx = x + w + b.dx * 0.5 - tw
+    const ty = y - b.dy * 0.5 - th / 2
+    g.fillStyle = C.outline
+    g.strokeStyle = C.rim
+    g.lineWidth = 1.2
+    g.beginPath()
+    g.roundRect(tx, ty, tw, th, 3)
+    g.fill()
+    g.stroke()
+    g.fillStyle = C.rim
+    g.textAlign = 'left'
+    g.textBaseline = 'middle'
+    g.fillText(p.tag, tx + th * 0.3, ty + th / 2 + 0.5)
+  }
   if (p.red) {
-    g.lineWidth = p.next ? 3.5 : 3
-    g.strokeStyle = p.still ? C.urgent : `rgb(233 72 61 / ${Math.round(45 + 55 * pulse(now, 360, p.seed))}%)`
+    // A thick white outline with a red one flashing over it; under reduced motion a static white outline with a red
+    // inner line.
+    g.lineWidth = p.next ? 4 : 3.5
+    g.strokeStyle = C.rim
     outline(g, b)
     g.stroke()
+    const flash = p.still ? 1 : pulse(now, 360, p.seed) > 0.5 ? 1 : 0
+    if (flash > 0) {
+      g.lineWidth = p.still ? 1.5 : p.next ? 4 : 3.5
+      g.strokeStyle = C.urgent
+      outline(g, b)
+      g.stroke()
+    }
   }
   if (p.selected) {
     g.lineWidth = 3
@@ -893,7 +924,7 @@ export function useYardCanvas(
       if (paint.bonus) badge(g, collectTruck.cargo, paint, now)
     }
     g.restore()
-    if (vm.receiptCargo) truckFacing(g, layout.receipt, geo, 'right', C['cab-orange'], C['gantry-dark'])
+    if (vm.receiptCargo) truckFacing(g, layout.receipt, geo, 'right', C['cab-steel'], C['gantry-dark'])
 
     // Which container rides the crane: the top of its source stack, or the receipt cargo.
     const stackHeight = (i: number) => vm.containers.filter((c) => c.stack === i).length
@@ -959,7 +990,7 @@ export function useYardCanvas(
       const d = dressed(c, c.shake > 0 || c.urgent, { kind: 'receipt' }, true)
       const lift = c.selected ? geo.lift * 0.6 : 0
       const b = moveBox(receiptTruck.cargo, d.dx, -lift)
-      const paint: Paint = { ...c, ...d.paint, colour: C['cab-orange'], exposed: true, seed: c.id }
+      const paint: Paint = { ...c, ...d.paint, colour: C['receipt-cargo'], tag: 'IN', exposed: true, seed: c.id }
       container(g, b, paint, now)
       if (c.bonus) badges.push({ b, p: paint })
       if (d.miss) poof(g, b, fxProgress(d.miss, now))
@@ -978,7 +1009,7 @@ export function useYardCanvas(
     if (m && (moving || movingCargo)) {
       const paint: Paint = moving
         ? { ...moving, gold: moving.bonusActive, selected: false, glint: false, exposed: true, seed: moving.id }
-        : { ...movingCargo!, colour: C['cab-orange'], selected: false, exposed: true, seed: movingCargo!.id }
+        : { ...movingCargo!, colour: C['receipt-cargo'], tag: 'IN', selected: false, exposed: true, seed: movingCargo!.id }
       carried = { label: paint.label, colour: paint.colour, bonus: paint.gold ?? false }
       const src = moving ? boxAt(geo, layout, m.from, moving.tier) : receiptTruck.cargo
       const dst = m.to >= 0 ? boxAt(geo, layout, m.to, stackHeight(m.to)) : collectTruck.cargo

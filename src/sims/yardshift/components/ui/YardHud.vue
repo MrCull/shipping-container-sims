@@ -129,7 +129,7 @@ dd {
   display: block;
   height: 100%;
   border-radius: 3px;
-  background: var(--ys-seq-0);
+  background: var(--ys-seq-2);
 }
 .clock.truck .bar span {
   background: var(--ys-gold);
@@ -156,7 +156,7 @@ dd {
   position: absolute;
   right: 0;
   top: -0.2em;
-  color: var(--ys-seq-0);
+  color: var(--ys-seq-2);
   font-size: 0.75rem;
   animation: float-up 0.9s ease-out forwards;
   pointer-events: none;

@@ -15,7 +15,7 @@ defineProps<{
     <ol
       class="queue"
       data-testid="ys-queue"
-      aria-label="Next six containers"
+      aria-label="Next five containers"
     >
       <li
         v-for="(item, i) in queue"
