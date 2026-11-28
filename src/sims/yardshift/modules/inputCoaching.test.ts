@@ -189,6 +189,21 @@ describe('Yardshift coaching hints', () => {
     expect(hint()).toBe('Tap #2 to load the next truck.')
     shift.dispatch({ type: 'collect', from: 1 })
     expect(hint()).toBe('Tap #3 to load the next truck.')
+    shift.dispatch({ type: 'collect', from: 2 })
+    // #4 is the tutorial's one bonus: its window opens as it becomes next (owner round 4).
+    expect(shift.state.bonusMs).toBeGreaterThan(0)
+    expect(hint()).toBe('Gold bonus! Load #4 fast for +250')
+  })
+
+  it('once the tutorial bonus window closes, the plain coaching returns', () => {
+    const shift = createShift(TUTORIAL)
+    shift.dispatch({ type: 'collect', from: 0 })
+    shift.dispatch({ type: 'rehandle', from: 1, to: 3 })
+    shift.dispatch({ type: 'collect', from: 1 })
+    shift.dispatch({ type: 'collect', from: 2 })
+    for (let t = 0; t < 2100; t += 100) shift.tick(100)
+    expect(shift.state.bonusMs).toBe(0)
+    expect(present(shift.state, NONE, PHONE).hint).toBe('Tap #4 to load the next truck.')
   })
 
   it('other levels get the plain hint', () => {

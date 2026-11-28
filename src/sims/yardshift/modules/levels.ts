@@ -17,6 +17,8 @@ interface V20Row {
   truckSeconds: readonly [number, number, number]
   /** Bonus cadence: every multiple of this id is a bonus container (0 for none). */
   bonusEvery: number
+  /** Explicit bonus ids, in place of the cadence (the tutorial's one bonus, owner round 4). */
+  bonusIds?: number[]
   bonusWindowSeconds: number
   overtimeMultiplier: number
   tutorialCoaching?: boolean
@@ -52,7 +54,7 @@ function level(n: number, row: V20Row): LevelDef {
     truckSeconds: row.truckSeconds,
     arrivals: row.arrivals ?? [],
     heavy: row.heavy ?? [],
-    bonusIds: bonusIds(row.bonusEvery, row.count),
+    bonusIds: row.bonusIds ?? bonusIds(row.bonusEvery, row.count),
     bonusWindowSeconds: row.bonusWindowSeconds,
     overtimeMultiplier: row.overtimeMultiplier,
     tutorialCoaching: row.tutorialCoaching ?? false,
@@ -64,7 +66,9 @@ function level(n: number, row: V20Row): LevelDef {
 // prettier-ignore
 const ROWS: V20Row[] = [
   { name: 'First shift', stacks: [[1], [2, 4], [3], []], count: 4, capacity: 2, maxRehandles: 5, shiftSeconds: 150,
-    truckSeconds: [30, 20, 15], bonusEvery: 0, bonusWindowSeconds: 0, overtimeMultiplier: 2, tutorialCoaching: true,
+    // Owner round 4, deviating from V20 (no tutorial bonus): one bonus, the last container, with a generous window.
+    truckSeconds: [30, 20, 15], bonusEvery: 0, bonusIds: [4], bonusWindowSeconds: 2.0, overtimeMultiplier: 2,
+    tutorialCoaching: true,
     tip: 'Tap #1 to load it. Move #4 aside to uncover #2.' },
   { name: 'Think ahead', stacks: [[2, 5], [1, 6], [3, 4], []], count: 6, capacity: 3, maxRehandles: 7, shiftSeconds: 40,
     truckSeconds: truck(12), bonusEvery: 3, bonusWindowSeconds: 1.6, overtimeMultiplier: 3,

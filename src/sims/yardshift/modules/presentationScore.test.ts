@@ -32,8 +32,8 @@ const view = (shift: Shift, ui: UiState = NONE) => present(shift.state, ui, PHON
 const byId = (shift: Shift, ui: UiState = NONE) => new Map(view(shift, ui).containers.map((c) => [c.id, c]))
 
 describe('Yardshift colours and queue', () => {
-  it('the palette is mint, blue, purple, yellow, pink, lime, then grey', () => {
-    expect(SEQUENCE_COLOURS).toEqual(['#54ddb0', '#58b3ef', '#b19af5', '#f7ce53', '#ee8bb7', '#a5d36e'])
+  it('the palette is a hue walk: green, teal, blue, indigo, purple, pink, then grey (owner round 4)', () => {
+    expect(SEQUENCE_COLOURS).toEqual(['#5cc96b', '#38c3bd', '#5fb0f5', '#7a7fee', '#cb93f2', '#f27aae'])
     expect(GREY).toBe('#84949c')
   })
 

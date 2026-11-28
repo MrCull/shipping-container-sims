@@ -46,11 +46,16 @@ describe('Yardshift levels', () => {
     expect(LEVELS[0]!.truckSeconds).toEqual([30, 20, 15])
     expect(LEVELS[1]!.truckSeconds).toEqual([12, 6, 12 * 0.28])
     expect(LEVELS.map((l) => l.overtimeMultiplier)).toEqual([2, ...Array(12).fill(3)])
-    expect(LEVELS.map((l) => l.bonusWindowSeconds)).toEqual([0, 1.6, 1.3, 1.3, ...Array(9).fill(1.1)])
-    expect(LEVELS[0]!.bonusIds).toEqual([])
+    expect(LEVELS.map((l) => l.bonusWindowSeconds).slice(1)).toEqual([1.6, 1.3, 1.3, ...Array(9).fill(1.1)])
     expect(LEVELS[9]!.bonusIds).toEqual([3, 6, 9, 12, 15])
     expect(LEVELS.filter((l) => l.heavyHints).map((l) => l.number)).toEqual([11, 12])
     expect(LEVELS.filter((l) => l.tutorialCoaching).map((l) => l.number)).toEqual([1])
+  })
+
+  it('the tutorial has one bonus, its last container #4, with a generous 2.0 s window (owner round 4)', () => {
+    // Owner decision, deviating from V20 (the tutorial had no bonus): one bonus, last in the sequence.
+    expect(LEVELS[0]!.bonusIds).toEqual([4])
+    expect(LEVELS[0]!.bonusWindowSeconds).toBe(2)
   })
 
   it('chooses no level value from the level number (each row states it)', () => {

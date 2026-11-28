@@ -93,7 +93,7 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   face, a darker end face, a few soft ribs, two subtle door bars, thin rails, corner castings, a big bold number with
   a light halo; the next box is slightly brighter. A bonus box keeps its sequence colour with a static star badge on
   its top-left corner, inside its column, drawn in a second pass so it never covers a number. Only the active bonus
-  (`bonusActive`: next, window open) is amber metallic gold (`gold-body`, kept apart from the yellow sequence colour)
+  (`bonusActive`: next, window open) is amber metallic gold (`gold-body`; the sequence colours hold no yellow since owner round 4)
   with its sequence colour along the bottom rail, a gold halo, a shine sweep every 1.6 s, up to three sparkles at the
   box ends, a bouncing badge and the countdown ring; "H" tile for `heavy`), the NEXT chevron (white, outlined,
   striped in the next box's colour; hidden while the crane works that stack), ghost drop boxes on `destinations`, the blue gantry and the yellow trolley with
@@ -119,8 +119,11 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   `QueueItem.active`, and `ViewModel.nextMarker` (`{ stack, buried }`, null when the shift is over, the next box is
   not in the yard, or a receipt is mandatory). Hit regions stay layout-only (tested calm, urgent, reduced and selected).
 - Screenshots: `docs/prototypes/2d/` (art pass 3, phone 390x844 at 2x: level 3 after one rehandle, the owner's
-  `owner-2d-v3` state; level 2 bonus window open on #3; level 4 mandatory receipt; tutorial start; desktop 1280x800
-  level 4).
+  `owner-2d-v3` state; level 2 bonus window open on #3; level 4 mandatory receipt; tutorial start; tutorial with #4's bonus window open
+  and its coaching line; desktop 1280x800 level 4). Re-captured in owner round 4 for the hue-walk colours.
+- Active bonus shine (owner round 4): the sweep is clipped inside the front face's outline, and the next box's white
+  rim and glow are clipped to outside the box silhouette (`clipOutside`), so neither draws a pale band over the dark
+  end face or past the box's right edge.
 
 ## Playtest fixes (spec #374 phase 1)
 
@@ -250,7 +253,7 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `URGENT_RISK` 0.5). `UiState.reducedMotion` comes from `setReducedMotion`. The scene offsets the mesh only
   (amplitude 0.65 + 3.35 x risk px) or adds a static red glow; hit regions never move.
 - Coaching (hint): `tutorialCoaching` levels coach collect #1, move the blocker to an empty stack, then collect in
-  order; `heavyHints` levels (11, 12) say "Heavy #n · Choose a highlighted stack: heavy on heavy or empty." or
+  order, and while a bonus window is open (level 1's #4) say "Gold bonus! Load #4 fast for +250"; `heavyHints` levels (11, 12) say "Heavy #n · Choose a highlighted stack: heavy on heavy or empty." or
   "... No valid stack. Make space first." while heavy cargo is selected; 13 has none. Rejection messages (the store's
   `message`, shown over the hint) stay on every level.
 
@@ -273,7 +276,7 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   in the receipt bay; plus singular and plural copy ("1 MOVE LEFT", "1 rehandle", "1 star bonus").
 - Scene: the gantry beam runs along the slanted row of stacks (first to last column, legs just outside) and moves
   across it with the trolley; the trolley rest point resets when the surface size or stack count changes.
-- Cover: `assets/cover.png` (art pass 3) is a 640x360 crop of the phone level 3 capture (390x844 at 2x,
+- Cover: `assets/cover.png` (art pass 3, re-cut in owner round 4 for the hue walk) is a 640x360 crop of the phone level 3 capture (390x844 at 2x,
   `loadLevel(3)` then `{ type: 'rehandle', from: 2, to: 4 }`): the 16:9 band from the beam down to the stack
   numbers, 8-bit palette, about 20 KB.
 
@@ -377,10 +380,20 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
 `modules/levels.ts` holds all 13 V20 levels exactly (`levels.test.ts` checks them against the V20 array). V20's code
 rules keyed on the level index are explicit fields on each row, never chosen from the level number (a test scans the
 source): `truckSeconds` (tutorial `[30, 20, 15]`, else `truck(first)`: first, x0.5, x0.28), `bonusEvery` (3 from
-level 2, giving `bonusIds`), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
+level 2, giving `bonusIds`), `bonusIds` (an explicit list in place of the cadence), `bonusWindowSeconds`, `overtimeMultiplier` (2 on the tutorial, 3 elsewhere),
 `tutorialCoaching`, `heavyHints` (11 and 12) and `tip`. There is no hand-entered minimum: the star target comes from
 the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no intro) or the level picker. Arrival levels
 (4, 6, 8, 9, 10, 13) start with a truck waiting.
+
+| Level | Bonus ids | Bonus window |
+| --- | --- | --- |
+| 1 (tutorial) | #4 only (`bonusIds: [4]`, the last container) | 2.0 s |
+| 2 | every third (`bonusEvery: 3`) | 1.6 s |
+| 3, 4 | every third | 1.3 s |
+| 5 to 13 | every third | 1.1 s |
+
+Level 1's bonus is an owner decision (round 4) deviating from V20, where the tutorial had none; `levels.test.ts`
+records it. The bonus does not change rehandles, so the solver fixtures are unchanged.
 
 ## Solver and stars
 
@@ -397,7 +410,9 @@ the solver fixture. Start a level in dev with `window.__ys.loadLevel(n)` (no int
 ## Colours
 
 `styles/palette.css` (loaded by `Yardshift.vue`, scoped to `.yardshift`) holds the sim's own palette as `--ys-*`
-properties: the six sequence colours, grey, gold, arrival orange, red and the panel shades. Background, text and muted
+properties: the six sequence colours (a hue walk so the order reads at a glance, owner round 4: #1 green `#5cc96b`,
+#2 teal `#38c3bd`, #3 blue `#5fb0f5`, #4 indigo `#7a7fee`, #5 purple `#cb93f2`, #6 pink `#f27aae`; yellow, amber
+gold, orange and red stay free for bonus, receipt and alerts; each holds the dark number ink at 4.7:1 or more), grey, gold, arrival orange, red and the panel shades. Background, text and muted
 text use the shared tokens of `src/assets/main.css`. Components use those or `--ys-*`, never hex
 (`scripts/check-no-hex-colours.mjs` in verify); `modules/palette.test.ts` keeps `--ys-seq-*` and `--ys-grey` equal to `SEQUENCE_COLOURS` and `GREY`. The
 canvas yard keeps its colours in `modules/yardPalette.ts`, each mirrored as `--ys-yard-*` in the palette and kept

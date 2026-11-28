@@ -7,13 +7,13 @@
  * the tests keep them equal.
  */
 .yardshift {
-  /* Sequence colours: the next six containers in order. */
-  --ys-seq-0: #54ddb0;
-  --ys-seq-1: #58b3ef;
-  --ys-seq-2: #b19af5;
-  --ys-seq-3: #f7ce53;
-  --ys-seq-4: #ee8bb7;
-  --ys-seq-5: #a5d36e;
+  /* Sequence colours: the next six containers in order, a hue walk (green, teal, blue, indigo, purple, pink). */
+  --ys-seq-0: #5cc96b;
+  --ys-seq-1: #38c3bd;
+  --ys-seq-2: #5fb0f5;
+  --ys-seq-3: #7a7fee;
+  --ys-seq-4: #cb93f2;
+  --ys-seq-5: #f27aae;
   /* Containers farther than six positions away. */
   --ys-grey: #84949c;
 

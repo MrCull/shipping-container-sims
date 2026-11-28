@@ -3,7 +3,7 @@
  * draw; `input` turns a UI event into the next UI state and at most one engine action. Hit regions come from the
  * layout alone (never from animated positions), so a tap target never moves.
  */
-import { exposedNextStack, rejectionFor, waitingArrival } from './engine'
+import { BONUS_POINTS, exposedNextStack, rejectionFor, waitingArrival } from './engine'
 import { yardFit } from './yardGeometry'
 import type { ShiftAction, ShiftState } from '../types/engine'
 import type {
@@ -22,8 +22,11 @@ import type {
   Viewport,
 } from '../types/presentation'
 
-/** Colours of the next six collection positions: mint, blue, purple, yellow, pink, lime (V20). */
-export const SEQUENCE_COLOURS = ['#54ddb0', '#58b3ef', '#b19af5', '#f7ce53', '#ee8bb7', '#a5d36e'] as const
+/**
+ * Colours of the next six collection positions, a hue walk so the order reads at a glance (owner round 4): green,
+ * teal, blue, indigo, purple, pink. Yellow, amber/gold, orange and red stay free for bonus, receipt and alerts.
+ */
+export const SEQUENCE_COLOURS = ['#5cc96b', '#38c3bd', '#5fb0f5', '#7a7fee', '#cb93f2', '#f27aae'] as const
 /** Containers farther than six positions away. */
 export const GREY = '#84949c'
 /** Queue slot past the last container. */
@@ -197,6 +200,7 @@ function tutorialHint(state: ShiftState, ui: UiState): string | null {
   if (!state.level.tutorialCoaching) return null
   if (ui.selection !== null) return null
   if (state.collected === 0) return `Tap container #${state.next} to load the first truck.`
+  if (state.bonusMs > 0) return `Gold bonus! Load #${state.next} fast for +${BONUS_POINTS}`
   if (exposedNextStack(state) >= 0) return `Tap #${state.next} to load the next truck.`
   const holder = state.stacks.find((s) => s.includes(state.next))
   const blocker = holder?.[holder.length - 1]

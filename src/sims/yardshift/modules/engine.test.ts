@@ -103,12 +103,14 @@ describe('Yardshift engine', () => {
     for (const a of plan) expect(shift.dispatch(a).ok).toBe(true)
     expect(shift.state.status).toBe('playing')
     const last = shift.dispatch({ type: 'collect' })
-    expect(last.ok && last.events.map((e) => e.type)).toEqual(['collected', 'completed'])
+    // #4 is the tutorial's one bonus (owner round 4), collected inside its window.
+    expect(last.ok && last.events.map((e) => e.type)).toEqual(['collected', 'bonus-awarded', 'completed'])
     expect(shift.state).toMatchObject({ status: 'complete', collected: 4, next: 5, rehandles: 1 })
     expect(shift.state.stacks.every((s) => s.length === 0)).toBe(true)
     expect(seen.filter((t) => t === 'completed')).toHaveLength(1)
     expect(shift.dispatch({ type: 'collect' }).ok).toBe(false)
-    expect(shift.events).toHaveLength(7) // four collections, one rehandle and its time credit, completed
+    // Four collections, one rehandle and its time credit, the #4 bonus window and award, completed.
+    expect(shift.events).toHaveLength(9)
   })
 
   it('tick is a no-op once the shift is over', () => {

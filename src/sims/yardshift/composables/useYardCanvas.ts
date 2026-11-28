@@ -108,6 +108,21 @@ function outline(g: CanvasRenderingContext2D, b: Box): void {
   g.closePath()
 }
 
+/** Clips to everything outside the box's silhouette (front, top and end faces). */
+function clipOutside(g: CanvasRenderingContext2D, b: Box): void {
+  const pad = 64
+  g.beginPath()
+  g.rect(b.x - pad, b.y - b.dy - pad, b.w + b.dx + 2 * pad, b.h + b.dy + 2 * pad)
+  g.moveTo(b.x, b.y + b.h)
+  g.lineTo(b.x, b.y)
+  g.lineTo(b.x + b.dx, b.y - b.dy)
+  g.lineTo(b.x + b.w + b.dx, b.y - b.dy)
+  g.lineTo(b.x + b.w + b.dx, b.y + b.h - b.dy)
+  g.lineTo(b.x + b.w, b.y + b.h)
+  g.closePath()
+  g.clip('evenodd')
+}
+
 function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, points = 5, inner = 0.45): void {
   g.beginPath()
   for (let i = 0; i < points * 2; i++) {
@@ -180,7 +195,7 @@ function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold
   g.fillStyle = gold ? C['gold-deep'] : tone(-0.3)
   g.fill()
   if (gold) {
-    // Metallic gold: a bright cream top edge, rich amber gold and a deep bronze foot, never the flat yellow slot.
+    // Metallic gold: a bright cream top edge, rich amber gold and a deep bronze foot, distinct from every sequence colour.
     const body = g.createLinearGradient(0, y, 0, y + h)
     body.addColorStop(0, C['gold-shine'])
     body.addColorStop(0.22, C['gold-body'])
@@ -271,9 +286,10 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
     // Shine sweep: a slanted light band crossing the box every 1.6 s.
     const s = shineAt(now, p.seed)
     if (s !== null) {
+      // Clipped inside the front face's outline (owner round 4): the band never reaches the end face or past the box.
       g.save()
       g.beginPath()
-      g.rect(x, y, w, h)
+      g.rect(x + 1, y + 1, w - 2, h - 2)
       g.clip()
       const sx = x - h + (w + 2 * h) * s
       const grad = g.createLinearGradient(sx - h * 0.6, 0, sx + h * 0.6, 0)
@@ -336,10 +352,12 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
   }
   if (p.glow && !p.red && !p.selected) {
     // The next container: a thick bright white outline with a soft outer glow that breathes (static when still).
+    // Clipped to outside the box (owner round 4), so the glow never washes a pale band over the dark end face.
     g.save()
+    clipOutside(g, b)
     g.shadowColor = `rgb(255 255 255 / ${Math.round(60 + 35 * glowPulse)}%)`
     g.shadowBlur = 6 + 6 * glowPulse
-    g.lineWidth = 3.5
+    g.lineWidth = 6
     g.strokeStyle = C.rim
     outline(g, b)
     g.stroke()
