@@ -1,6 +1,6 @@
 /** Yardshift sound nodes are released when they end (no node left connected per cue). */
 import { describe, expect, it, vi } from 'vitest'
-import { playTone, releaseOnEnded } from './useYardAudio'
+import { installAudioUnlock, playTone, releaseOnEnded } from './useYardAudio'
 import { cuesForStep } from '../modules/audioCues'
 import { createShift } from '../modules/engine'
 import { TUTORIAL } from '../modules/levels'
@@ -50,5 +50,66 @@ describe('Yardshift audio nodes', () => {
     envs.forEach((env, i) => expect(env.gain!.exponentialRampToValueAtTime).toHaveBeenCalledWith(jackpot!.tones[i]!.vol, expect.any(Number)))
     for (const n of nodes) if (n.onended) n.onended()
     for (const n of nodes) expect(n.disconnect).toHaveBeenCalledTimes(1)
+  })
+})
+
+/** An AudioContext stand-in for the unlock: a state iOS keeps 'suspended' (or 'interrupted') until a gesture resumes it. */
+function unlockContext(state: string) {
+  const sources: Array<{ buffer: unknown; start: ReturnType<typeof vi.fn>; connect: ReturnType<typeof vi.fn> }> = []
+  const ac = {
+    state,
+    destination: { name: 'destination' },
+    resume: vi.fn(() => Promise.resolve()),
+    createBuffer: vi.fn((channels: number, length: number, rate: number) => ({ channels, length, rate })),
+    createBufferSource: () => {
+      const s = { buffer: null as unknown, start: vi.fn(), connect: vi.fn() }
+      sources.push(s)
+      return s
+    },
+  }
+  return { ac, sources }
+}
+
+describe('Yardshift audio unlock (iOS)', () => {
+  it('resumes the context on every pointerdown or touchend until it runs, and plays one silent buffer on the first', () => {
+    const { ac, sources } = unlockContext('suspended')
+    const target = new EventTarget()
+    const stop = installAudioUnlock(target, () => ac as unknown as AudioContext)
+    target.dispatchEvent(new Event('pointerdown'))
+    expect(ac.resume).toHaveBeenCalledTimes(1)
+    expect(sources).toHaveLength(1)
+    expect(ac.createBuffer).toHaveBeenCalledWith(1, 1, expect.any(Number))
+    expect(sources[0]!.connect).toHaveBeenCalledWith(ac.destination)
+    expect(sources[0]!.start).toHaveBeenCalledTimes(1)
+    // Still suspended (iOS ignored the first resume): the next gesture tries again, with no second buffer.
+    target.dispatchEvent(new Event('touchend'))
+    expect(ac.resume).toHaveBeenCalledTimes(2)
+    expect(sources).toHaveLength(1)
+    // An interruption (a call, the app backgrounded) is resumed the same way.
+    ac.state = 'interrupted'
+    target.dispatchEvent(new Event('pointerdown'))
+    expect(ac.resume).toHaveBeenCalledTimes(3)
+    // Running: gestures do nothing.
+    ac.state = 'running'
+    target.dispatchEvent(new Event('touchend'))
+    target.dispatchEvent(new Event('keydown'))
+    expect(ac.resume).toHaveBeenCalledTimes(3)
+    stop()
+    ac.state = 'suspended'
+    target.dispatchEvent(new Event('pointerdown'))
+    expect(ac.resume).toHaveBeenCalledTimes(3)
+  })
+
+  it('waits for a context: no context yet means no buffer is spent', () => {
+    const { ac, sources } = unlockContext('suspended')
+    const target = new EventTarget()
+    let ready: AudioContext | null = null
+    installAudioUnlock(target, () => ready)
+    target.dispatchEvent(new Event('pointerdown'))
+    expect(sources).toHaveLength(0)
+    ready = ac as unknown as AudioContext
+    target.dispatchEvent(new Event('pointerdown'))
+    expect(sources).toHaveLength(1)
+    expect(ac.resume).toHaveBeenCalledTimes(1)
   })
 })

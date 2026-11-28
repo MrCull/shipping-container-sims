@@ -10,13 +10,17 @@ import {
   COMBO_LADDER_TOP,
   comboCue,
   craneCues,
+  craneStartCue,
   cuesForStep,
   rejectionCue,
   SHIFT_TICK_SECONDS,
+  uiCue,
+  winCue,
   type Cue,
   type CueName,
+  type UiSoundEvent,
 } from './audioCues'
-import type { LevelDef, Shift, ShiftAction, ShiftEvent } from '../types/engine'
+import type { LevelDef, Shift, ShiftAction, ShiftEvent, ShiftState } from '../types/engine'
 
 /** Four exposed-in-order collections; first truck 12 s, shift 40 s, overtime 3x. */
 const timed: LevelDef = {
@@ -41,8 +45,9 @@ function recorder(level: LevelDef): { shift: Shift; cues: Cue[]; act(a: ShiftAct
   shift.onEvent((e) => batch.push(e))
   function step(f: () => void): void {
     batch = []
+    const before = shift.state
     f()
-    cues.push(...cuesForStep(shift.state, batch))
+    cues.push(...cuesForStep(shift.state, batch, before))
   }
   return {
     shift,
@@ -88,9 +93,9 @@ describe('Yardshift audio cues', () => {
   it('a collection fires collect once, and combo from the second in a chain', () => {
     const r = recorder(timed)
     r.act({ type: 'collect' })
-    expect(names(r.cues)).toEqual(['collect'])
+    expect(names(r.cues).filter((n) => n === 'collect' || n === 'combo')).toEqual(['collect'])
     r.act({ type: 'collect' })
-    expect(names(r.cues)).toEqual(['collect', 'collect', 'combo'])
+    expect(names(r.cues).filter((n) => n === 'collect' || n === 'combo')).toEqual(['collect', 'collect', 'combo'])
     r.run(500)
     expect(count(r.cues, 'collect')).toBe(2)
   })
@@ -285,5 +290,141 @@ describe('Yardshift audio cues', () => {
         expect(t.vol).toBeGreaterThan(0)
         expect(t.vol).toBeLessThanOrEqual(1)
       }
+  })
+})
+
+/** A cue's sound, for telling cues apart: every tone's pitches, timbre and timing, plus its sample. */
+function signature(cue: Cue): string {
+  const tones = cue.tones.map((t) => `${t.type}:${Math.round(t.f0)}>${Math.round(t.f1)}@${t.delay.toFixed(2)}/${t.dur.toFixed(2)}`)
+  return `${cue.sample ?? ''}|${[...tones].sort().join(',')}`
+}
+
+function levelState(n: number): ShiftState {
+  return createShift(levelByNumber(n)!).state
+}
+
+describe('Yardshift sound coverage (art pass 3)', () => {
+  const s = createShift(timed).state
+
+  it('a collection plays the load clunk and blip, the truck driving off, the new truck pulling in and a soft next ding', () => {
+    const r = recorder(timed)
+    r.act({ type: 'collect' })
+    expect(names(r.cues)).toEqual(['collect', 'truck-off', 'truck-in', 'next-ready'])
+    const [collect, off, arrive, ding] = r.cues
+    expect(collect!.tones.some((t) => t.f0 < 200 && t.f1 < t.f0)).toBe(true) // the clunk
+    expect(off!.tones[0]!.delay).toBeGreaterThan(0.2) // after the bounce, as the truck pulls away
+    expect(arrive!.tones[0]!.delay).toBeGreaterThan(off!.tones[0]!.delay)
+    expect(Math.min(...ding!.tones.map((t) => t.delay))).toBeGreaterThan(Math.min(...arrive!.tones.map((t) => t.delay)))
+    for (const t of ding!.tones) expect(t.vol).toBeLessThanOrEqual(0.015)
+  })
+
+  it('the last collection sends the truck off with no new truck or ding, then the fanfare', () => {
+    const r = recorder(timed)
+    for (let i = 0; i < 4; i++) r.act({ type: 'collect' })
+    expect(count(r.cues, 'truck-off')).toBe(4)
+    expect(count(r.cues, 'truck-in')).toBe(3)
+    expect(count(r.cues, 'next-ready')).toBe(3)
+    expect(names(r.cues).at(-1)).toBe('win')
+  })
+
+  it('the moves-left count fires deadline-two once when it drops to 2, not on an arrival at 2', () => {
+    const before = { ...s, deadline: 3 }
+    const after = { ...s, deadline: 2 }
+    expect(names(cuesForStep(after, [{ type: 'rehandled', id: 1, from: 0, to: 1 }], before))).toEqual(['rehandle', 'deadline-two'])
+    expect(names(cuesForStep(after, [{ type: 'arrival', id: 9, moves: 2 }], { ...s, deadline: null }))).toEqual(['arrival'])
+    expect(names(cuesForStep(after, [], after))).toEqual([])
+    expect(names(cuesForStep({ ...s, deadline: 1 }, [{ type: 'deadline-one', id: 9 }], after))).toEqual(['deadline-one'])
+  })
+
+  it('a receipt level fires deadline-two once on the way to mandatory', () => {
+    const r = recorder(levelByNumber(4)!)
+    r.act({ type: 'rehandle', from: 0, to: 4 })
+    r.act({ type: 'collect', from: 0 })
+    r.act({ type: 'rehandle', from: 2, to: 3 })
+    expect(count(r.cues, 'deadline-two')).toBe(1)
+    expect(names(r.cues).filter((n) => n.startsWith('deadline'))).toEqual(['deadline-two', 'deadline-one', 'deadline-zero'])
+  })
+
+  it('shift ticks rise in pitch as the shift runs out', () => {
+    const pitch = (seconds: number) => cuesForStep(s, [{ type: 'shift-low', seconds }])[0]!.tones[0]!.f0
+    for (let i = 1; i < SHIFT_TICK_SECONDS.length; i++) expect(pitch(SHIFT_TICK_SECONDS[i]!)).toBeGreaterThan(pitch(SHIFT_TICK_SECONDS[i - 1]!))
+  })
+
+  it('the level-complete fanfare grows with the stars', () => {
+    const at = (rehandles: number) => cuesForStep({ ...levelState(1), rehandles }, [{ type: 'completed' }])[0]!
+    const [one, two, three] = [winCue(1), winCue(2), winCue(3)]
+    expect(three.tones.length).toBeGreaterThan(two.tones.length)
+    expect(two.tones.length).toBeGreaterThan(one.tones.length)
+    expect([one.detail, two.detail, three.detail]).toEqual([1, 2, 3])
+    expect(at(0).detail).toBe(3)
+    expect(at(50).detail).toBe(1)
+    // A level with no solver fixture (a test level) plays the full fanfare.
+    expect(cuesForStep(s, [{ type: 'completed' }])[0]!.detail).toBe(3)
+  })
+
+  it('UI sounds: select, receipt selected, deselect, pause and resume map to one cue each', () => {
+    expect(uiCue({ type: 'selected', target: 2 }).name).toBe('select')
+    expect(uiCue({ type: 'selected', target: 'receipt' }).name).toBe('receipt-select')
+    expect(uiCue({ type: 'deselected' }).name).toBe('deselect')
+    expect(uiCue({ type: 'paused' }).name).toBe('pause')
+    expect(uiCue({ type: 'resumed' }).name).toBe('resume')
+  })
+
+  it('every outcome has its own sound, and none sums louder than the 0.306 cap', () => {
+    const r = recorder(timed)
+    r.act({ type: 'collect' })
+    const events: ShiftEvent[] = [
+      { type: 'received', id: 8, to: 0 },
+      { type: 'rehandled', id: 1, from: 0, to: 1 },
+      { type: 'arrival', id: 8, moves: 3 },
+      { type: 'deadline-one', id: 8 },
+      { type: 'deadline-zero', id: 8 },
+      { type: 'truck-low' },
+      { type: 'overtime-start' },
+      { type: 'overtime-end' },
+      { type: 'shift-low', seconds: 9 },
+      { type: 'bonus-window', id: 3, ms: 1200 },
+      { type: 'bonus-awarded', id: 3, points: 250, ms: 5000 },
+      { type: 'bonus-missed', id: 3 },
+      { type: 'undone', points: -25, ms: 3000 },
+      { type: 'failed', reason: 'timeout' },
+      { type: 'failed', reason: 'blocked' },
+    ]
+    const ui: UiSoundEvent[] = [
+      { type: 'selected', target: 1 },
+      { type: 'selected', target: 'receipt' },
+      { type: 'deselected' },
+      { type: 'paused' },
+      { type: 'resumed' },
+    ]
+    const all: Cue[] = [
+      ...r.cues,
+      rejectionCue(),
+      craneStartCue(),
+      comboCue(3),
+      ...craneCues(0, 1),
+      ...cuesForStep({ ...s, deadline: 2 }, [], { ...s, deadline: 3 }),
+      ...events.flatMap((e) => cuesForStep(s, [e])),
+      winCue(1),
+      winCue(2),
+      winCue(3),
+      ...ui.map(uiCue),
+    ]
+    const seen = new Map<string, string>()
+    for (const cue of all) {
+      const sig = signature(cue)
+      expect(seen.get(sig), `${cue.name} sounds like ${seen.get(sig)}`).toBeUndefined()
+      seen.set(sig, `${cue.name}${cue.detail ?? ''}`)
+    }
+    expect(new Set(all.map((c) => c.name)).size).toBe(31) // every CueName
+    for (const cue of all) expect(peakGain(cue), cue.name).toBeLessThanOrEqual(0.306)
+  })
+
+  it('a collection step with combo and bonus stays under the step budget with the truck sounds added', () => {
+    const r = recorder(timed)
+    r.act({ type: 'collect' })
+    const jackpot = cuesForStep(s, [{ type: 'bonus-awarded', id: 3, points: 250, ms: 5000 }])
+    const step = [...cuesForStep(r.shift.state, [{ type: 'collected', id: 2, from: 1 }]), comboCue(8), ...jackpot]
+    expect(step.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(0.45)
   })
 })

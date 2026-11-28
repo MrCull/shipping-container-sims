@@ -8,7 +8,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { LEVELS, levelByNumber } from '../modules/levels'
 import { createShift, exposedNextStack, MAX_STEP_MS, rejectionFor, waitingArrival } from '../modules/engine'
 import { craneDurationMs, hitTest, input, moveSpan, present } from '../modules/presentation'
-import { craneCues, craneStartCue, cuesForStep, PICK_AT, rejectionCue, type Cue } from '../modules/audioCues'
+import { craneCues, craneStartCue, cuesForStep, PICK_AT, rejectionCue, uiCue, type Cue, type UiSoundEvent } from '../modules/audioCues'
 import type { DispatchResult, Shift, ShiftAction, ShiftEvent, ShiftState } from '../types/engine'
 import type { HitTarget, UiAction, UiEvent, UiState, Viewport } from '../types/presentation'
 import { loadProgress, recordCompletion, saveProgress, type Progress } from '../modules/progress'
@@ -17,8 +17,11 @@ import { minRehandlesFor, starsFor } from '../modules/stars'
 /** A screen over the yard. Result and fail follow the shift status; the others are opened by the player. */
 export type Overlay = 'intro' | 'pause' | 'levels' | null
 
-/** What the yard effects hear: engine events, and a move the engine refused (the tapped container shakes red). */
-export type YardFxEvent = ShiftEvent | { type: 'rejected'; action: ShiftAction }
+/**
+ * What the yard effects hear: engine events, a move the engine refused (the tapped container shakes red), and the
+ * store-level UI outcomes the engine never sees (a selection made or cleared, the pause menu opened or closed).
+ */
+export type YardFxEvent = ShiftEvent | { type: 'rejected'; action: ShiftAction } | UiSoundEvent
 
 /** `CraneMove.from` for a receipt: the crane lifts the cargo off the receipt truck. */
 export const RECEIPT_TRUCK = -2
@@ -88,10 +91,17 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   /** Run one engine step (a dispatch or a tick) and fire its cues once. */
   function step<T>(run: () => T): T {
     stepEvents = []
+    const before = shift.state
     const result = run()
-    emitCues(cuesForStep(shift.state, stepEvents))
+    emitCues(cuesForStep(shift.state, stepEvents, before))
     stepEvents = []
     return result
+  }
+
+  /** A store-level UI outcome: once to the yard effects and once as its sound. */
+  function uiEvent(e: UiSoundEvent): void {
+    for (const listener of fxListeners) listener(e)
+    emitCues([uiCue(e)])
   }
 
   function sync(): void {
@@ -174,13 +184,16 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     shift.dispatch({ type: 'pause', reason: 'player' })
     overlay.value = 'pause'
     sync()
+    uiEvent({ type: 'paused' })
   }
 
   function resume(): void {
+    const held = shift.state.pauses.includes('player')
     overlay.value = null
     shift.dispatch({ type: 'resume', reason: 'player' })
     lastFrame = null
     sync()
+    if (held) uiEvent({ type: 'resumed' })
   }
 
   /** The level picker; the shift underneath stays paused until a level is chosen or the picker is closed. */
@@ -300,9 +313,13 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   /** Forward one raw UI event to `input`. */
   function send(event: UiEvent): void {
     const r = input(ui.value, event, state.value)
+    const before = ui.value.selection
+    const after = r.ui.selection
     // A new selection answers the last rejection, so its message gives way to the live hint.
-    if (r.ui.selection !== ui.value.selection) message.value = ''
+    if (after !== before) message.value = ''
     ui.value = r.ui
+    // A selection made or cleared on its own sounds; one cleared by a move leaves the sound to the move.
+    if (!r.action && after !== before) uiEvent(after === null ? { type: 'deselected' } : { type: 'selected', target: after })
     if (r.action) apply(r.action)
   }
 
