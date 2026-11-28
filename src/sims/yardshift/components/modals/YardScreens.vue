@@ -35,7 +35,36 @@ function play(n: number): void {
     :data-testid="`ys-screen-${screen}`"
   >
     <div class="card">
-      <template v-if="screen === 'intro'">
+      <template v-if="screen === 'start' && store.startChoice">
+        <h2>{{ store.startChoice.title }}</h2>
+        <p>{{ store.startChoice.detail }}</p>
+        <div class="buttons">
+          <button
+            type="button"
+            class="primary"
+            data-testid="ys-continue"
+            @click="store.continueAt()"
+          >
+            {{ store.startChoice.continueLabel }} ›
+          </button>
+          <button
+            type="button"
+            data-testid="ys-start-over"
+            @click="store.startFromOne()"
+          >
+            {{ store.startChoice.restartLabel }}
+          </button>
+          <button
+            type="button"
+            data-testid="ys-levels"
+            @click="store.openLevels()"
+          >
+            Levels
+          </button>
+        </div>
+      </template>
+
+      <template v-else-if="screen === 'intro'">
         <h2>{{ intro.title }}</h2>
         <p>{{ intro.objective }}</p>
         <p class="target">

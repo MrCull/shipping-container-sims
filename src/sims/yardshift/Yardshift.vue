@@ -7,7 +7,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import YardHud from './components/ui/YardHud.vue'
 import YardQueue from './components/ui/YardQueue.vue'
 import YardScreens from './components/modals/YardScreens.vue'
-import { LEVELS } from './modules/levels'
 import { unlockAllRequested } from './modules/progress'
 import { undoView } from './modules/screens'
 import { useYardAudio } from './composables/useYardAudio'
@@ -25,8 +24,8 @@ const devApiEnabled = import.meta.env.DEV || import.meta.env.MODE === 'smoke'
 
 const store = useYardshiftStore()
 store.setUnlockAll(unlockAllRequested(window.location.search, import.meta.env.DEV, import.meta.env.MODE))
-// Open on the intro of the highest unlocked level.
-store.loadLevel(Math.min(LEVELS.length, store.progress.unlocked), { intro: true })
+// Level 1's intro, or the start choice (continue at the highest unlocked level or start from level 1).
+store.enter()
 const undo = computed(() => undoView(store.state))
 
 const root = ref<HTMLElement | null>(null)

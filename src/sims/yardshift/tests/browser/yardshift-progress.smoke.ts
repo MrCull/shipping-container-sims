@@ -1,7 +1,7 @@
 /**
  * Yardshift smoke spec 3 (#386): at a desktop viewport, winning level 1 (its solver fixture played through the
- * smoke-build `window.__ys` hook) shows the result screen; the progress survives a reload and level 2 is unlocked in
- * the level picker. Run with `pnpm run test:smoke`.
+ * smoke-build `window.__ys` hook) shows the result screen; the progress survives a reload (the start choice offers
+ * level 2) and level 2 is unlocked in the level picker. Run with `pnpm run test:smoke`.
  */
 import { expect, test } from '@playwright/test'
 import type {} from '../../dev/devApi' // window.__ys typing
@@ -26,7 +26,10 @@ test('a win shows the result, and progress and the next level survive a reload',
 
   await page.reload()
   await page.waitForFunction(() => window.__ys !== undefined)
-  // The route now opens on the highest unlocked level.
+  // The route now asks where to start (owner round 6): continuing opens the highest unlocked level's intro.
+  await expect(page.getByTestId('ys-continue')).toHaveText('Continue at level 2 ›')
+  await expect(page.getByTestId('ys-start-over')).toHaveText('Start from level 1')
+  await page.getByTestId('ys-continue').click()
   await expect(page.getByTestId('ys-screen-intro')).toContainText('2.')
   await page.getByTestId('ys-levels').click()
   await expect(page.getByTestId('ys-level-1')).toContainText('★★★')
