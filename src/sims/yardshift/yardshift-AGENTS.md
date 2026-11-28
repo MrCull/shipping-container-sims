@@ -43,21 +43,26 @@ with Canvas 2D. Canvas rather than SVG: one paint pass per change with no DOM no
 and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3) for crisp lines.
 
 - `modules/yardGeometry.ts` (pure) places every shape from `layoutFor`'s layout and the capacity (art pass 3,
-  orchestrator review of pass 2): boxes are sized from the column width first (side 0.86 of the column, door end 0.06,
-  top rise 0.08), as tall as `ASPECT_MIN` 1.8:1 allows (`boxHFor`); a short room narrows a box rather than flattening
-  it past `ASPECT_MAX` 2.4. The stacks need full capacity plus one box of crane headroom (a carried box, `carryY`,
+  orchestrator review of pass 2; owner art pass 3 of the 2D yard, back to the v1 look in
+  `docs/prototypes/2d/`): chunky boxes sized from the column width first (front 0.74 of the column, end face 0.17,
+  top rise 0.12), as tall as `ASPECT_MIN` 1.3:1 allows (`boxHFor`); a short room narrows a box rather than flattening
+  it past `ASPECT_MAX` 1.45. `numberSize(box)` is `NUMBER_SHARE` (58 %) of the box height. `chevronAt(geo, layout,
+  stack, height)` places the NEXT chevron just above the stack top, inside its column, under the beam, with
+  `CHEVRON_BOUNCE` (3 px) room each way. The stacks need full capacity plus one box of crane headroom (a carried box, `carryY`,
   clears a full stack; at rest the spreader hangs there). The gantry beam (`beamHFor`) sits at the top of the
   concrete, just under the sky band, with the legs running down the full yard; the trolley rides the beam and its
   cables lower the spreader, so cable length follows the move. The sky band is at least `SKY_MIN` and at most
-  `SKY_SHARE` (22 %) of the yard; on a short yard it ends where the beam still clears a carried box (spreader room),
-  so spare height becomes concrete headroom under the beam, never a tall empty sky. `yardFit(colW, capacity, maxH)` gives the box height and the yard that fits it
+  `SKY_SHARE` (40 %) of the yard; the beam sits a quarter box over the crane headroom (art pass 3: full stacks fill the
+  concrete, spare height is quiet sky, not empty concrete), and never sinks into the headroom. `yardFit(colW, capacity, maxH)` gives the box height and the yard that fits it
   exactly. Each bay's truck (`truckIn(bay, geo, facing)`): tractor cab at the end it faces (the receipt truck faces
   right with its cab under `arrowBox`, the collection truck faces left), a heavy skeletal trailer, three axles, cargo
   a yard box scaled up to `MAX_CARGO_SCALE` 1.6, the cab up to 28 % of the bay width, the whole truck filling most of the bay width and centred
   vertically between the bay title and status rows. `boxAt(geo, layout, stack, tier, lift)` is a container's box;
   `boxBounds` its whole drawn area. `modules/yardGeometry.test.ts` proves, for every level and five surfaces, that
   every slot (the top one lifted too) lies inside its own column hit region and under the beam, the box aspect stays
-  1.8 to 2.4 (under 1.9 on a phone), the sky band is at most 22 % of the yard, the carried box clears a full stack
+  1.3 to 1.45 (under 1.35 on a phone), the number 55 to 60 % of the box, the chevron inside its column clear of the
+  stack top and the beam at every stack height, the sky band at most 40 % of the yard and the spare concrete over full
+  stacks at most a quarter box unless the sky is at its cap, the carried box clears a full stack
   at least 8 px below the beam, the beam top within 3 px of the sky band bottom, the legs touch no column, and each truck (both facings) lies inside its
   bay, fills most of its width, is vertically centred, has its cab ahead of the trailer and its wheels on the road,
   with the cargo on the trailer and the arrow over the receipt cab, clear of the cargo.
@@ -66,8 +71,10 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   bays (up to `MAX_BAY_SHARE`, 30 %; the trucks scale with them), then to the yard's concrete headroom. The canvas
   always fills the whole play surface: no dark gaps (`playtestFixes.test.ts`). Hit regions still come from the layout only. Without the capacity the bays take their old share.
 - `modules/yardEffects.ts` (pure, `yardEffects.test.ts`): every render-only effect as a function of time.
-  `urgencyStyle(container, current, reducedMotion)`: the current container on a calm turn (risk at `FOCUS_BASE_RISK`)
-  glows with a breathing white outline; once the next-truck clock is low it vibrates (`vibrateX`: horizontal only,
+  `urgencyStyle(container, current, reducedMotion)`: the next container glows from the start of its turn (art pass 3:
+  a thick white outline with a breathing outer glow, static under reduced motion), bobs `nextBob` (`BOB_PX` 2 px,
+  1 Hz, vertical paint offset only) and a NEXT chevron bounces over its stack (`chevronBounce`); both are 0 under
+  reduced motion; once the next-truck clock is low it vibrates (`vibrateX`: horizontal only,
   1 to 2 px at `VIBRATE_HZ` 27 Hz, never a rotation) with a pulsing red outline; in the last 9 s of the shift every
   container vibrates with rising amplitude; under reduced motion nothing moves and the `urgent` flag gives a static
   red outline. Effects in flight (`Fx`, durations `FX_MS`): `land` (squash about the bottom centre plus a dust puff,
@@ -82,12 +89,14 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   window, livery stripe, grille, headlight, bumper, exhaust stack, mudguards, tyres with light hubs, skeletal
   trailer with a heavy beam, cross members and yellow twist-lock posts, soft road shadow; the collected box rides
   the trailer while the truck drives off; white cab facing left for collection, orange cab facing right for
-  receipt, none in the receipt bay with no truck), containers (corrugated ribs, top and bottom rails, door end with
-  locking bars and handles, four corner castings, a few bold ribs, thin top face, big dark number with a light halo; a bonus box is
-  smooth two-tone metallic gold (faint wide ribs) with its sequence colour along the bottom rail, a gold glow, and a
-  star badge on its top-left corner casting, drawn in a second pass over every box so it never covers a number; an
-  exposed one also gets a shine sweep every 1.6 s, up to three big sparkles at the box ends and a bouncing badge, and the open bonus window adds a countdown ring round the badge, a brighter halo and faster
-  sparkles; "H" tile for `heavy`), ghost drop boxes on `destinations`, the blue gantry and the yellow trolley with
+  receipt, none in the receipt bay with no truck), containers (art pass 3, the v1 look: a flat front in its colour, one light top
+  face, a darker end face, a few soft ribs, two subtle door bars, thin rails, corner castings, a big bold number with
+  a light halo; the next box is slightly brighter. A bonus box keeps its sequence colour with a static star badge on
+  its top-left corner, inside its column, drawn in a second pass so it never covers a number. Only the active bonus
+  (`bonusActive`: next, window open) is amber metallic gold (`gold-body`, kept apart from the yellow sequence colour)
+  with its sequence colour along the bottom rail, a gold halo, a shine sweep every 1.6 s, up to three sparkles at the
+  box ends, a bouncing badge and the countdown ring; "H" tile for `heavy`), the NEXT chevron (white, outlined,
+  striped in the next box's colour; hidden while the crane works that stack), ghost drop boxes on `destinations`, the blue gantry and the yellow trolley with
   hoist cables and a spreader as long as a box whose twist-lock legs drop when it grips. Selection lifts the box
   `LIFT` (0.3 of its height) with a white rim. The crane move (`cranePhase`, 330 to 460 ms) slides the trolley to the
   source, lowers, lifts, travels, lowers and releases; the trolley rests where the last move ended.
@@ -99,13 +108,19 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   (`ys-receipt-status`) at the bay's bottom-left, the dim overlay (`ys-dim`), the bobbing arrow (`ys-arrow`), the
   arrival announcement (36 px down, clear of the beam), the bonus "+250" pop (overshoot scale bounce) in the middle of
   the collection bay, clear of its labels, and the "+5s" (`fly-time`, outside the surface) starting just above the bay
-  and flying to the shift clock; bonus queue chips are the yard boxes' metallic gold with a small star; the
+  and flying to the shift clock; bonus queue chips keep their colour with a small static star, and only the active bonus's chip (`QueueItem.active`)
+  is metallic gold; the
   combo number pops when it changes (`YardQueue.vue`, re-keyed). Reduced motion: no fly, no pop.
 - HUD in the target's style: wordmark and uppercase level title, big shift and next-truck numbers with bars, LOADED
-  with "n/max REHANDLES" under it; queue chips with a top lip and lower rail (gold for a bonus, its sequence colour
-  kept as the rail). Band heights: `bandHeights` (HUD 108 px narrow, 74 wide; queue 54; incoming 28).
-- Screenshots: `docs/prototypes/2d/` (art pass 2, phone 390x844 at 2x: level 3 start, level 2 bonus window open and
-  bonus collect mid-burst, level 4 mandatory receipt; desktop 1280x800 level 4).
+  with "n/max REHANDLES" under it; queue chips with a top lip and lower rail (gold only for the active bonus, its sequence
+  colour kept as the rail). Band heights: `bandHeights` (HUD 108 px narrow, 74 wide; queue 54; incoming 28).
+- View-model for the art (art pass 3, `presentationScore.test.ts`): `ContainerView.next` from the start of each turn
+  (#1 included, false once the shift ends), `bonusActive` and `glint` (active bonus, no glint under reduced motion),
+  `QueueItem.active`, and `ViewModel.nextMarker` (`{ stack, buried }`, null when the shift is over, the next box is
+  not in the yard, or a receipt is mandatory). Hit regions stay layout-only (tested calm, urgent, reduced and selected).
+- Screenshots: `docs/prototypes/2d/` (art pass 3, phone 390x844 at 2x: level 3 after one rehandle, the owner's
+  `owner-2d-v3` state; level 2 bonus window open on #3; level 4 mandatory receipt; tutorial start; desktop 1280x800
+  level 4).
 
 ## Playtest fixes (spec #374 phase 1)
 
@@ -258,9 +273,9 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   in the receipt bay; plus singular and plural copy ("1 MOVE LEFT", "1 rehandle", "1 star bonus").
 - Scene: the gantry beam runs along the slanted row of stacks (first to last column, legs just outside) and moves
   across it with the trolley; the trolley rest point resets when the surface size or stack count changes.
-- Cover: `assets/cover.png` is a 640x360 capture of level 6 at 1280x760, scale 2 (8-bit palette, about 24 KB):
-  `window.__ys.loadLevel(6)` and the first four fixture actions, wait about 2 s so no announcement or message shows,
-  then crop the 880 px game column from the incoming band down to 16:9 (no toast, no control bar).
+- Cover: `assets/cover.png` (art pass 3) is a 640x360 crop of the phone level 3 capture (390x844 at 2x,
+  `loadLevel(3)` then `{ type: 'rehandle', from: 2, to: 4 }`): the 16:9 band from the beam down to the stack
+  numbers, 8-bit palette, about 20 KB.
 
 ## Audio cues (#388)
 

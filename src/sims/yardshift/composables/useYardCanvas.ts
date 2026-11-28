@@ -786,6 +786,7 @@ export function useYardCanvas(
     fx = [...liveFx(fx, e.at), e]
   }
 
+  /** Effects for the event types it knows; any other type (UI sound events and future ones) only redraws. */
   function onYardEvent(e: YardFxEvent): void {
     const now = performance.now()
     if (e.type === 'bonus-awarded') addFx({ kind: 'bonus', at: now })
