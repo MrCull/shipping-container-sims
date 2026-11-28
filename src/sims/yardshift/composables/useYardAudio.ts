@@ -45,6 +45,37 @@ export function playTone(ac: BaseAudioContext, out: AudioNode, t: Tone): void {
   osc.stop(start + t.dur + 0.01)
 }
 
+/** The gestures that may start audio: iOS Safari unlocks on `touchend` and `pointerdown`, desktops on any of them. */
+const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'keydown'] as const
+
+/**
+ * Keeps the context running (art pass 3, item 5): on every gesture while it is not `running` ('suspended' before
+ * the first gesture, 'interrupted' on iOS after a call or backgrounding), `resume()` inside the gesture, and on
+ * the first gesture with a context, also play a one-sample silent buffer, which is what makes iOS Safari unlock
+ * Web Audio reliably. `context` creates the context lazily (it may return null with no Web Audio). Returns a
+ * function that removes the listeners.
+ */
+export function installAudioUnlock(target: EventTarget, context: () => AudioContext | null): () => void {
+  let primed = false
+  function unlock(): void {
+    const ac = context()
+    if (!ac || ac.state === 'running') return
+    if (!primed) {
+      primed = true
+      const src = ac.createBufferSource()
+      src.buffer = ac.createBuffer(1, 1, 22050)
+      src.connect(ac.destination)
+      src.start(0)
+    }
+    void ac.resume().catch(() => {})
+  }
+  const options = { capture: true, passive: true }
+  for (const type of UNLOCK_EVENTS) target.addEventListener(type, unlock, options)
+  return () => {
+    for (const type of UNLOCK_EVENTS) target.removeEventListener(type, unlock, options)
+  }
+}
+
 export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void): void {
   const audio = useAudioStore()
   let ctx: AudioContext | null = null
@@ -91,26 +122,20 @@ export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void
   function play(cue: Cue): void {
     const ac = context()
     if (!ac || !bus) return
-    if (ac.state === 'suspended') void ac.resume().catch(() => {})
+    if (ac.state !== 'running') void ac.resume().catch(() => {})
     for (const t of cue.tones) playTone(ac, bus, t)
     if (cue.sample) playSample(ac, bus, cue.sample, cue.sampleGain ?? 1)
   }
 
-  /** Browsers start an AudioContext only after a gesture: create it on the first pointer or key press. */
-  function unlock(): void {
-    const ac = context()
-    if (ac?.state === 'suspended') void ac.resume().catch(() => {})
-  }
-  window.addEventListener('pointerdown', unlock, { once: true })
-  window.addEventListener('keydown', unlock, { once: true })
+  /** Browsers start an AudioContext only after a gesture: created on the first one, resumed on each until running. */
+  const stopUnlock = installAudioUnlock(window, context)
 
   const stopCues = onCue(play)
 
   onBeforeUnmount(() => {
     stopCues()
     stopGain()
-    window.removeEventListener('pointerdown', unlock)
-    window.removeEventListener('keydown', unlock)
+    stopUnlock()
     void ctx?.close().catch(() => {})
     ctx = null
     bus = null

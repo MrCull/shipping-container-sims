@@ -271,7 +271,11 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
 - `modules/audioCues.ts` (pure): `cuesForStep(after, events)` maps one engine step's events (a `dispatch` or a
   `tick`) to cues in event order (collect, combo, receive, rehandle, arrival, deadline-one, deadline-zero, overtime
   start and end, bonus window, jackpot, bonus missed, truck-low, `shift-tick` from `shift-low`, win, timeout,
-  blocked, undo). It never diffs states.
+  blocked, undo, plus the collection truck's `truck-off`, `truck-in` and `next-ready`). Given `before` (the store
+  passes it), it adds `deadline-two` when a move drops the moves-left count from above 2 to 2 (not on an arrival
+  at 2); that is the one state diff, since the engine has no such event. `winCue(stars)` scales the fanfare by the
+  stars (`starsFor` with the level's solver fixture; 3 for a level with none). `uiCue(e)` plays the store-level
+  `UiSoundEvent`s.
   `rejectionCue()` (invalid), `craneStartCue()`, `comboCue(c)` (one C major pentatonic step per combo,
   `pentatonicNote(min(c, 8) - 1)`: D5 at 2 up to E6 at 8, so chains play a tune) and
   `craneCues(before, after)` (pick at progress `PICK_AT` 0.30, land at `LAND_AT` 0.88). Tones are V20's
@@ -283,10 +287,58 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   downward sine blip. Level budget: no cue's summed envelope peaks exceed 0.306 (the jackpot before this pass; its
   low thump went 0.09 to 0.08 and its arpeggio 0.045 to 0.04 to make room), checked in `audioCues.test.ts`.
 - Store: `step()` wraps every dispatch and tick and sends its cues to `onCue` listeners; `startMove` sends the
-  crane start, `frame` the pick and land crossings; reduced motion sends only the landing.
+  crane start, `frame` the pick and land crossings; reduced motion sends only the landing. Store-level UI events
+  (`UiSoundEvent`, also sent to `onYardEvent` listeners, which ignore types they do not know): `selected`
+  (`target` a stack or `'receipt'`) and `deselected` from `send` when the selection changes with no action (a
+  selection a move clears leaves the sound to the move), `paused` from `pause()` and `resumed` from `resume()` when
+  the player pause was held. Each fires once per outcome (`store/yardshiftStoreAudio.test.ts`).
+- **Sound table (art pass 3 audit).** Every outcome has its own sound; `audioCues.test.ts` checks no two cues share
+  pitches, timbre and rhythm, that every `CueName` is covered, and that none sums over the 0.306 peak cap.
+  `tone(f0>f1, dur, vol, delay, type)`, Hz and seconds; all through `gainFor(..., 'sfx')` via the bus.
+
+  | Event (source) | Cue | How it is made |
+  | --- | --- | --- |
+  | Select a container (store `selected`) | `select` | one short high sine click, E6 to 1250 Hz, 35 ms |
+  | Select the receipt truck (store `selected` `'receipt'`) | `receipt-select` | two triangle clicks G5 then C6 |
+  | Deselect or cancel (store `deselected`) | `deselect` | one soft falling sine 880 to 600 Hz |
+  | Invalid tap (store `rejected`) | `invalid` | soft buzz: two short low square pulses, 150 and 140 Hz falling |
+  | Crane accepts a move (`startMove`) | `crane-start` | triangle motor whine 92 to 140 Hz |
+  | Crane pick and land (`frame` crossing `PICK_AT`, `LAND_AT`) | `pick`, `land` | samples `crane-pick.mp3`, `crane-land.mp3` |
+  | Collect (`collected`) | `collect` | trailer clunk (triangle 150 to 60 Hz) then a rising sine blip C5, G5; a low tail on the first two operations |
+  | Combo chain (`collected`, combo 2+) | `combo` | one pentatonic step per combo, D5 up to E6 |
+  | Collection truck drives off (`collected`) | `truck-off` | quiet sawtooth rumble falling 120 to 70 Hz at 0.25 s |
+  | New collection truck arrives (`collected`, not the last) | `truck-in` | sawtooth rumble rising 70 to 115 Hz at 0.84 s, brake squeak |
+  | Next container ready (`collected`, not the last) | `next-ready` | very soft G6 sine ding at 1.38 s, as the new truck stops |
+  | Receipt truck arrives (`arrival`) | `arrival` | horn: two honks of a square minor third (D#4, F#4) with `truck.mp3` |
+  | Receipt placed (`received`) | `receive` | trailer clunk then a settling falling pair E5, C5, with `truck.mp3` |
+  | Rehandle (`rehandled`) | `rehandle` | short rising sine 550 to 740 Hz |
+  | Deadline 2 (moves-left drops to 2) | `deadline-two` | two soft triangle ticks at 620 Hz |
+  | Deadline 1 (`deadline-one`) | `deadline-one` | one louder sine drop 510 to 390 Hz |
+  | Deadline 0 (`deadline-zero`) | `deadline-zero` | alarm: four fast triangle pulses alternating 880 and 660 Hz |
+  | Next-truck clock low (`truck-low`) | `truck-low` | short sine drop 700 to 540 Hz |
+  | Overtime start (`overtime-start`) | `overtime-start` | siren: sawtooth sweeping 440 to 660 and back, twice |
+  | Overtime end (`overtime-end`) | `overtime-end` | sine rise 300 to 520 Hz |
+  | Shift ticks at 9, 5, 3, 2, 1 s (`shift-low`) | `shift-tick` | short triangle tick rising G5 (9 s) to G6 (1 s) |
+  | Bonus window opens (`bonus-window`) | `bonus-window` | twinkle: G6, C7, E7 sines with detuned twins |
+  | Bonus collected (`bonus-awarded`) | `jackpot` | fanfare chord with coin arpeggio, shimmer and pop |
+  | Bonus missed (`bonus-missed`) | `bonus-missed` | gentle two-step downward sine blip |
+  | Undo (`undone`) | `undo` | rewind swoosh: triangle sweep 1400 to 260 Hz, then a short rising flick |
+  | Pause (store `paused`) | `pause` | triangle E5 then A4 |
+  | Resume (store `resumed`) | `resume` | triangle A4 then E5 |
+  | Level complete (`completed`) | `win` | triangle arpeggio, 4 notes at 1 star, 5 plus a held chord at 2, 6 plus chord and a high sparkle at 3 |
+  | Fail, shift out (`failed` `timeout`) | `timeout` | low triangle drop then three falling notes |
+  | Fail, blocked (`failed` `blocked`) | `blocked` | sawtooth then triangle drops, low thud |
+  | Time credit (`time-credit`) | none | the rehandle sound covers it |
 - `composables/useYardAudio.ts` (mounted by `Yardshift.vue`): one Web Audio bus `GainNode` set from
-  `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live; the context starts on the
-  first pointer or key press. No fixed volumes. Every oscillator or buffer source and its envelope gain disconnect on
+  `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live. No fixed volumes.
+- **Unlock (iOS, art pass 3 item 5):** `installAudioUnlock(window, context)` listens (capture, passive) to
+  `pointerdown`, `touchend` and `keydown` for the whole mount. Each gesture while the context is not `running`
+  (`suspended` before the first gesture, `interrupted` on iOS after a call or backgrounding) calls `resume()`
+  inside the gesture; the first gesture with a context also plays a one-sample silent buffer to the destination,
+  which iOS Safari needs to unlock Web Audio. `play` also resumes a context that is not running. Unit-tested with
+  a fake context in `useYardAudio.test.ts`. **The iPhone silent (ring/silent) switch mutes Web Audio**: with it on,
+  Yardshift's effects are silent even when unlocked (the `Audio` element music may still play); a tester who hears
+  nothing on an iPhone should check the switch first. Every oscillator or buffer source and its envelope gain disconnect on
   `onended` (`releaseOnEnded`; `playTone` is exported, and `composables/useYardAudio.test.ts` plays the whole jackpot
   through a fake context and checks every node reaches the bus and disconnects).
 - Samples in `assets/audio/` (mono 64 kbit/s, trimmed with a fade out from `available-media/sound-samples`):
