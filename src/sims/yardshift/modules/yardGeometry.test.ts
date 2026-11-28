@@ -13,6 +13,7 @@ import {
   chevronAt,
   freeSlots,
   numberSize,
+  SKY_SHARE,
   slotsFor,
   truckIn,
   yardGeometry,
@@ -53,8 +54,13 @@ describe('Yardshift 2D yard geometry', () => {
         for (const level of LEVELS) {
           const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
-          // The sky band is at most about a fifth of the yard; spare height is concrete headroom, not sky.
-          expect(g.backdrop.h, `level ${level.number}`).toBeLessThanOrEqual(layout.yard.h * 0.22 + 1)
+          // The sky band is at most `SKY_SHARE` (40 %) of the yard.
+          expect(g.backdrop.h, `level ${level.number}`).toBeLessThanOrEqual(layout.yard.h * SKY_SHARE + 1)
+          // Full stacks fill the concrete (owner, art pass 3): under the beam there is the crane headroom (one box and
+          // spreader room) and at most a quarter box more, unless the sky has hit its cap.
+          const beamBottom = g.gantry.beamY + g.gantry.beamH
+          const spare = g.groundY - level.capacity * g.boxH - g.dy - beamBottom - g.boxH - 10
+          if (g.backdrop.h < layout.yard.h * SKY_SHARE - 1) expect(spare, `level ${level.number}`).toBeLessThanOrEqual(g.boxH * 0.25 + 2)
           // A carried box clears a full stack, and still hangs below the beam (room for the spreader).
           const fullTop = g.groundY - level.capacity * g.boxH
           expect(g.carryY + g.boxH).toBeLessThanOrEqual(fullTop)

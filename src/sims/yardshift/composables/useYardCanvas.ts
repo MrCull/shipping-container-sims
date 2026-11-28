@@ -10,13 +10,26 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
 import type { ContainerView, HitTarget, Rect, ViewModel } from '../types/presentation'
 import { RECEIPT_TRUCK, type CraneMove, type YardFxEvent } from '../store/yardshiftStore'
-import { boxAt, freeSlots, slotsFor, truckIn, type Box, type Truck, type YardGeometry, yardGeometry } from '../modules/yardGeometry'
+import {
+  boxAt,
+  chevronAt,
+  freeSlots,
+  numberSize,
+  slotsFor,
+  truckIn,
+  type Box,
+  type Truck,
+  type YardGeometry,
+  yardGeometry,
+} from '../modules/yardGeometry'
 import {
   burst,
+  chevronBounce,
   collectMotion,
   type Fx,
   fxProgress,
   liveFx,
+  nextBob,
   pulse,
   rejectX,
   shineAt,
@@ -56,14 +69,19 @@ const centreX = (b: Box) => b.x + (b.w + b.dx) / 2
 interface Paint {
   label: string
   colour: string
+  /** A bonus still worth its bonus: the static star badge. */
   bonus: boolean
+  /** The active bonus (next, window open): gold body, halo, shine, sparkles (owner, art pass 3). */
+  gold?: boolean
+  /** The next container: a slightly brighter fill (the glow paints its outline). */
+  next?: boolean
   heavy: boolean
   selected?: boolean
   /** Red outline (pulsing unless `still`). */
   red?: boolean
   /** Soft glow of the calm current container (pulsing unless `still`). */
   glow?: boolean
-  /** Exposed bonus: shine sweep, sparkles and bouncing star (never under reduced motion). */
+  /** The active bonus moving: shine sweep, sparkles and bouncing star (never under reduced motion). */
   glint?: boolean
   /** The open bonus window on this container: its remaining fraction 0..1. */
   window?: number | null
@@ -131,80 +149,78 @@ function heavyTile(g: CanvasRenderingContext2D, x: number, y: number, s: number)
   g.fillText('H', x + s / 2, y + s / 2 + 1)
 }
 
-/** The side of a container: base colour (gold for a bonus), corrugated ribs, rails, door end and corner castings. */
-function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold: boolean): void {
+/**
+ * The faces of a container (owner, art pass 3: the v1 look): a flat front in its colour (slightly brighter when it is
+ * next), one light top face, a darker end face, a few soft ribs, subtle door bars at the right end, thin rails and
+ * corner castings. No gradients or busy texture, except on the active bonus's metallic gold.
+ */
+function containerSide(g: CanvasRenderingContext2D, b: Box, colour: string, gold: boolean, bright = false): void {
   const { x, y, w, h, dx, dy } = b
-  const rail = Math.max(1.5, h * 0.1)
-  const door = w * 0.17
-  // Top face and the end face, a thin sliver each.
+  const rail = Math.max(1.5, h * 0.06)
+  const door = w * 0.16
+  // `shade` reads a hex colour, so a brighter tone is one more step from the base colour, not a shade of a shade.
+  const tone = (a: number) => shade(colour, bright ? (a >= 0 ? a + 0.14 * (1 - a) : a * 0.75 + 0.1) : a)
+  const front = tone(0)
+  // Top face, light.
   g.beginPath()
   g.moveTo(x, y)
   g.lineTo(x + dx, y - dy)
   g.lineTo(x + w + dx, y - dy)
   g.lineTo(x + w, y)
   g.closePath()
-  g.fillStyle = gold ? C['gold-shine'] : shade(colour, 0.4)
+  g.fillStyle = gold ? C['gold-shine'] : tone(0.38)
   g.fill()
+  // End face, darker.
   g.beginPath()
   g.moveTo(x + w, y)
   g.lineTo(x + w + dx, y - dy)
   g.lineTo(x + w + dx, y + h - dy)
   g.lineTo(x + w, y + h)
   g.closePath()
-  g.fillStyle = gold ? C['gold-deep'] : shade(colour, -0.3)
+  g.fillStyle = gold ? C['gold-deep'] : tone(-0.3)
   g.fill()
-  // The side: a vertical gradient so it reads as metal; gold gets a brighter, richer one.
-  const body = g.createLinearGradient(0, y, 0, y + h)
   if (gold) {
-    // Metallic gold: a bright cream top edge, rich gold, a deep bronze foot, so it never reads as the yellow slot.
-    // Two-tone: a bright upper half over a deeper lower half, joined softly.
+    // Metallic gold: a bright cream top edge, rich amber gold and a deep bronze foot, never the flat yellow slot.
+    const body = g.createLinearGradient(0, y, 0, y + h)
     body.addColorStop(0, C['gold-shine'])
-    body.addColorStop(0.2, C['gold-body'])
-    body.addColorStop(0.5, C['gold-body'])
-    body.addColorStop(0.62, C['gold-deep'])
+    body.addColorStop(0.22, C['gold-body'])
+    body.addColorStop(0.55, C['gold-body'])
+    body.addColorStop(0.7, C['gold-deep'])
     body.addColorStop(1, C['medal-rim'])
-  } else {
-    body.addColorStop(0, shade(colour, 0.12))
-    body.addColorStop(1, shade(colour, -0.08))
-  }
-  g.fillStyle = body
+    g.fillStyle = body
+  } else g.fillStyle = front
   g.fillRect(x, y, w, h)
-  // Corrugated ribs: a few bold light and dark pairs across the side, short of the door end (smooth faint ones on gold,
-  // so the metal reads as one shine at phone size).
-  const ribs = Math.max(4, Math.round((w - door) / (gold ? 16 : 9)))
-  const step = (w - door) / ribs
-  const lit = gold ? 'rgb(255 251 232 / 30%)' : shade(colour, 0.22)
-  const dark = gold ? 'rgb(120 76 18 / 18%)' : shade(colour, -0.2)
-  for (let i = 0; i < ribs; i++) {
-    const rx = x + i * step
-    g.fillStyle = lit
-    g.fillRect(rx + step * 0.12, y + rail, Math.max(1, step * 0.3), h - 2 * rail)
-    g.fillStyle = dark
-    g.fillRect(rx + step * 0.55, y + rail, Math.max(1, step * 0.3), h - 2 * rail)
-  }
-  // Door end: a panel with two vertical locking bars and their handles.
-  const dxp = x + w - door
-  g.fillStyle = gold ? 'rgb(120 76 18 / 18%)' : shade(colour, -0.06)
-  g.fillRect(dxp, y + rail, door, h - 2 * rail)
-  g.strokeStyle = gold ? C['gold-deep'] : shade(colour, -0.42)
+  // A few soft ribs across the front, short of the door end.
+  const ribs = Math.max(3, Math.min(6, Math.round((w - door) / 11)))
+  const step = (w - door) / (ribs + 1)
+  g.fillStyle = gold ? 'rgb(120 76 18 / 20%)' : tone(-0.12)
+  for (let i = 1; i <= ribs; i++) g.fillRect(Math.round(x + i * step), y + rail + 1, 1.5, h - 2 * rail - 2)
+  // End face ribs, two of them.
+  g.strokeStyle = gold ? 'rgb(120 76 18 / 25%)' : tone(-0.4)
   g.lineWidth = 1
   g.beginPath()
-  g.moveTo(Math.round(dxp) + 0.5, y + rail)
-  g.lineTo(Math.round(dxp) + 0.5, y + h - rail)
-  for (const f of [0.35, 0.72]) {
-    const bx = Math.round(dxp + door * f) + 0.5
-    g.moveTo(bx, y + rail)
-    g.lineTo(bx, y + h - rail)
+  for (const f of [0.33, 0.66]) {
+    g.moveTo(x + w + dx * f, y - dy * f + rail)
+    g.lineTo(x + w + dx * f, y + h - dy * f - rail)
   }
   g.stroke()
-  g.fillStyle = g.strokeStyle
-  for (const f of [0.35, 0.72]) g.fillRect(dxp + door * f - 1.2, y + h * 0.52, 3, Math.max(1.5, h * 0.08))
+  // Door end: two subtle locking bars.
+  const dxp = x + w - door
+  g.strokeStyle = gold ? 'rgb(120 76 18 / 35%)' : tone(-0.2)
+  g.lineWidth = 1.5
+  g.beginPath()
+  for (const f of [0.35, 0.72]) {
+    const bx = Math.round(dxp + door * f) + 0.5
+    g.moveTo(bx, y + rail + 2)
+    g.lineTo(bx, y + h - rail - 2)
+  }
+  g.stroke()
   // Top and bottom rails.
-  g.fillStyle = gold ? C['gold-deep'] : shade(colour, -0.28)
+  g.fillStyle = gold ? C['gold-deep'] : tone(-0.22)
   g.fillRect(x, y, w, rail)
   g.fillRect(x, y + h - rail, w, rail)
   // Four corner castings.
-  const cs = Math.max(2, Math.min(5, h * 0.17))
+  const cs = Math.max(2, Math.min(5, h * 0.09))
   g.fillStyle = C.casting
   for (const [cx, cy] of [
     [x, y],
@@ -226,32 +242,32 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
     g.translate(-cx, -(b.y + b.h))
   }
   const { x, y, w, h } = b
-  // A soft halo under the box: gold for a bonus (stronger while its window is open), mint for the calm current box.
-  const glowPulse = p.still ? 0.6 : pulse(now, 1200, p.seed)
-  if (p.bonus || p.glow) {
+  // A soft halo under the box: gold for the active bonus, white for the next container (pulsing unless still).
+  const glowPulse = p.still ? 0.6 : pulse(now, 1000, p.seed)
+  if (p.gold || p.glow) {
     g.save()
-    g.shadowColor = p.bonus ? `rgb(255 205 80 / ${p.window != null ? 95 : 60}%)` : `rgb(255 255 255 / ${Math.round(45 + 45 * glowPulse)}%)`
-    g.shadowBlur = p.bonus ? (p.window != null ? 16 + 8 * glowPulse : 9) : 8 + 8 * glowPulse
+    g.shadowColor = p.gold ? 'rgb(255 190 60 / 95%)' : `rgb(255 255 255 / ${Math.round(55 + 40 * glowPulse)}%)`
+    g.shadowBlur = p.gold ? 16 + 8 * glowPulse : 10 + 8 * glowPulse
     g.fillStyle = C.outline
     outline(g, b)
     g.fill()
     g.restore()
   }
-  const gold = p.bonus || (p.miss != null && p.miss < 1)
-  containerSide(g, b, p.colour, false)
+  const gold = p.gold || (p.miss != null && p.miss < 1)
+  containerSide(g, b, p.colour, false, p.next)
   if (gold) {
     // Gold over the box's own colour; a missed bonus fades it out.
     g.save()
-    g.globalAlpha = p.bonus ? 1 : 1 - (p.miss ?? 1)
+    g.globalAlpha = p.gold ? 1 : 1 - (p.miss ?? 1)
     containerSide(g, b, p.colour, true)
     g.restore()
     // The sequence colour runs along the bottom rail, so the order still reads on gold.
-    if (p.bonus) {
+    if (p.gold) {
       g.fillStyle = p.colour
       g.fillRect(x + w * 0.08, y + h - Math.max(2.5, h * 0.12), w * 0.66, Math.max(2.5, h * 0.12))
     }
   }
-  if (p.bonus && p.glint && !p.still) {
+  if (p.gold && p.glint && !p.still) {
     // Shine sweep: a slanted light band crossing the box every 1.6 s.
     const s = shineAt(now, p.seed)
     if (s !== null) {
@@ -288,24 +304,24 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
   g.moveTo(x + w, y)
   g.lineTo(x + w, y + h)
   g.stroke()
-  // The big dark number on the side, with a light halo so it reads on every colour at phone size.
-  const size = Math.round(Math.min(h * 0.74, w * 0.36))
-  const nx = x + (w * 0.83) / 2
-  const ny = y + h / 2 + size * 0.04
+  // The big bold number on the front (58 % of the box height), with a light halo so it reads on every colour.
+  const size = numberSize(b)
+  const nx = x + (w * 0.84) / 2
+  const ny = y + h / 2 + size * 0.06
   g.font = `900 ${size}px system-ui, sans-serif`
   g.textAlign = 'center'
   g.textBaseline = 'middle'
-  g.lineWidth = Math.max(2, size * 0.16)
-  g.strokeStyle = 'rgb(255 255 255 / 55%)'
+  g.lineWidth = Math.max(2, size * 0.12)
+  g.strokeStyle = 'rgb(255 255 255 / 40%)'
   g.strokeText(p.label, nx, ny)
   g.fillStyle = C['number-ink']
   g.fillText(p.label, nx, ny)
   if (p.heavy) {
     const s = Math.max(9, Math.min(h * 0.5, w * 0.18))
-    heavyTile(g, x + w * 0.83 - s - 2, y + (h - s) / 2, s)
+    heavyTile(g, x + w * 0.84 - s - 2, y + h - s - 3, s)
   }
-  if (p.bonus) {
-    // Sparkles on the gold (faster while the bonus window is open).
+  if (p.gold) {
+    // Sparkles on the gold (fast: the bonus window is open).
     if (p.glint && !p.still) {
       g.fillStyle = C['gold-shine']
       for (const sp of sparkles(now, p.seed, p.window != null).slice(0, 3)) {
@@ -319,14 +335,18 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
     // The star badge goes on the top-left corner casting in a second pass (`badge`), over every box.
   }
   if (p.glow && !p.red && !p.selected) {
-    // The calm current container: a soft breathing white outline.
-    g.lineWidth = 2
-    g.strokeStyle = `rgb(255 255 255 / ${Math.round(45 + 50 * glowPulse)}%)`
+    // The next container: a thick bright white outline with a soft outer glow that breathes (static when still).
+    g.save()
+    g.shadowColor = `rgb(255 255 255 / ${Math.round(60 + 35 * glowPulse)}%)`
+    g.shadowBlur = 6 + 6 * glowPulse
+    g.lineWidth = 3.5
+    g.strokeStyle = C.rim
     outline(g, b)
     g.stroke()
+    g.restore()
   }
   if (p.red) {
-    g.lineWidth = 3
+    g.lineWidth = p.next ? 3.5 : 3
     g.strokeStyle = p.still ? C.urgent : `rgb(233 72 61 / ${Math.round(45 + 55 * pulse(now, 360, p.seed))}%)`
     outline(g, b)
     g.stroke()
@@ -346,11 +366,13 @@ function container(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): 
  */
 function badge(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): void {
   const r = Math.max(6, Math.min(b.h * 0.27, 10))
-  const bounce = p.glint && !p.still ? -2.5 * Math.abs(Math.sin(now * 0.005 + p.seed)) : 0
-  const bx = b.x + 1
+  // Static until it is the active bonus (owner, art pass 3): only then does the badge bounce.
+  const bounce = p.gold && p.glint && !p.still ? -2.5 * Math.abs(Math.sin(now * 0.005 + p.seed)) : 0
+  // Over the top-left corner, kept inside its own column (art pass 3), clear of the number.
+  const bx = b.x + r * 0.55
   const by = b.y - b.dy * 0.5 - 1 + bounce
   medallion(g, bx, by, r)
-  if (p.window != null) {
+  if (p.gold && p.window != null) {
     g.lineCap = 'round'
     g.lineWidth = 3
     g.strokeStyle = 'rgb(255 255 255 / 45%)'
@@ -363,6 +385,40 @@ function badge(g: CanvasRenderingContext2D, b: Box, p: Paint, now: number): void
     g.stroke()
     g.lineCap = 'butt'
   }
+}
+
+/** The NEXT chevron: a bold down-pointing arrow, white with a dark outline and a soft glow, striped in `tint`. */
+function chevron(g: CanvasRenderingContext2D, r: Rect, tint: string): void {
+  const { x, y, w, h } = r
+  const t = Math.max(3, h * 0.38)
+  g.save()
+  g.beginPath()
+  g.moveTo(x, y)
+  g.lineTo(x + w / 2, y + h - t)
+  g.lineTo(x + w, y)
+  g.lineTo(x + w, y + t)
+  g.lineTo(x + w / 2, y + h)
+  g.lineTo(x, y + t)
+  g.closePath()
+  g.shadowColor = 'rgb(255 255 255 / 70%)'
+  g.shadowBlur = 6
+  g.fillStyle = C.rim
+  g.fill()
+  g.shadowBlur = 0
+  g.lineJoin = 'round'
+  g.lineWidth = 1.6
+  g.strokeStyle = C.outline
+  g.stroke()
+  // A stripe of the next container's colour along the chevron, so it matches its box.
+  g.beginPath()
+  g.moveTo(x + w * 0.16, y + t * 0.5)
+  g.lineTo(x + w / 2, y + h - t * 0.5)
+  g.lineTo(x + w * 0.84, y + t * 0.5)
+  g.lineWidth = Math.max(1.5, t * 0.4)
+  g.lineJoin = 'miter'
+  g.strokeStyle = tint
+  g.stroke()
+  g.restore()
 }
 
 /** A soft contact shadow on the ground under a box. */
@@ -813,7 +869,7 @@ export function useYardCanvas(
     g.translate(motion.x, motion.y)
     truckFacing(g, layout.collection, geo, 'left', C['cab-white'], C['cab-teal'])
     if (collecting && motion.carrying) {
-      const paint: Paint = { ...collecting, heavy: false, exposed: true, seed: 1 }
+      const paint: Paint = { ...collecting, gold: collecting.bonus, heavy: false, exposed: true, seed: 1 }
       container(g, collectTruck.cargo, paint, now)
       if (paint.bonus) badge(g, collectTruck.cargo, paint, now)
     }
@@ -835,7 +891,7 @@ export function useYardCanvas(
     const windowFor = (id: number) => (vm.bonus && vm.bonus.id === id ? vm.bonus.fraction : null)
 
     /** Paint and offset of a resting container from its urgency, effects and the bonus window. */
-    function dressed(c: { id: number; shake: number; urgent: boolean; bonus: boolean }, current: boolean, target: HitTarget, top: boolean) {
+    function dressed(c: { id: number; shake: number; urgent: boolean }, current: boolean, target: HitTarget, top: boolean) {
       const u = urgencyStyle(c, current, reduced)
       const reject = top ? fxFor(target, 'reject') : undefined
       const land = top ? fxFor(target, 'land') : undefined
@@ -869,8 +925,11 @@ export function useYardCanvas(
       const top = c.tier === stackHeight(c.stack) - 1
       const d = dressed(c, c.next, { kind: 'stack', index: c.stack }, top)
       if (c.glint) animated = true
-      const b = moveBox(boxAt(geo, layout, c.stack, c.tier, lift), d.dx, 0)
-      const paint: Paint = { ...c, ...d.paint, exposed: top, seed: c.id }
+      // The next container bobs gently (paint only; its hit region is the column).
+      const bob = c.next && !c.selected ? nextBob(now, reduced) : 0
+      if (c.next && !reduced) animated = true
+      const b = moveBox(boxAt(geo, layout, c.stack, c.tier, lift), d.dx, bob)
+      const paint: Paint = { ...c, ...d.paint, gold: c.bonusActive, exposed: top, seed: c.id }
       container(g, b, paint, now)
       if (c.bonus) badges.push({ b, p: paint })
       if (d.land) dust(g, b, fxProgress(d.land, now))
@@ -881,8 +940,7 @@ export function useYardCanvas(
       const d = dressed(c, c.shake > 0 || c.urgent, { kind: 'receipt' }, true)
       const lift = c.selected ? geo.lift * 0.6 : 0
       const b = moveBox(receiptTruck.cargo, d.dx, -lift)
-      if (c.bonus && !reduced) animated = true
-      const paint: Paint = { ...c, ...d.paint, colour: C['cab-orange'], glint: c.bonus && !reduced, exposed: true, seed: c.id }
+      const paint: Paint = { ...c, ...d.paint, colour: C['cab-orange'], exposed: true, seed: c.id }
       container(g, b, paint, now)
       if (c.bonus) badges.push({ b, p: paint })
       if (d.miss) poof(g, b, fxProgress(d.miss, now))
@@ -900,9 +958,9 @@ export function useYardCanvas(
     let gripping = false
     if (m && (moving || movingCargo)) {
       const paint: Paint = moving
-        ? { ...moving, selected: false, glint: false, exposed: true, seed: moving.id }
+        ? { ...moving, gold: moving.bonusActive, selected: false, glint: false, exposed: true, seed: moving.id }
         : { ...movingCargo!, colour: C['cab-orange'], selected: false, exposed: true, seed: movingCargo!.id }
-      carried = { label: paint.label, colour: paint.colour, bonus: paint.bonus }
+      carried = { label: paint.label, colour: paint.colour, bonus: paint.gold ?? false }
       const src = moving ? boxAt(geo, layout, m.from, moving.tier) : receiptTruck.cargo
       const dst = m.to >= 0 ? boxAt(geo, layout, m.to, stackHeight(m.to)) : collectTruck.cargo
       const p = cranePhase(m.progress)
@@ -929,6 +987,14 @@ export function useYardCanvas(
       if (m.progress >= 0.999) restX = centreX(dst)
     }
     trolley(g, geo, hookX, hookY, gripping)
+
+    // The bouncing NEXT chevron over the next container's stack (static under reduced motion), hidden while the crane
+    // works that stack.
+    if (vm.nextMarker && !(m && (m.from === vm.nextMarker.stack || m.to === vm.nextMarker.stack))) {
+      const r = chevronAt(geo, layout, vm.nextMarker.stack, stackHeight(vm.nextMarker.stack))
+      chevron(g, { ...r, y: r.y + chevronBounce(now, reduced) }, vm.containers.find((c) => c.next)?.colour ?? C.rim)
+      if (!reduced) animated = true
+    }
 
     // The bonus collect: gold flash over the collection bay and a coin and star burst from the truck.
     for (const f of fx) {

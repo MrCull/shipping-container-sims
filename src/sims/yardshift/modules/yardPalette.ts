@@ -42,8 +42,8 @@ export const YARD_COLOURS = {
   'casting': '#20282f',
   'dust': '#efe7d6',
   'gold-shine': '#fffbe8',
-  'gold-body': '#f5c542',
-  'gold-deep': '#b9821f',
+  'gold-body': '#eba832',
+  'gold-deep': '#a2631b',
 } as const
 
 export type YardColour = keyof typeof YARD_COLOURS

@@ -21,7 +21,7 @@ defineProps<{
         v-for="(item, i) in queue"
         :key="i"
         :style="{ '--chip': item.colour }"
-        :class="{ empty: item.id === null, gold: item.bonus }"
+        :class="{ empty: item.id === null, gold: item.active }"
       >
         {{ item.label }}
         <span
@@ -101,7 +101,7 @@ defineProps<{
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-/* A bonus container's chip is the yard boxes' metallic gold, with its sequence colour kept as the lower rail. */
+/* Only the active bonus (next, window open) is metallic gold, its sequence colour kept as the lower rail; any other bonus keeps its colour and a small static star (art pass 3). */
 .queue li.gold {
   background:
     linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 45%) 42%, transparent 54%),
