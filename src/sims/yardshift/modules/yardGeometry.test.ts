@@ -2,7 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { LEVELS } from './levels'
 import { arrowBox, layoutFor } from './presentation'
 import { contains, overlaps, screenLayout } from './screenLayout'
-import { ASPECT_MAX, ASPECT_MIN, BAY_STATUS_PX, BAY_TITLE_PX, boxAt, boxBounds, freeSlots, slotsFor, truckIn, yardGeometry } from './yardGeometry'
+import {
+  ASPECT_MAX,
+  ASPECT_MIN,
+  BAY_STATUS_PX,
+  BAY_TITLE_PX,
+  boxAt,
+  boxBounds,
+  CHEVRON_BOUNCE,
+  chevronAt,
+  freeSlots,
+  numberSize,
+  slotsFor,
+  truckIn,
+  yardGeometry,
+} from './yardGeometry'
 
 /** Play surfaces of a phone (with and without notch insets), a tablet and two desktops. */
 const SURFACES = [
@@ -49,8 +63,27 @@ describe('Yardshift 2D yard geometry', () => {
           expect(Math.abs(g.gantry.beamY - (g.backdrop.y + g.backdrop.h)), `level ${level.number}`).toBeLessThanOrEqual(3)
           // The legs run from the beam down the full yard.
           expect(g.gantry.footY).toBeGreaterThanOrEqual(g.groundY)
-          // Boxes are sized from the column width first: on a phone they are as tall as the 1.8:1 shape allows.
-          if (s.w < 600) expect(g.boxW / g.boxH, `level ${level.number}`).toBeLessThan(1.9)
+          // Boxes are sized from the column width first: on a phone they are as tall as the 1.3:1 shape allows.
+          if (s.w < 600) expect(g.boxW / g.boxH, `level ${level.number}`).toBeLessThan(1.35)
+        }
+      })
+
+      it('the NEXT chevron sits over its stack, inside its column and under the beam, at every stack height', () => {
+        for (const level of LEVELS) {
+          const layout = layoutFor(level.stacks.length, vp, level.capacity)
+          const g = yardGeometry(layout, level.capacity)
+          layout.columns.forEach((col, i) => {
+            for (let height = 0; height <= level.capacity; height++) {
+              const c = chevronAt(g, layout, i, height)
+              const where = `level ${level.number} stack ${i} height ${height}`
+              expect(contains(col, c), where).toBe(true)
+              // Clear of the stack top even at the bottom of its bounce, and clear of the beam at the top of it.
+              const stackTop = height > 0 ? boxBounds(boxAt(g, layout, i, height - 1)).y : g.groundY
+              expect(c.y + c.h + CHEVRON_BOUNCE, where).toBeLessThanOrEqual(stackTop)
+              expect(c.y - CHEVRON_BOUNCE, where).toBeGreaterThanOrEqual(g.gantry.beamY + g.gantry.beamH)
+              expect(c.w, where).toBeGreaterThanOrEqual(12)
+            }
+          })
         }
       })
 
@@ -74,13 +107,19 @@ describe('Yardshift 2D yard geometry', () => {
           expect(g.backdrop.y + g.backdrop.h).toBe(g.floor.y)
           expect(g.groundY).toBeGreaterThan(g.floor.y)
           expect(g.groundY).toBeLessThan(layout.yard.y + layout.yard.h)
-          // Container shaped (art pass 3): a side-on box 1.8 to 2.4 times as long as tall, that fills its column unless
-          // the room is short, when it narrows to keep its shape instead of flattening.
+          // Chunky boxes (owner, art pass 3 of the 2D yard: the v1 look): 1.3 to 1.45 times as wide as tall, filling
+          // the column unless the room is short, when they narrow to keep their shape instead of flattening.
           const aspect = g.boxW / g.boxH
+          expect(ASPECT_MIN).toBe(1.3)
+          expect(ASPECT_MAX).toBe(1.45)
           expect(aspect, `level ${level.number}`).toBeGreaterThanOrEqual(ASPECT_MIN - 0.01)
           expect(aspect, `level ${level.number}`).toBeLessThanOrEqual(ASPECT_MAX + 0.01)
           if (aspect < ASPECT_MAX - 0.01) expect((g.boxW + g.dx) / layout.columns[0]!.w).toBeGreaterThan(0.85)
           expect(g.dy).toBeLessThan(g.boxH * 0.5)
+          // Big bold numbers: 55 to 60 % of the box height.
+          const n = numberSize(boxAt(g, layout, 0, 0))
+          expect(n / g.boxH, `level ${level.number}`).toBeGreaterThanOrEqual(0.55 - 1 / g.boxH)
+          expect(n / g.boxH, `level ${level.number}`).toBeLessThanOrEqual(0.6 + 1 / g.boxH)
         }
       })
 

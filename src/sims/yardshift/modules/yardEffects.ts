@@ -5,6 +5,7 @@
  * sample it. Nothing here moves a hit region; the renderer only offsets what it paints.
  */
 import { FOCUS_BASE_RISK } from './presentation'
+import { CHEVRON_BOUNCE } from './yardGeometry'
 import type { HitTarget } from '../types/presentation'
 
 /** One effect in flight; `at` is its start time (ms, the renderer's clock). */
@@ -65,8 +66,24 @@ export interface UrgencyStyle {
 export function urgencyStyle(c: { shake: number; urgent: boolean }, current: boolean, reducedMotion: boolean): UrgencyStyle {
   if (reducedMotion || c.urgent) return { vibrate: 0, red: c.urgent, glow: current && !c.urgent }
   const calm = c.shake <= FOCUS_BASE_RISK + 1e-6
-  if (current) return calm ? { vibrate: 0, red: false, glow: c.shake > 0 } : { vibrate: c.shake, red: true, glow: false }
+  // Art pass 3: the next container glows from the start of its turn, whatever its shake.
+  if (current) return calm ? { vibrate: 0, red: false, glow: true } : { vibrate: c.shake, red: true, glow: false }
   return { vibrate: c.shake, red: false, glow: false }
+}
+
+/** How far the next container bobs (px, peak to peak; owner, art pass 3: about 2 px at about 1 Hz). */
+export const BOB_PX = 2
+
+/** Vertical paint offset (px, up is negative) of the next container: a gentle 1 Hz bob; 0 under reduced motion. */
+export function nextBob(now: number, reducedMotion: boolean): number {
+  if (reducedMotion) return 0
+  return -BOB_PX * (0.5 - 0.5 * Math.cos((2 * Math.PI * now) / 1000))
+}
+
+/** Vertical paint offset (px) of the NEXT chevron: a bounce within `CHEVRON_BOUNCE`; 0 under reduced motion. */
+export function chevronBounce(now: number, reducedMotion: boolean): number {
+  if (reducedMotion) return 0
+  return CHEVRON_BOUNCE * -Math.abs(Math.sin((Math.PI * now) / 700)) * 2 + CHEVRON_BOUNCE
 }
 
 /** A 0..1 pulse with period `periodMs`. */

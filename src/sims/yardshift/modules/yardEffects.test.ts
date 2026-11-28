@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FOCUS_BASE_RISK } from './presentation'
-import { burst, collectMotion, FX_MS, fxProgress, liveFx, rejectX, squash, urgencyStyle, vibrateX, VIBRATE_HZ, type Fx } from './yardEffects'
+import { CHEVRON_BOUNCE } from './yardGeometry'
+import { BOB_PX, burst, chevronBounce, collectMotion, nextBob, FX_MS, fxProgress, liveFx, rejectX, squash, urgencyStyle, vibrateX, VIBRATE_HZ, type Fx } from './yardEffects'
 
 describe('Yardshift yard effects (render only, deterministic)', () => {
   it('vibration is a tight sideways buzz: 1 to 2 px at about 27 Hz, none at zero risk', () => {
@@ -33,6 +34,25 @@ describe('Yardshift yard effects (render only, deterministic)', () => {
     expect(urgencyStyle({ shake: 0, urgent: false }, false, false)).toEqual({ vibrate: 0, red: false, glow: false })
     expect(urgencyStyle({ shake: 0, urgent: true }, true, true)).toEqual({ vibrate: 0, red: true, glow: false })
     expect(urgencyStyle({ shake: 0, urgent: false }, true, true).vibrate).toBe(0)
+  })
+
+  it('the next container bobs about 2 px at about 1 Hz, vertical only; reduced motion holds it and the chevron still', () => {
+    let min = 0
+    let max = 0
+    for (let ms = 0; ms <= 2000; ms += 5) {
+      min = Math.min(min, nextBob(ms, false))
+      max = Math.max(max, nextBob(ms, false))
+      const c = chevronBounce(ms, false)
+      expect(Math.abs(c)).toBeLessThanOrEqual(CHEVRON_BOUNCE + 1e-9)
+    }
+    expect(BOB_PX).toBe(2)
+    expect(max - min).toBeCloseTo(BOB_PX, 1)
+    // One cycle a second: the same offset a second later, a different one half a second later.
+    expect(nextBob(1250, false)).toBeCloseTo(nextBob(250, false))
+    expect(nextBob(600, false)).not.toBeCloseTo(nextBob(100, false))
+    expect(nextBob(333, true)).toBe(0)
+    expect(chevronBounce(333, true)).toBe(0)
+    expect(nextBob(333, false)).toBe(nextBob(333, false))
   })
 
   it('squash, reject shake and the truck motion start and end at rest', () => {

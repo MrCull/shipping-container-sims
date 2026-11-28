@@ -59,17 +59,22 @@ export interface ContainerView {
   tier: number
   label: string
   selected: boolean
-  /** The next container to collect. */
+  /** The next container to collect, from the start of its turn (#1 at the shift start); false once the shift is over. */
   next: boolean
   /** Sequence colour slot 0..5 (position after the next required container), or null for grey. */
   slot: number | null
   /** Body colour (hex): the slot's sequence colour, or grey. */
   colour: string
-  /** Gold star medallion: a bonus container still worth its bonus (also when buried or grey). */
+  /** Static star badge: a bonus container still worth its bonus (also when buried or grey). */
   bonus: boolean
+  /**
+   * The active bonus (art pass 3): this is the next container and its bonus window is open. Only then is it gold, with
+   * shine, sparkles, a bouncing badge and the countdown ring; any other bonus keeps its sequence colour.
+   */
+  bonusActive: boolean
   /** Heavy cargo (`level.heavy`): an "H" badge on the faces, also when buried or grey. */
   heavy: boolean
-  /** A bonus container on top of its stack glints and rocks (render only); false under reduced motion. */
+  /** The active bonus glints (shine sweep, sparkles, bouncing badge; render only); false under reduced motion. */
   glint: boolean
   /** Outlined: only the selection. The current container never has a border. */
   border: boolean
@@ -84,7 +89,10 @@ export interface QueueItem {
   id: number | null
   label: string
   colour: string
+  /** A small static star: a bonus container still worth its bonus. */
   bonus: boolean
+  /** The active bonus (next, window open): the only gold chip. */
+  active: boolean
 }
 
 /** The incoming status band and the receipt bay status. The band always takes its space, truck or not. */
@@ -132,6 +140,12 @@ export interface ViewModel {
   hud: { title: string; loaded: string; rehandles: string; score: string; combo: string }
   /** The next six collection positions. */
   queue: QueueItem[]
+  /**
+   * The bouncing "NEXT" chevron over the next container's stack (`buried`: other boxes sit on it, so the chevron
+   * points at the stack top to dig), or null when the shift is over, the next container is not in the yard, or a
+   * receipt is mandatory (the red arrow has the focus then).
+   */
+  nextMarker: { stack: number; buried: boolean } | null
   /** The open bonus window, or null. */
   bonus: { id: number; text: string; fraction: number } | null
   clocks: ClocksView

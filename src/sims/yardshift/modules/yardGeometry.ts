@@ -1,8 +1,9 @@
 /**
  * Geometry of the 2D yard drawing (owner decision on spec #374: a flat illustrated yard, not 3D). Pure: every shape
  * the canvas renderer draws is placed here from the layout (`layoutFor`) and the capacity, so the tests can prove that
- * what is drawn lines up with the hit regions. Containers are side-on 20 ft boxes (art pass 2): a long side face about
- * 2.1 to 2.4 times as wide as it is tall, with a thin top face and door end offset up and to the right by (`dx`, `dy`).
+ * what is drawn lines up with the hit regions. Containers are chunky boxes (owner, art pass 3 of the 2D yard, back to
+ * the v1 look): a front face 1.3 to 1.45 times as wide as it is tall, with a light top face and a darker end face
+ * offset up and to the right by (`dx`, `dy`).
  */
 import type { Layout, Rect } from '../types/presentation'
 
@@ -48,17 +49,19 @@ export interface YardGeometry {
 
 /** Room under the ground line for the stack numbers. */
 export const LABEL_PX = 18
-/** Share of the column a container side takes; the door end takes `DEPTH` more (0.92 of the column in all). */
-const FRONT = 0.86
-const DEPTH = 0.06
-const RISE = 0.08
+/** Share of the column a container front takes; the end face takes `DEPTH` more (0.91 of the column in all). */
+const FRONT = 0.74
+const DEPTH = 0.17
+const RISE = 0.12
 /**
- * Length to height of a container side on screen (art pass 3): boxes are sized from the column width first, as tall
- * as `ASPECT_MIN` (1.8:1, a chunky 20 ft box on a narrow phone) allows; a short room narrows a box rather than
- * flattening it past `ASPECT_MAX`.
+ * Width to height of a container front on screen (owner, art pass 3: chunky near-square boxes): boxes are sized from
+ * the column width first, as tall as `ASPECT_MIN` (1.3:1) allows; a short room narrows a box rather than flattening it
+ * past `ASPECT_MAX` (1.45:1).
  */
-export const ASPECT_MIN = 1.8
-export const ASPECT_MAX = 2.4
+export const ASPECT_MIN = 1.3
+export const ASPECT_MAX = 1.45
+/** The big number's height as a share of the box height (owner: big bold numbers, 55 to 60 %). */
+export const NUMBER_SHARE = 0.58
 /** Lift of the selected container, as a share of its height. */
 export const LIFT = 0.3
 /** The sky strip kept above the gantry beam. */
@@ -135,6 +138,31 @@ export function boxAt(g: YardGeometry, layout: Layout, stack: number, tier: numb
   const col = layout.columns[stack]!
   const x = col.x + (col.w - g.boxW - g.dx) / 2
   return { x, y: g.groundY - (tier + 1) * g.boxH - lift, w: g.boxW, h: g.boxH, dx: g.dx, dy: g.dy }
+}
+
+/** Font size (px) of a box's big number: `NUMBER_SHARE` of its height. */
+export function numberSize(b: Box): number {
+  return Math.round(b.h * NUMBER_SHARE)
+}
+
+/** Most the NEXT chevron bounces up or down from its rest (px); the renderer's bounce stays inside it. */
+export const CHEVRON_BOUNCE = 3
+
+/**
+ * The bouncing NEXT chevron over stack `stack` holding `height` boxes: centred on the boxes' front, just above the
+ * stack top (a buried next container's stack top too, so the player sees where to dig), never up into the beam. The
+ * hit regions stay the columns; this is paint only.
+ */
+export function chevronAt(g: YardGeometry, layout: Layout, stack: number, height: number): Rect {
+  const col = layout.columns[stack]!
+  const top = height > 0 ? boxBounds(boxAt(g, layout, stack, height - 1)).y : g.groundY
+  const bottom = top - CHEVRON_BOUNCE - 2
+  const ceiling = g.gantry.beamY + g.gantry.beamH + CHEVRON_BOUNCE
+  const h = Math.max(6, Math.min(g.boxH * 0.6, col.w * 0.32, bottom - ceiling))
+  const w = Math.min(col.w - 4, h * 1.5)
+  const cx = boxAt(g, layout, stack, 0).x + g.boxW / 2
+  const x = Math.min(col.x + col.w - 2 - w, Math.max(col.x + 2, cx - w / 2))
+  return { x, y: bottom - h, w, h }
 }
 
 /** The whole drawn area of a box: front, top and side faces. */

@@ -46,12 +46,26 @@ export function showsBonus(state: ShiftState, id: number): boolean {
   return id !== state.next || state.bonusMs > 0
 }
 
+/** The active bonus (art pass 3): the next container, a bonus, with its window open. The only gold one. */
+export function bonusActive(state: ShiftState, id: number): boolean {
+  return id === state.next && state.bonusMs > 0 && state.level.bonusIds.includes(id)
+}
+
 function queueFor(state: ShiftState): QueueItem[] {
   return SEQUENCE_COLOURS.map((_, i): QueueItem => {
     const id = state.next + i
-    if (id > state.level.count) return { id: null, label: '–', colour: EMPTY_SLOT, bonus: false }
-    return { id, label: String(id), colour: colourOf(state, id), bonus: showsBonus(state, id) }
+    if (id > state.level.count) return { id: null, label: '–', colour: EMPTY_SLOT, bonus: false, active: false }
+    return { id, label: String(id), colour: colourOf(state, id), bonus: showsBonus(state, id), active: bonusActive(state, id) }
   })
+}
+
+/** Where the "NEXT" chevron points: the next container's stack while it is in the yard and the shift plays on. */
+function nextMarkerFor(state: ShiftState): ViewModel['nextMarker'] {
+  if (state.status !== 'playing' || state.deadline === 0) return null
+  const stack = state.stacks.findIndex((s) => s.includes(state.next))
+  if (stack < 0) return null
+  const s = state.stacks[stack]!
+  return { stack, buried: s[s.length - 1] !== state.next }
 }
 
 const SIDE = 16
@@ -299,13 +313,14 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
         tier,
         label: String(id),
         selected: ui.selection === si && tier === stack.length - 1,
-        next: id === state.next,
+        next: state.status === 'playing' && id === state.next,
         slot: colourSlot(state, id),
         colour: colourOf(state, id),
         bonus: showsBonus(state, id),
+        bonusActive: bonusActive(state, id),
         heavy: state.level.heavy.includes(id),
-        // Story 54: an exposed bonus container glints and rocks (render only); still under reduced motion.
-        glint: !ui.reducedMotion && tier === stack.length - 1 && showsBonus(state, id),
+        // Art pass 3: only the active bonus glints (render only); every other bonus keeps a static badge.
+        glint: !ui.reducedMotion && bonusActive(state, id),
         border: ui.selection === si && tier === stack.length - 1,
         // At deadline 0 the receipt cargo is the current container, not the next one in the yard.
         ...urgencyFor(state, ui, id === state.next && state.deadline !== 0),
@@ -347,6 +362,7 @@ export function present(state: ShiftState, ui: UiState, viewport: Viewport): Vie
       combo: `×${state.combo}`,
     },
     queue: queueFor(state),
+    nextMarker: nextMarkerFor(state),
     bonus:
       state.bonusMs > 0
         ? {

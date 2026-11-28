@@ -66,9 +66,9 @@ describe('Yardshift colours and queue', () => {
     const level: LevelDef = { ...deep, stacks: [[2, 1], [3], []], count: 3, bonusIds: [] }
     const vm = view(createShift(level))
     expect(vm.queue.slice(3)).toEqual([
-      { id: null, label: '–', colour: '#526773', bonus: false },
-      { id: null, label: '–', colour: '#526773', bonus: false },
-      { id: null, label: '–', colour: '#526773', bonus: false },
+      { id: null, label: '–', colour: '#526773', bonus: false, active: false },
+      { id: null, label: '–', colour: '#526773', bonus: false, active: false },
+      { id: null, label: '–', colour: '#526773', bonus: false, active: false },
     ])
   })
 
@@ -125,12 +125,62 @@ describe('Yardshift score HUD', () => {
     expect(v.receiptCargo).toMatchObject({ id: 13, heavy: true })
   })
 
-  it('an exposed bonus container glints; buried, or under reduced motion, it stays still', () => {
+  it('a bonus container shows a static badge until it is next with its window open (art pass 3)', () => {
     const shift = createShift({ ...deep, stacks: [[2, 1], [3, 4], [5, 6], [9, 8, 7], []] })
-    const glints = (ui: UiState) => present(shift.state, ui, PHONE).containers.filter((c) => c.glint).map((c) => c.id)
-    expect(glints(NONE)).toEqual([6])
-    expect(present(shift.state, NONE, PHONE).containers.find((c) => c.id === 3)).toMatchObject({ bonus: true, glint: false })
-    expect(glints({ selection: null, reducedMotion: true })).toEqual([])
+    const v = present(shift.state, NONE, PHONE)
+    // #6 is exposed but not next: badge only, no gold, no glint; its chip keeps its colour with a star.
+    expect(v.containers.find((c) => c.id === 6)).toMatchObject({ bonus: true, bonusActive: false, glint: false })
+    expect(v.containers.find((c) => c.id === 3)).toMatchObject({ bonus: true, bonusActive: false, glint: false })
+    expect(v.queue.map((q) => q.active)).toEqual([false, false, false, false, false, false])
+    expect(v.queue[2]).toMatchObject({ bonus: true, active: false })
+  })
+
+  it('the next bonus container turns active (gold, glint) while its window is open; reduced motion keeps it still', () => {
+    const shift = createShift({ ...deep, stacks: [[1], [2], [3], [4], [9, 8, 7, 6], [5], []], maxRehandles: 0 })
+    shift.dispatch({ type: 'collect' })
+    shift.dispatch({ type: 'collect' })
+    const v = present(shift.state, NONE, PHONE)
+    expect(v.containers.find((c) => c.id === 3)).toMatchObject({ next: true, bonus: true, bonusActive: true, glint: true })
+    expect(v.containers.find((c) => c.id === 6)).toMatchObject({ bonus: true, bonusActive: false, glint: false })
+    expect(v.queue[0]).toMatchObject({ id: 3, bonus: true, active: true })
+    expect(v.queue.filter((q) => q.active)).toHaveLength(1)
+    const still = present(shift.state, { selection: null, reducedMotion: true }, PHONE)
+    expect(still.containers.find((c) => c.id === 3)).toMatchObject({ bonusActive: true, glint: false })
+    run(shift, 1300)
+    const after = present(shift.state, NONE, PHONE)
+    expect(after.containers.find((c) => c.id === 3)).toMatchObject({ bonus: false, bonusActive: false, glint: false })
+    expect(after.queue[0]!.active).toBe(false)
+  })
+})
+
+describe('Yardshift next marker (art pass 3)', () => {
+  it('the next container is flagged from the start of the shift, #1 included, and the chevron targets its stack', () => {
+    const shift = createShift(levelByNumber(3)!)
+    const v = present(shift.state, NONE, PHONE)
+    expect(v.containers.filter((c) => c.next).map((c) => c.id)).toEqual([1])
+    expect(v.nextMarker).toEqual({ stack: 0, buried: true })
+    shift.dispatch({ type: 'rehandle', from: 0, to: 4 })
+    shift.dispatch({ type: 'rehandle', from: 0, to: 4 })
+    expect(present(shift.state, NONE, PHONE).nextMarker).toEqual({ stack: 0, buried: false })
+    shift.dispatch({ type: 'collect' })
+    const v2 = present(shift.state, NONE, PHONE)
+    expect(v2.containers.filter((c) => c.next).map((c) => c.id)).toEqual([2])
+    expect(v2.nextMarker).toEqual({ stack: 2, buried: true })
+  })
+
+  it('hit regions come from the layout only: calm, urgent (buzzing) and reduced motion give the same regions', () => {
+    const state = createShift(levelByNumber(3)!).state
+    const calm = present(state, NONE, PHONE).hitRegions
+    expect(present({ ...state, truckMs: 1, shiftMs: 2000 }, NONE, PHONE).hitRegions).toEqual(calm)
+    expect(present(state, { selection: null, reducedMotion: true }, PHONE).hitRegions).toEqual(calm)
+    expect(present(state, { selection: 0 }, PHONE).hitRegions).toEqual(calm)
+  })
+
+  it('no chevron once the shift is over or while a receipt is mandatory', () => {
+    const shift = createShift({ ...deep, stacks: [[1], []], count: 1, bonusIds: [] })
+    shift.dispatch({ type: 'collect' })
+    expect(present(shift.state, NONE, PHONE).nextMarker).toBeNull()
+    expect(present({ ...createShift(deep).state, deadline: 0 }, NONE, PHONE).nextMarker).toBeNull()
   })
 })
 
