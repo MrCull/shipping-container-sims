@@ -66,7 +66,7 @@ export interface ContainerView {
   selected: boolean
   /** The next container to collect, from the start of its turn (#1 at the shift start); false once the shift is over. */
   next: boolean
-  /** Sequence colour slot 0..5 (position after the next required container), or null for grey. */
+  /** Sequence colour slot 0..4, `(id - 1) mod 5` inside the next-five window, or null (grey) beyond it. */
   slot: number | null
   /** Body colour (hex): the slot's sequence colour, or grey. */
   colour: string
