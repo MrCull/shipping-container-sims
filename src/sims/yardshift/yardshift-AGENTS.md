@@ -303,6 +303,13 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   mute govern them; `MUSIC_GAIN` went 0.3 to 0.18. The per-cue peak cap is `CUE_PEAK_CAP` (the old 0.306 times
   `SFX_BOOST`, about 0.46) and the step budgets (bonus collect step 0.45, last-collection bonus step with the
   fanfare 0.6) are scaled the same way.
+- **Levels (owner round 5):** "music still too loud, effects still too quiet". `MUSIC_GAIN` is 0.08. The effects
+  are doubled after the sliders, not in the cues: the sfx chain (`createSfxChain` in `composables/useYardAudio.ts`)
+  is bus `GainNode` (`gainFor(1, 'sfx')`) into a makeup gain `SFX_MAKEUP_GAIN` 2 into a `DynamicsCompressorNode`
+  limiter (`SFX_LIMITER`: threshold -10 dB, knee 0, ratio 12, attack 3 ms, release 250 ms) into the destination.
+  The cue levels, `CUE_PEAK_CAP` and the step budgets in `audioCues.test.ts` are measured before the makeup gain and
+  the limiter; the limiter keeps the doubled sums of overlapping cues from clipping. Mute and the sliders still act
+  on the bus, so a muted bus stays silent.
 - **Collect reward (owner round 4, "dopamine"):** every collect plays the trailer clunk then a bright rising
   three-note pentatonic `chime` (root, +2, +4 steps) whose root climbs with the collection index,
   `collectLadderStep(k, count)`: 0 (C5) on the first collection up to `COLLECT_LADDER_SPAN` 7 (E6) on the last,
@@ -361,7 +368,8 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   | Fail, blocked (`failed` `blocked`) | `blocked` | sawtooth then triangle drops, low thud |
   | Time credit (`time-credit`) | none | the rehandle sound covers it |
 - `composables/useYardAudio.ts` (mounted by `Yardshift.vue`): one Web Audio bus `GainNode` set from
-  `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live. No fixed volumes.
+  `gainFor(1, 'sfx')` and watched, so the shared sliders and mute change every sound live, then the makeup gain
+  and limiter (owner round 5, above). No fixed volumes.
 - **Unlock (iOS, art pass 3 item 5):** `installAudioUnlock(window, context)` listens (capture, passive) to
   `pointerdown`, `touchend` and `keydown` for the whole mount. Each gesture while the context is not `running`
   (`suspended` before the first gesture, `interrupted` on iOS after a call or backgrounding) calls `resume()`
@@ -377,11 +385,15 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and
   receipt).
 - **Music (#390):** `composables/useYardMusic.ts` (mounted by `Yardshift.vue`) loops one `Audio` element through
-  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.18 in `modules/music.ts`, 60 % of the earlier 0.3 since owner round 4), so the master and music
+  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.08 in `modules/music.ts`: 0.3, then 0.18 in owner round 4, then 0.08 in round 5), so the master and music
   sliders and mute change it live. `musicPlaying(state)` (pure, `modules/music.test.ts`): plays while the shift status
   is `playing` with no pause but `animation`; the intro, pause menu, level picker, a hidden tab and the end of the
   shift pause it. Unmount stops it and releases the element; the menu music stops when the home page unmounts. A
   blocked autoplay retries on the next pointer or key press.
+- **Sound on entry (owner round 5):** the home page starts muted by default (AGENTS.md, "Volume and mute");
+  entering Yardshift unmutes for the visit: `useYardMusic` takes `holdSoundMuted(false)` from the audio store and
+  releases it on unmount. The stored mute and the sliders are not written, so leaving restores the stored mute; a
+  mute or unmute the player chooses inside Yardshift ends the hold and is kept (`useYardMusic.test.ts`).
 - Track: `assets/audio/music-light-piano.mp3`, `available-media/sound-samples/background-gaming-light-piano.mp3`
   (60 s loop, the one candidate no other sim uses) re-encoded to 80 kbit/s stereo with metadata stripped (600 KB).
   Source and licence: the repo's pre-sourced `available-media/` set; `available-media/README.md` records no source

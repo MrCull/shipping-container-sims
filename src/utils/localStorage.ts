@@ -11,6 +11,7 @@ const DEFAULT_STORAGE: SiteStorageData = {
     volume: DEFAULT_VOLUME,
     musicVolume: 1,
     sfxVolume: 1,
+    menuMusicOn: false,
     godModeEnabled: false,
   },
   sims: {},
@@ -50,6 +51,9 @@ function sanitizeStorage(raw: unknown): SiteStorageData {
     if (typeof value === 'number' && Number.isFinite(value)) {
       storage.global[key] = Math.min(1, Math.max(0, value))
     }
+  }
+  if (isRecord(raw.global) && typeof raw.global.menuMusicOn === 'boolean') {
+    storage.global.menuMusicOn = raw.global.menuMusicOn
   }
   if (isRecord(raw.global) && typeof raw.global.godModeEnabled === 'boolean') {
     storage.global.godModeEnabled = raw.global.godModeEnabled

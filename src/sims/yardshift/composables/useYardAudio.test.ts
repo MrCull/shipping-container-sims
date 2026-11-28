@@ -1,7 +1,7 @@
 /** Yardshift sound nodes are released when they end (no node left connected per cue). */
 import { describe, expect, it, vi } from 'vitest'
-import { installAudioUnlock, playTone, releaseOnEnded } from './useYardAudio'
-import { cuesForStep } from '../modules/audioCues'
+import { createSfxChain, installAudioUnlock, playTone, releaseOnEnded } from './useYardAudio'
+import { cuesForStep, SFX_LIMITER, SFX_MAKEUP_GAIN } from '../modules/audioCues'
 import { createShift } from '../modules/engine'
 import { levelByNumber, TUTORIAL } from '../modules/levels'
 
@@ -30,11 +30,30 @@ function fakeContext() {
     },
     createBufferSource: () => node({ buffer: null as unknown, start: vi.fn(), stop: vi.fn() }),
     createBiquadFilter: () => node({ type: 'lowpass', Q: { value: 1 }, frequency: param() }),
+    createDynamicsCompressor: () =>
+      node({ threshold: { value: -24 }, knee: { value: 30 }, ratio: { value: 12 }, attack: { value: 0.003 }, release: { value: 0.25 } }),
+    destination: { name: 'destination' },
   }
   return { ac: ac as unknown as BaseAudioContext, nodes }
 }
 
 describe('Yardshift audio nodes', () => {
+  it('the sfx bus (slider gain) feeds a 2x makeup gain and a limiter before the speakers (owner round 5)', () => {
+    const { ac } = fakeContext()
+    const { bus, limiter } = createSfxChain(ac, 0.4)
+    expect(bus.gain.value).toBe(0.4)
+    const [makeup] = (bus as unknown as { to: Array<GainNode & { to: unknown[] }> }).to
+    expect(makeup!.gain.value).toBe(SFX_MAKEUP_GAIN)
+    expect(SFX_MAKEUP_GAIN).toBe(2)
+    expect(makeup!.to).toEqual([limiter])
+    expect((limiter as unknown as { to: unknown[] }).to).toEqual([ac.destination])
+    expect(limiter.threshold.value).toBe(SFX_LIMITER.threshold)
+    expect(limiter.knee.value).toBe(0)
+    expect(limiter.ratio.value).toBeGreaterThanOrEqual(12)
+    expect(limiter.attack.value).toBeLessThanOrEqual(0.005)
+    expect(SFX_LIMITER.threshold).toBeCloseTo(-10)
+  })
+
   it('disconnects the source and its gain once the source ends', () => {
     const src = fakeNode()
     const env = fakeNode()
