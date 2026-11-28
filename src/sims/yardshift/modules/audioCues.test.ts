@@ -354,8 +354,34 @@ describe('Yardshift audio cues', () => {
       p = next
     }
     expect(names(cues)).toEqual(['pick', 'land'])
-    expect(cues.map((c) => c.sample)).toEqual(['pick', 'land'])
     expect(names(craneCues(0, 1))).toEqual(['pick', 'land'])
+  })
+
+  it('the move sounds are soft (owner round 6: "horrible"): no samples, nothing above 2 kHz, all quieter than the collect chime', () => {
+    const move = [craneStartCue(), ...craneCues(0, 1)]
+    expect(names(move)).toEqual(['crane-start', 'pick', 'land'])
+    const collect = recorder(timed)
+    collect.act({ type: 'collect' })
+    const chime = collect.cues[0]!.tones.filter((t) => t.role === 'chime')
+    const chimePeak = peakGain({ name: 'collect', tones: chime })
+    expect(chimePeak).toBeGreaterThan(0)
+    for (const cue of move) {
+      expect(cue.sample, cue.name).toBeUndefined()
+      for (const t of cue.tones) expect(Math.max(t.f0, t.f1, t.lowpass ?? 0), cue.name).toBeLessThanOrEqual(2000)
+      expect(peakGain(cue), cue.name).toBeLessThan(chimePeak)
+    }
+    // The whole move (whirr under the pick and the landing) still sums under the chime.
+    expect(move.reduce((sum, c) => sum + peakGain(c), 0)).toBeLessThan(chimePeak)
+    // The whirr is a low-passed motor that fades in over the move, not a click.
+    const [whirr] = move[0]!.tones
+    expect(whirr!.lowpass).toBeLessThanOrEqual(600)
+    expect(whirr!.attack).toBeGreaterThanOrEqual(0.08)
+    expect(whirr!.dur).toBeGreaterThanOrEqual(0.33)
+    // The pick is a low sine thump near 120 Hz with a fast decay.
+    const thump = move[1]!.tones.find((t) => t.type === 'sine')!
+    expect(thump.f0).toBeGreaterThanOrEqual(100)
+    expect(thump.f0).toBeLessThanOrEqual(140)
+    expect(thump.dur).toBeLessThanOrEqual(0.15)
   })
 
   it('no cue carries a fixed output volume: tone levels are relative sound gains in 0..1', () => {

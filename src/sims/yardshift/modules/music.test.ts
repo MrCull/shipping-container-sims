@@ -9,8 +9,8 @@ import { fixtureFor } from './fixtures'
 import { MUSIC_GAIN, musicPlaying } from './music'
 
 describe('Yardshift music', () => {
-  it('sits at 0.08 (owner round 5: "music still too loud"; it was 0.18 after round 4, 0.3 before)', () => {
-    expect(MUSIC_GAIN).toBeCloseTo(0.08)
+  it('sits at 0.035 (owner round 6: "music still too loud"; 0.08 after round 5, 0.18 after round 4, 0.3 before)', () => {
+    expect(MUSIC_GAIN).toBeCloseTo(0.035)
   })
 
   beforeEach(() => setActivePinia(createPinia()))

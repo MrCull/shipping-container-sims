@@ -1,7 +1,7 @@
 /** Yardshift sound nodes are released when they end (no node left connected per cue). */
 import { describe, expect, it, vi } from 'vitest'
 import { createSfxChain, installAudioUnlock, playTone, releaseOnEnded } from './useYardAudio'
-import { cuesForStep, SFX_LIMITER, SFX_MAKEUP_GAIN } from '../modules/audioCues'
+import { craneStartCue, cuesForStep, SFX_LIMITER, SFX_MAKEUP_GAIN } from '../modules/audioCues'
 import { createShift } from '../modules/engine'
 import { levelByNumber, TUTORIAL } from '../modules/levels'
 
@@ -89,6 +89,21 @@ describe('Yardshift audio nodes', () => {
     const env = nodes.find((n) => n.gain)!
     expect(filter.to).toEqual([env])
     expect(env.to).toEqual([bus])
+    for (const n of nodes) if (n.onended) n.onended()
+    for (const n of nodes) expect(n.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('the crane whirr plays an oscillator through a low-pass filter and fades in over its attack', () => {
+    const { ac, nodes } = fakeContext()
+    const bus = { name: 'bus' } as unknown as AudioNode
+    const [whirr] = craneStartCue().tones
+    playTone(ac, bus, whirr!)
+    const filter = nodes.find((n) => 'Q' in n) as unknown as { type: string; to: unknown[]; frequency: { setValueAtTime: ReturnType<typeof vi.fn> } }
+    expect(filter.type).toBe('lowpass')
+    expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(whirr!.lowpass, expect.any(Number))
+    const env = nodes.find((n) => n.gain)!
+    expect(filter.to).toEqual([env])
+    expect(env.gain!.exponentialRampToValueAtTime).toHaveBeenCalledWith(whirr!.vol, whirr!.attack)
     for (const n of nodes) if (n.onended) n.onended()
     for (const n of nodes) expect(n.disconnect).toHaveBeenCalledTimes(1)
   })

@@ -26,9 +26,13 @@ export interface Tone {
    * hit and score pop; the collect reward chime and the last collection's flourish; the arrival's hiss and horn.
    */
   role?: 'coin' | 'arpeggio' | 'shimmer' | 'power' | 'pop' | 'chime' | 'flourish' | 'hiss' | 'horn'
+  /** Seconds the envelope takes to swell to `vol` (default 8 ms, a click); the crane whirr fades in over the move. */
+  attack?: number
+  /** A low-pass filter cutoff in Hz after the source (none by default): softens the crane move sounds (owner round 6). */
+  lowpass?: number
 }
 
-export type SampleName = 'pick' | 'land' | 'truck'
+export type SampleName = 'truck'
 
 export type CueName =
   | 'crane-start'
@@ -205,9 +209,22 @@ export function winCue(stars: Stars): Cue {
   return { name: 'win', tones, detail: stars }
 }
 
-/** The crane accepted a move: a short motor whine. */
+/**
+ * Owner round 6: the old move sounds (a triangle whine and the `crane-pick`/`crane-land` samples) were "horrible".
+ * Every move sound is now short, low and soft: a low-pass filtered motor whirr under the move that fades in and
+ * out, a muffled clunk on the pick and a wooden thock on the landing, all under 2 kHz and quieter than the collect
+ * chime (`audioCues.test.ts`).
+ */
+const MOVE_LOWPASS = 420
+
+/** The crane accepted a move: a quiet low-passed motor whirr (sawtooth plus its octave) that swells and fades over the move. */
 export function craneStartCue(): Cue {
-  return { name: 'crane-start', tones: [tone(92, 140, 0.28, 0.02, 0, 'triangle')] }
+  const whirr = (f0: number, f1: number, vol: number, type: ToneType): Tone => ({
+    ...tone(f0, f1, 0.42, vol, 0, type),
+    attack: 0.14,
+    lowpass: MOVE_LOWPASS,
+  })
+  return { name: 'crane-start', tones: [whirr(78, 92, 0.007, 'sawtooth'), whirr(156, 184, 0.003, 'sine')] }
 }
 
 /**
@@ -223,11 +240,25 @@ export function comboCue(combo: number): Cue {
 export const PICK_AT = 0.3
 export const LAND_AT = 0.88
 
-/** The sample cues a crane move crosses between two progress values: each fires once per move. */
+/** The spreader grips the box: a muffled clunk, a low sine thump near 120 Hz with a fast decay and a gentle click. */
+const PICK_TONES: Tone[] = [
+  tone(120, 70, 0.12, 0.012),
+  tone(240, 150, 0.06, 0.005, 0, 'triangle'),
+  { ...tone(1400, 900, 0.025, 0.003, 0, 'noise'), lowpass: 1800 },
+]
+
+/** The box sets down: a soft wooden thock, a short mid triangle knock over a low sine body and a muffled tick. */
+const LAND_TONES: Tone[] = [
+  tone(440, 310, 0.05, 0.007, 0, 'triangle'),
+  tone(170, 115, 0.11, 0.011),
+  { ...tone(1000, 700, 0.02, 0.003, 0, 'noise'), lowpass: 1500 },
+]
+
+/** The cues a crane move crosses between two progress values (the pick, then the landing): each fires once per move. */
 export function craneCues(before: number, after: number): Cue[] {
   const cues: Cue[] = []
-  if (before < PICK_AT && after >= PICK_AT) cues.push({ name: 'pick', tones: [], sample: 'pick', sampleGain: sampleGain(0.6) })
-  if (before < LAND_AT && after >= LAND_AT) cues.push({ name: 'land', tones: [], sample: 'land', sampleGain: sampleGain(0.7) })
+  if (before < PICK_AT && after >= PICK_AT) cues.push({ name: 'pick', tones: PICK_TONES })
+  if (before < LAND_AT && after >= LAND_AT) cues.push({ name: 'land', tones: LAND_TONES })
   return cues
 }
 

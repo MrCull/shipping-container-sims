@@ -317,7 +317,8 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `rejectionCue()` (invalid), `craneStartCue()`, `comboCue(c)` (one C major pentatonic step per combo,
   `pentatonicNote(min(c, 8) - 1)`: D5 at 2 up to E6 at 8, so chains play a tune) and
   `craneCues(before, after)` (pick at progress `PICK_AT` 0.30, land at `LAND_AT` 0.88). Tones are V20's
-  `tone(f0, f1, dur, vol, delay, type)` with `vol` a relative sound gain.
+  `tone(f0, f1, dur, vol, delay, type)` with `vol` a relative sound gain, plus two optional fields: `attack` (the
+  envelope's swell, 8 ms by default) and `lowpass` (a low-pass cutoff in Hz after the source).
 - **Levels (owner round 4):** effects are louder and the music quieter. `tone()` and `sampleGain()` multiply every
   design level by `SFX_BOOST` 1.5, still relative sound gains under the `'sfx'` bus (`gainFor`), so the sliders and
   mute govern them; `MUSIC_GAIN` went 0.3 to 0.18. The per-cue peak cap is `CUE_PEAK_CAP` (the old 0.306 times
@@ -330,6 +331,13 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   The cue levels, `CUE_PEAK_CAP` and the step budgets in `audioCues.test.ts` are measured before the makeup gain and
   the limiter; the limiter keeps the doubled sums of overlapping cues from clipping. Mute and the sliders still act
   on the bus, so a muted bus stays silent.
+- **Move sounds and levels (owner round 6):** "the container moving noise is horrible" and "music still too loud".
+  The crane start whine and the `crane-pick.mp3` / `crane-land.mp3` samples are gone (files deleted): every move
+  sound is synth, short, low and soft (sound table below). `audioCues.test.ts` checks the three move cues carry no
+  sample, no tone (frequency or low-pass) above 2 kHz, each peaks under the collect chime and all three summed still
+  do. `MUSIC_GAIN` is 0.035: the track is mastered hot (about -15.4 LUFS integrated, -0.8 dBFS peak), so the gain is
+  the fix, not a new file; at the default sliders (master `DEFAULT_VOLUME` 0.4, music 1) the element plays at
+  0.035 x 0.4 = 0.014 (it was 0.032).
 - **Collect reward (owner round 4, "dopamine"):** every collect plays the trailer clunk then a bright rising
   three-note pentatonic `chime` (root, +2, +4 steps) whose root climbs with the collection index,
   `collectLadderStep(k, count)`: 0 (C5) on the first collection up to `COLLECT_LADDER_SPAN` 7 (E6) on the last,
@@ -360,8 +368,9 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   | Select the receipt truck (store `selected` `'receipt'`) | `receipt-select` | two triangle clicks G5 then C6 |
   | Deselect or cancel (store `deselected`) | `deselect` | one soft falling sine 880 to 600 Hz |
   | Invalid tap (store `rejected`) | `invalid` | soft buzz: two short low square pulses, 150 and 140 Hz falling |
-  | Crane accepts a move (`startMove`) | `crane-start` | triangle motor whine 92 to 140 Hz |
-  | Crane pick and land (`frame` crossing `PICK_AT`, `LAND_AT`) | `pick`, `land` | samples `crane-pick.mp3`, `crane-land.mp3` |
+  | Crane accepts a move (`startMove`) | `crane-start` | quiet motor whirr under the move: sawtooth 78 to 92 Hz plus its sine octave, low-passed at 420 Hz, swelling over 0.14 s and fading by 0.42 s (round 6) |
+  | Crane pick (`frame` crossing `PICK_AT`) | `pick` | muffled clunk: sine thump 120 to 70 Hz, 0.12 s, a triangle 240 to 150 Hz under it and a noise click (1.4 to 0.9 kHz, low-passed at 1.8 kHz) (round 6) |
+  | Crane land (`frame` crossing `LAND_AT`) | `land` | soft wooden thock: triangle knock 440 to 310 Hz, sine body 170 to 115 Hz, muffled noise tick (1 to 0.7 kHz, low-passed at 1.5 kHz) (round 6) |
   | Collect (`collected`) | `collect` | trailer clunk (triangle 150 to 60 Hz) then a rising three-note pentatonic chime whose root climbs C5 to E6 over the shift; a low tail on the first two operations; the last collection adds a run into a high bell |
   | Combo chain (`collected`, combo 2+) | `combo` | one pentatonic step per combo, D5 up to E6 |
   | Collection truck drives off (`collected`) | `truck-off` | quiet sawtooth rumble falling 120 to 70 Hz at 0.25 s |
@@ -401,11 +410,10 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   `onended` (`releaseOnEnded`; `playTone` is exported, and `composables/useYardAudio.test.ts` plays the whole jackpot
   through a fake context and checks every node reaches the bus and disconnects).
 - Samples in `assets/audio/` (mono 64 kbit/s, trimmed with a fade out from `available-media/sound-samples`):
-  `crane-pick.mp3` (first 0.6 s of `container-loaded-to-ship.mp3`), `crane-land.mp3` (first 0.7 s of
-  `container-set-down-on-ship.mp3`), `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and
-  receipt).
+  `truck.mp3` (1.6 s from 0.5 s of `quiet-truck-engine.mp3`; on arrival and receipt), the only one. The crane
+  pick and land samples were deleted in owner round 6 (the move sounds are synth now).
 - **Music (#390):** `composables/useYardMusic.ts` (mounted by `Yardshift.vue`) loops one `Audio` element through
-  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.08 in `modules/music.ts`: 0.3, then 0.18 in owner round 4, then 0.08 in round 5), so the master and music
+  `followMasterGain(element, MUSIC_GAIN, 'music')` (`MUSIC_GAIN` 0.035 in `modules/music.ts`: 0.3, then 0.18 in owner round 4, 0.08 in round 5, 0.035 in round 6), so the master and music
   sliders and mute change it live. `musicPlaying(state)` (pure, `modules/music.test.ts`): plays while the shift status
   is `playing` with no pause but `animation`; the intro, pause menu, level picker, a hidden tab and the end of the
   shift pause it. Unmount stops it and releases the element; the menu music stops when the home page unmounts. A

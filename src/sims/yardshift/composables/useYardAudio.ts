@@ -11,8 +11,6 @@ import { useAudioStore } from '@/stores/audio'
 import { SFX_LIMITER, SFX_MAKEUP_GAIN, type Cue, type SampleName, type Tone } from '../modules/audioCues'
 
 const SAMPLE_URLS: Record<SampleName, string> = {
-  pick: new URL('../assets/audio/crane-pick.mp3', import.meta.url).href,
-  land: new URL('../assets/audio/crane-land.mp3', import.meta.url).href,
   truck: new URL('../assets/audio/truck.mp3', import.meta.url).href,
 }
 
@@ -28,17 +26,29 @@ export function releaseOnEnded(src: AudioScheduledSourceNode, ...nodes: AudioNod
 }
 
 /**
- * Plays one tone into `out` (the sfx bus): an oscillator ramping f0 to f1 through its own envelope gain (8 ms attack
- * to `vol`, exponential decay over `dur`). A `noise` tone is a white-noise buffer through a band-pass filter whose
- * centre ramps f0 to f1 (the air-brake hiss). Every node disconnects when the source ends.
+ * Plays one tone into `out` (the sfx bus): an oscillator ramping f0 to f1 through its own envelope gain (an attack
+ * of `attack`, 8 ms by default, to `vol`, then an exponential decay to the end of `dur`). A `noise` tone is a
+ * white-noise buffer through a band-pass filter whose centre ramps f0 to f1 (the air-brake hiss). A tone with
+ * `lowpass` adds a low-pass filter at that cutoff before the envelope (the crane move sounds). Every node
+ * disconnects when the source ends.
  */
 export function playTone(ac: BaseAudioContext, out: AudioNode, t: Tone): void {
   const start = ac.currentTime + t.delay
   const env = ac.createGain()
   env.gain.setValueAtTime(SILENT, start)
-  env.gain.exponentialRampToValueAtTime(t.vol, start + 0.008)
+  env.gain.exponentialRampToValueAtTime(t.vol, start + (t.attack ?? 0.008))
   env.gain.exponentialRampToValueAtTime(SILENT, start + t.dur)
   env.connect(out)
+  let into: AudioNode = env
+  let lowpass: BiquadFilterNode | null = null
+  if (t.lowpass !== undefined) {
+    lowpass = ac.createBiquadFilter()
+    lowpass.type = 'lowpass'
+    lowpass.frequency.setValueAtTime(t.lowpass, start)
+    lowpass.connect(env)
+    into = lowpass
+  }
+  const tail: AudioNode[] = lowpass ? [lowpass, env] : [env]
   let src: AudioScheduledSourceNode
   if (t.type === 'noise') {
     const length = Math.max(1, Math.ceil(ac.sampleRate * (t.dur + 0.01)))
@@ -52,16 +62,16 @@ export function playTone(ac: BaseAudioContext, out: AudioNode, t: Tone): void {
     filter.Q.value = 1.2
     filter.frequency.setValueAtTime(t.f0, start)
     filter.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
-    noise.connect(filter).connect(env)
-    releaseOnEnded(noise, filter, env)
+    noise.connect(filter).connect(into)
+    releaseOnEnded(noise, filter, ...tail)
     src = noise
   } else {
     const osc = ac.createOscillator()
     osc.type = t.type
     osc.frequency.setValueAtTime(t.f0, start)
     osc.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
-    osc.connect(env)
-    releaseOnEnded(osc, env)
+    osc.connect(into)
+    releaseOnEnded(osc, ...tail)
     src = osc
   }
   src.start(start)
