@@ -21,7 +21,7 @@ export interface Gantry {
   left: number
   right: number
   legW: number
-  /** Top of the beam and its height; legs run from the beam down to `footY`. */
+  /** Top of the beam (the top of the concrete, just under the sky band) and its height; legs run down to `footY`. */
   beamY: number
   beamH: number
   footY: number
@@ -108,12 +108,14 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const boxH = boxHFor(colW, cap, groundY - yard.y - (fixedFor(colW) - LABEL_PX))
   // A short room keeps the box container shaped: it narrows instead of flattening.
   const boxW = Math.min(fullW, boxH * ASPECT_MAX)
-  // The crane carries a box one box above a full stack; the beam sits just above that, the spreader between.
+  // The crane carries a box one box above a full stack (the crane headroom); at rest the spreader hangs there.
   const carryY = groundY - (cap + 1) * boxH - 2
-  const beamY = Math.floor(carryY - dy - SPREADER - beamH)
-  // The sky band is at most `SKY_SHARE` of the yard: the concrete starts just above the top slot, or higher on a tall
-  // yard, so spare height becomes concrete headroom rather than empty sky.
-  const floorY = Math.round(Math.min(groundY - cap * boxH - dy - 3, Math.max(yard.y + SKY_MIN, yard.y + yard.h * SKY_SHARE)))
+  // The beam sits at the top of the concrete, just under the sky band, and the hoist cables span the gap down to the
+  // spreader. The sky band is at most `SKY_SHARE` of the yard; on a short yard it ends where the beam still clears a
+  // carried box, so the beam never sinks into the headroom.
+  const lowestBeam = Math.floor(carryY - dy - SPREADER - beamH)
+  const floorY = Math.round(Math.min(lowestBeam, Math.max(yard.y + SKY_MIN, yard.y + yard.h * SKY_SHARE)))
+  const beamY = floorY
   const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: floorY - yard.y }
   const floor = { x: yard.x, y: floorY, w: yard.w, h: yard.y + yard.h - floorY }
   const legW = Math.max(6, Math.min(12, yard.x - 4))

@@ -35,16 +35,20 @@ describe('Yardshift 2D yard geometry', () => {
         }
       })
 
-      it('full stacks fill the yard: no bare concrete above the top slot, the beam just above the crane headroom', () => {
+      it('full stacks fill the yard; the beam tops the concrete and a carried box clears a full stack', () => {
         for (const level of LEVELS) {
           const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
           // The sky band is at most about a fifth of the yard; spare height is concrete headroom, not sky.
           expect(g.backdrop.h, `level ${level.number}`).toBeLessThanOrEqual(layout.yard.h * 0.22 + 1)
-          // A carried box clears a full stack, and the beam sits just above it (spreader room only).
+          // A carried box clears a full stack, and still hangs below the beam (room for the spreader).
           const fullTop = g.groundY - level.capacity * g.boxH
           expect(g.carryY + g.boxH).toBeLessThanOrEqual(fullTop)
-          expect(g.carryY - g.dy - (g.gantry.beamY + g.gantry.beamH)).toBeLessThanOrEqual(10)
+          expect(g.carryY - g.dy - (g.gantry.beamY + g.gantry.beamH)).toBeGreaterThanOrEqual(8)
+          // The beam sits at the top of the concrete, just under the sky band, not across the middle of the yard.
+          expect(Math.abs(g.gantry.beamY - (g.backdrop.y + g.backdrop.h)), `level ${level.number}`).toBeLessThanOrEqual(3)
+          // The legs run from the beam down the full yard.
+          expect(g.gantry.footY).toBeGreaterThanOrEqual(g.groundY)
           // Boxes are sized from the column width first: on a phone they are as tall as the 1.8:1 shape allows.
           if (s.w < 600) expect(g.boxW / g.boxH, `level ${level.number}`).toBeLessThan(1.9)
         }
