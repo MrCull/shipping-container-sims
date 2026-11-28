@@ -69,6 +69,15 @@ test('a test reported by two shards is flagged as run twice', () => {
   assert.deepEqual(m.problems, ['1 test reported by more than one shard: x.smoke.ts > t x (a, b)'])
 })
 
+test('tests over their group budget give OVER BUDGET lines (a warning: the result stays ok)', () => {
+  const shards = [{ name: 'a', text: [line('ys', 'expected', 12000), line('cam', 'expected', 12000)].join('\n') + '\n' }]
+  const groupOf = (file) => (file === 'ys.smoke.ts' ? 'yardshift' : 'camera')
+  const m = mergeShards(shards, { expect: 2, groupOf })
+  assert.equal(m.ok, true)
+  assert.deepEqual(m.overBudget, ['OVER BUDGET: ys.smoke.ts > t ys [dev] 12.0 s, budget 10 s (yardshift)'])
+  assert.deepEqual(mergeShards(shards).overBudget, [], 'with no group known, the 30 s repo limit applies')
+})
+
 test('a half-written last line is skipped', () => {
   const m = mergeShards([{ name: 'a', text: line('x', 'expected') + '\n{"id":"y","fi' }])
   assert.equal(m.rows.length, 1)
@@ -102,7 +111,9 @@ test('CLI: prints the SMOKE line, appends the timing table with budget flags to 
   assert.match(out, /^smoke-merge: failed: s4t2\.smoke\.ts > t s4t2$/m)
   assert.match(out, /^smoke-merge: flaky: s2t1\.smoke\.ts > t s2t1$/m)
   assert.match(out.trimEnd().split('\n').at(-1), /^SMOKE: /, 'the SMOKE line is the last line, so a short log tail holds it')
+  assert.equal(out.trimEnd().split('\n').at(-2), 'OVER BUDGET: s1t3.smoke.ts > t s1t3 [dev] 31.0 s, budget 30 s (repo limit)')
   const md = readFileSync(summary, 'utf8')
+  assert.match(md, /^- `OVER BUDGET: s1t3\.smoke\.ts > t s1t3 \[dev\] 31\.0 s, budget 30 s \(repo limit\)`$/m)
   assert.match(md, /^## Smoke timing$/m)
   assert.match(md, /SMOKE: 16 passed, 1 failed, 1 flaky, 0 skipped/)
   assert.match(md, /1 test over the 30 s budget: s1t3\.smoke\.ts > t s1t3 \(31\.0 s\)/)

@@ -1,10 +1,20 @@
 # Path pattern (extended regex on a changed file path) => smoke groups (space separated; `all` means every group).
-# scripts/smoke-select.mjs prints the groups a change needs; CI and merge-ticket.sh run them. `core` always runs.
+# scripts/smoke-select.mjs prints the groups a change needs; CI and merge-ticket.sh run them. `core` runs for
+# every change under src/ except a sim-only one (below).
 # A group is a Playwright tag on every test of a spec file (`{ tag: '@camera' }`); scripts/check-smoke-groups.mjs
 # (part of verify) fails when a spec has no group tag or more than one. A changed *.smoke.ts selects its own group.
 # Ignored before the map: paths outside src/, Markdown, docs/ folders, Node-only CLI code (src/sims/*/cli/) and
 # unit tests (*.test.ts). Patterns match a file or folder name, never a substring of a path (the word "tests"
-# contains "sts"). Add a line when a new area gets its own spec.
+# contains "sts"). A `[folder/]` line scopes the lines after it to paths under that folder, so a Terminal Twin
+# pattern (bay*, boom*, truck*) never selects a Terminal Twin group for another sim's file of the same name; `[]` ends
+# the scope. A sim-only change (every changed src/ path under src/sims/<id>/, no smoke label) runs the home wall spec
+# (`@home-wall`) in place of `core`. Add a line when a new area gets its own spec.
+
+# Yardshift: any change in its folder runs its own group.
+[src/sims/yardshift/]
+^src/sims/yardshift/ => yardshift
+
+[src/sims/terminal-twin/]
 (^|/)tests/browser/(openTwin|frameSampling)\.ts$ => all
 (^|/)(sceneDriver|sceneState|useTwinScene)\.ts$ => all
 (^|/)tests/browser/scenarioPicker\.ts$ => setup
@@ -25,7 +35,7 @@
 components/debug/ => analysis
 (^|/)(persistence|saves)/ => setup
 (^|/)(atmosphere|backdrop)[A-Za-z-]*\.ts$|terminals/ => yard
-(^|/)(FpsChip|PerfPanel|AudioControls|positionalSound|soundMixer|audio)[A-Za-z-]*\.(ts|vue)$ => shell
+(^|/)(FpsChip|PerfPanel|positionalSound|soundMixer|audio)[A-Za-z-]*\.(ts|vue)$ => shell
 (^|/)(positionalSound|soundMixer|soundShots|sceneModel|synth|gantryBeacons)\.ts$|assets/sounds/ => equipment
 components/setup/|(^|/)scenarioPicker|(^|/)scenario/[^/]*\.ts$ => setup
 scenario/fixtures/|(^|/)engine/ => engine
@@ -35,9 +45,6 @@ skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => she
 (^|/)infrastructure[A-Za-z-]*\.(ts|py)$|models/infrastructure/ => yard
 (^|/)(colour|Colour)[A-Za-z-]*\.(ts|vue)$|(^|/)(containerInstancer|robBoxes|sceneRenderer)\.ts$ => vessel yard
 (^|/)(vesselStatus|vesselCountdownLabels|InspectorPanel)[A-Za-z-]*\.(ts|vue)$ => analysis vessel
-(^|/)(HomePage\.vue|buildStamp\.ts|vite\.config\.ts)$ => core
-(^|/)(useMenuMusic|AudioControls|audio|HomePage)\.(ts|vue)$ => core
-(^|/)(HomePage|GameTile|SimPage)\.vue$|(^|/)lastPlayed\.ts$ => core
 (^|/)(escape|useTwinShortcuts|shortcuts)\.ts$ => analysis shell camera
 (^|/)(meshClip|hullHatchOpening|backdrop)\.ts$ => vessel yard
 (^|/)twinStore\.ts$ => yard shell vessel analysis
@@ -47,3 +54,9 @@ skin\.css$|(^|/)(TopBar|TerminalTwin|OverlayToggles)\.vue$|components/ui/ => she
 (^|/)(frameBenchmark|useFrameBenchmark)\.ts$|PerfPanel => yard
 (^|/)[A-Za-z-]*(Strict|strict)[A-Za-z-]*\.(ts|vue)$ => shell
 (^|/)(phone|Phone|touch|Touch|viewport)[A-Za-z-]*\.(ts|vue)$ => shell camera
+
+# Shared code outside src/sims/, so cross-cutting by nature: the home page and the shared audio control (which the
+# Terminal Twin HUD hosts, hence shell). A shared src/ change always runs core; these lines name the reason.
+[]
+^src/(pages/(HomePage|SimPage)\.vue|components/GameTile\.vue|utils/(buildStamp|lastPlayed)\.ts|composables/useMenuMusic\.ts)$ => core
+^src/(components/AudioControls\.vue|stores/audio\.ts|utils/audioControl\.ts)$ => core shell

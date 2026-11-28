@@ -48,7 +48,7 @@ src/sims/stowage-master/
 ├── composables/
 │   ├── useThreeScene.ts     # sim's own Three.js scene setup
 │   ├── useGameLoop.ts
-│   ├── useGameMusic.ts      # watches audioStore.musicMuted, controls background track
+│   ├── useGameMusic.ts      # background track through followMasterGain(..., 'music')
 │   ├── useAudio.ts
 │   └── useSlotPicking.ts
 ├── modules/
@@ -93,6 +93,9 @@ export const definition: SimDefinition = {
 | `color` | `string` | Hex colour for card accent |
 | `tags` | `string[]` | Category labels shown as chips |
 | `component` | `() => Promise<{ default: Component }>` | Dynamic import of the root Vue component |
+| `cardImage` | `string` (optional) | 16:9 screenshot in the sim's `assets/`, imported with `?url`; the cover of its home-wall tile (`box-empire`, `container-stack`) |
+
+The sim opens at `/sim/<id>` (the `/sim/:simId` route renders it inside `SimPage.vue`); no router change is needed.
 
 ### 3. Create the root component
 
@@ -148,24 +151,7 @@ The landing page will automatically move the card from "Coming Soon" to "Ready t
 
 ### 6. Audio integration
 
-#### Music
-
-Create `composables/useGameMusic.ts` following the pattern in `stowage-master` or `container-stack`. The composable must:
-- Watch `useAudioStore().musicMuted` (not `gameMusicMuted`) to pause/resume the looping background track
-- Use a module-level singleton `HTMLAudioElement` to survive component remounts
-
-`AudioControls.vue` is automatically rendered in the sim header by `SimPage.vue`, no per-sim UI work is needed.
-
-#### SFX
-
-In `composables/useAudio.ts` (or equivalent SFX module):
-- Import `useAudioStore` from `@/stores/audio`
-- Guard every sound-playing function with `if (audioStore.sfxMuted) return`
-- For ambient/scheduled sounds (seagulls etc.), check `sfxMuted` at fire time inside the timeout callback rather than cancelling the timer
-
-#### Rules
-- Use `audioStore.musicMuted` and `audioStore.sfxMuted`, do NOT add new flags to the audio store
-- Narrator / voiceover clips are SFX, guard with `sfxMuted`; when muted, still call `onEnded` after a short delay so sequences don't freeze
+Every sound names its channel and plays through the shared audio store, so the master, music and effects sliders and mute-all change it live: AGENTS.md, **Volume and mute** (`gainFor` for one-shot sounds and Web Audio gain nodes, `followMasterGain` for music and narration). Add no flags to the audio store. `AudioControls.vue` is rendered in the sim header by `SimPage.vue`, so a sim needs no audio UI of its own.
 
 ## Conventions
 

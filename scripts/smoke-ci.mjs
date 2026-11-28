@@ -20,7 +20,7 @@ import { existsSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { GROUPS } from './smoke-groups.mjs'
-import { loadSelectionInputs, selectGroups } from './smoke-select.mjs'
+import { HOME_WALL, loadSelectionInputs, selectGroups } from './smoke-select.mjs'
 import { mergeShards } from './smoke-merge.mjs'
 
 export const COMMENT_MARKER = '<!-- smoke-selection -->'
@@ -35,7 +35,7 @@ export function planSmoke({ event, labels, files, map, specGroup }) {
     return { run: true, all: true, grep: '', groups: GROUPS.map((group) => ({ group, reasons: [why] })), why, warnings: [] }
   }
   const r = selectGroups({ labels, files, map, specGroup })
-  const all = r.groups.length === GROUPS.length
+  const all = GROUPS.every((g) => r.groups.some((x) => x.group === g))
   return { run: r.groups.length > 0, all, grep: all ? '' : r.groups.map((g) => `@${g.group}`).join('|'), groups: r.groups, why: r.why, warnings: r.warnings }
 }
 
@@ -45,6 +45,7 @@ export function sourcesOf(reasons) {
   if (reasons.some((r) => r.startsWith('label '))) s.push('label')
   if (reasons.some((r) => r.startsWith('path ') || r.startsWith('spec '))) s.push('path')
   if (reasons.includes('always')) s.push('core')
+  if (reasons.some((r) => r.startsWith('sim-only'))) s.push('sim-only')
   if (!s.length) s.push(reasons[0] ?? 'unknown')
   return s
 }
@@ -55,7 +56,9 @@ export function commentBody(plan, { maxReasons = 3 } = {}) {
   if (!plan.run) {
     lines.push(`No smoke tests ran: ${plan.why}.`)
   } else {
-    lines.push(`${plan.groups.length} of ${GROUPS.length} groups ran${plan.all ? ' (every group)' : ''}.`, '', '| Group | From | Why |', '| --- | --- | --- |')
+    const ran = plan.groups.filter((g) => GROUPS.includes(g.group)).length
+    const home = plan.groups.some((g) => g.group === HOME_WALL) ? ', plus the home wall spec in place of `core` (sim-only change)' : ''
+    lines.push(`${ran} of ${GROUPS.length} groups ran${plan.all ? ' (every group)' : ''}${home}.`, '', '| Group | From | Why |', '| --- | --- | --- |')
     for (const g of plan.groups) {
       const shown = g.reasons.slice(0, maxReasons).map((r) => r.replace(/^(path|spec) (.+)$/, '$1 `$2`'))
       const more = g.reasons.length > maxReasons ? `; and ${g.reasons.length - maxReasons} more` : ''

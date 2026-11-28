@@ -26,8 +26,10 @@ exit 0
 EOF
 chmod +x "$bin/pnpm"
 
+ticket=tt/182-worktree-cleanup # the ticket branch make_repo creates and run_merge merges; cases 7 and 8 change it
+
 make_repo() { # make_repo <name> [norow]: an origin and a clone on integration branch "integ" with handover.md,
-  # the merge scripts and a ticket branch tt/182-worktree-cleanup that integ does not yet contain
+  # the merge scripts and a ticket branch $ticket (default tt/182-worktree-cleanup) that integ does not yet contain
   local dir="$scratch/$1"
   git init -q --bare "$dir.git"
   git init -q -b integ "$dir"
@@ -49,7 +51,7 @@ EOF
   echo base > "$dir/base.txt"
   git -C "$dir" add -A && git -C "$dir" commit -q -m "integ: base"
   git -C "$dir" push -q -u origin integ
-  git -C "$dir" checkout -q -b tt/182-worktree-cleanup
+  git -C "$dir" checkout -q -b "$ticket"
   echo ticket > "$dir/ticket.txt" && git -C "$dir" add -A && git -C "$dir" commit -q -m "ticket: work"
   git -C "$dir" checkout -q integ
   # the integration branch moves on, so the merge is a real merge commit and not a fast-forward
@@ -61,7 +63,7 @@ EOF
 
 run_merge() { # run_merge <repo> [flags]: merge-ticket.sh on the ticket branch, output to the log only
   local r="$1"; shift
-  (cd "$r" && PATH="$bin:$PATH" scripts/merge-ticket.sh "$@" tt/182-worktree-cleanup >/dev/null 2>&1)
+  (cd "$r" && PATH="$bin:$PATH" scripts/merge-ticket.sh "$@" "$ticket" >/dev/null 2>&1)
 }
 
 # Case 1: green merge, pushed. The row shows the merge commit, the handover change is one line in one commit.
@@ -77,6 +79,7 @@ check "the #182 row reads '$expected'" "$(git -C "$repo" show HEAD:handover.md |
 check "exactly one line of handover.md changed ($(diff "$scratch/green-before.md" <(git -C "$repo" show HEAD:handover.md) | grep -c '^[<>]') diff lines)" "$([ "$(diff "$scratch/green-before.md" <(git -C "$repo" show HEAD:handover.md) | grep -c '^[<>]')" -eq 2 ]; echo $?)"
 check "handover update is its own commit touching only handover.md" "$([ "$(git -C "$repo" log -1 --format=%s)" = "handover: #182 merged in branch ($merge_sha)" ] && [ "$(git -C "$repo" show --name-only --format= HEAD)" = "handover.md" ]; echo $?)"
 check "--push pushed the handover commit" "$([ "$(git -C "$repo" rev-parse integ)" = "$(git -C "$repo" rev-parse HEAD)" ] && [ "$(git -C "$repo.git" rev-parse integ)" = "$(git -C "$repo" rev-parse HEAD)" ]; echo $?)"
+check "verify ran against the pre-merge tip" "$(grep -qxF "fake pnpm run verify $(git -C "$repo" rev-parse HEAD^^1)" "$repo/.merge-ticket.log"; echo $?)"
 check "tracked tree is clean after the run" "$([ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ]; echo $?)"
 
 # Case 2: a failed check (verify) stops before the handover update: the row stays as it was.
@@ -138,6 +141,22 @@ check "handover commit subject unchanged" "$(git -C "$repo" log -1 --format=%s |
 repo="$(make_repo notrailer)"
 (unset CLAUDE_SESSION_URL; run_merge "$repo")
 check "without CLAUDE_SESSION_URL the handover commit has no trailer" "$([ -z "$(git -C "$repo" log -1 --format='%(trailers:only)' | sed '/^$/d')" ]; echo $?)"
+
+# Case 7 (#397): any <prefix>/<N>-<slug> branch, not only tt/, updates the ticket's row.
+ticket=yardshift/182-worktree-cleanup
+repo="$(make_repo prefix)"
+run_merge "$repo"; code=$?
+check "a yardshift/<N>-<slug> branch merges and exits 0" "$code"
+check "a yardshift/<N>-<slug> branch updates the #182 row" "$(git -C "$repo" log -1 --format=%s | grep -q '^handover: #182 merged in branch'; echo $?)"
+
+# Case 8: a branch with no ticket number (a review branch) warns and still exits 0, handover.md unchanged.
+ticket=yardshift/review-375
+repo="$(make_repo nonumber)"
+run_merge "$repo"; code=$?
+check "a branch without a number still exits 0" "$code"
+check "a branch without a number warns in the log" "$(grep -q 'is not <prefix>/<N>-<slug>' "$repo/.merge-ticket.log"; echo $?)"
+check "a branch without a number leaves handover.md unchanged" "$(git -C "$repo" show HEAD:handover.md | cmp -s - "$scratch/nonumber-before.md"; echo $?)"
+ticket=tt/182-worktree-cleanup
 
 echo "$fails failing"
 [ "$fails" -eq 0 ]

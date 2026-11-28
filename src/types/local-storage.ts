@@ -6,6 +6,11 @@ export interface SiteStorageGlobalSettings {
   musicVolume: number
   /** Sound-effects level 0..1 (effects, ambience, voice), relative to the master volume. */
   sfxVolume: number
+  /**
+   * The player turned the home page's menu music on (owner round 5). False by default: the home page starts muted
+   * (for that page only) until the player unmutes there, which sets this; muting there clears it.
+   */
+  menuMusicOn: boolean
   godModeEnabled: boolean
 }
 

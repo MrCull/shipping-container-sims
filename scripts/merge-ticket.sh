@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Merge a finished ticket branch into the current integration branch and verify it.
-# Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] tt/<N>-<slug>
+# Usage: scripts/merge-ticket.sh [--push] [--smoke | --smoke-all] <prefix>/<N>-<slug> (tt/, yardshift/, any sim)
 # Output goes to the terminal and to .merge-ticket.log; the last line is "EXIT <code>", so a background run
 # is finished when `tail -1 .merge-ticket.log` shows it. --push pushes the integration branch after a verified merge.
 # Smoke specs do not run here: CI runs them after each pushed merge (docs/agents/implementing.md, step 3).
@@ -32,8 +32,8 @@ branch="${1:?usage: scripts/merge-ticket.sh <ticket-branch>}"
 # warning, not a failure: the merge itself is green. No handover.md at all is silent.
 mark_handover() { # mark_handover <ticket-branch> <merge-sha>
   local n file=handover.md
-  if [[ "$1" =~ ^tt/([0-9]+)- ]]; then n="${BASH_REMATCH[1]}"; else
-    echo "handover: $1 is not tt/<N>-<slug>; handover.md not updated" >&2; return 0
+  if [[ "$1" =~ ^[^/]+/([0-9]+)- ]]; then n="${BASH_REMATCH[1]}"; else
+    echo "handover: $1 is not <prefix>/<N>-<slug>; handover.md not updated" >&2; return 0
   fi
   [ -f "$file" ] || return 0 # a run that fits in one session has no handover.md: nothing to mark, nothing to warn
   if ! awk -F'|' -v n="#$n" '$2 ~ "^ *" n " *$" {found = 1} END {exit !found}' "$file"; then
@@ -83,6 +83,9 @@ resolve_engine_version() {
 current="$(git rev-parse --abbrev-ref HEAD)"
 git fetch -q origin "$current"
 git merge --ff-only "origin/$current" >/dev/null 2>&1 || true
+# The pre-merge tip is verify's base: when the ticket branch already holds it, the merge fast-forwards onto the
+# implementer's own merge commit, whose first parent (verify's default base) would hide the ticket's changes.
+before="$(git rev-parse HEAD)"
 if ! git merge --no-edit "$branch" && ! resolve_engine_version; then
   echo "CONFLICT merging $branch into $current. Unmerged files:" >&2
   git diff --name-only --diff-filter=U >&2
@@ -94,7 +97,7 @@ if ! git merge --no-edit "$branch" && ! resolve_engine_version; then
 fi
 merged="$(git rev-parse --short HEAD)"
 scripts/check-engine-version.sh
-pnpm run verify
+pnpm run verify "$before"
 if [ "$smoke" = "all" ]; then
   pnpm run test:smoke --project dev --grep-invert @load
 elif [ -n "$smoke" ]; then

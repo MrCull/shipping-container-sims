@@ -1,0 +1,215 @@
+// Run: node --test scripts/test-unit-select.mjs
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { selectUnitScope, projectsFor, selectForEvent, summaryMarkdown, nodeTestedScripts, UNIT_IMPORTED_SCRIPTS } from './unit-select.mjs'
+
+const why = (r, path) => r.reasons.find((x) => x.path === path)?.why
+
+test('one sim: that sim, with the path as the reason', () => {
+  const r = selectUnitScope(['src/sims/stowage-master/modules/physics.ts'])
+  assert.deepEqual(r.scope, ['stowage-master'])
+  assert.match(why(r, 'src/sims/stowage-master/modules/physics.ts'), /sim stowage-master/)
+})
+
+test('two sims: both, sorted', () => {
+  const r = selectUnitScope(['src/sims/terminal-twin/a.ts', 'src/sims/box-empire/b.vue'])
+  assert.deepEqual(r.scope, ['box-empire', 'terminal-twin'])
+})
+
+test('sim plus shared src/: all', () => {
+  const r = selectUnitScope(['src/sims/terminal-twin/a.ts', 'src/utils/lastPlayed.ts'])
+  assert.equal(r.scope, 'all')
+  assert.match(why(r, 'src/utils/lastPlayed.ts'), /shared/)
+})
+
+test('shared only: all', () => {
+  assert.equal(selectUnitScope(['src/stores/audio.ts']).scope, 'all')
+})
+
+test('config files: all', () => {
+  for (const f of ['vitest.config.ts', 'vite.config.ts', 'tsconfig.tools.json', 'eslint.config.js', 'playwright.config.ts', 'package.json', 'scripts/foo.mjs', '.github/workflows/pr-checks.yml']) {
+    assert.equal(selectUnitScope([f]).scope, 'all', f)
+  }
+})
+
+test('lockfile: all', () => {
+  const r = selectUnitScope(['pnpm-lock.yaml'])
+  assert.equal(r.scope, 'all')
+  assert.match(why(r, 'pnpm-lock.yaml'), /lockfile|config/)
+})
+
+test('docs only: none, each path ignored', () => {
+  const r = selectUnitScope(['README.md', 'docs/agents/tooling.md', 'src/sims/terminal-twin/docs/engine.png'])
+  assert.equal(r.scope, 'none')
+  assert.match(why(r, 'docs/agents/tooling.md'), /ignored/)
+})
+
+test('Markdown inside a sim folder is ignored', () => {
+  const r = selectUnitScope(['src/sims/terminal-twin/terminal-twin-AGENTS.md'])
+  assert.equal(r.scope, 'none')
+})
+
+test('sim CLI code selects that sim', () => {
+  assert.deepEqual(selectUnitScope(['src/sims/terminal-twin/cli/run.ts']).scope, ['terminal-twin'])
+})
+
+test('a brand-new sim folder selects it by folder name', () => {
+  assert.deepEqual(selectUnitScope(['src/sims/yardshift/definition.ts']).scope, ['yardshift'])
+})
+
+test('other paths run no unit tests', () => {
+  const r = selectUnitScope(['knowledge-base/x.txt', 'available-media/a.glb', '.ai/plans/p.txt'])
+  assert.equal(r.scope, 'none')
+  assert.match(why(r, 'knowledge-base/x.txt'), /no unit tests/)
+})
+
+test('no changed paths: none', () => {
+  assert.equal(selectUnitScope([]).scope, 'none')
+})
+
+test('projectsFor: all runs every project; a sim without tests is skipped with a reason', () => {
+  assert.deepEqual(projectsFor('all', ['terminal-twin']), { projects: 'all', skipped: [] })
+  assert.deepEqual(projectsFor('none', ['terminal-twin']), { projects: [], skipped: [] })
+  const r = projectsFor(['box-empire', 'terminal-twin'], ['stowage-master', 'terminal-twin'])
+  assert.deepEqual(r.projects, ['terminal-twin'])
+  assert.equal(r.skipped[0].sim, 'box-empire')
+  assert.match(r.skipped[0].reason, /no unit tests/)
+})
+
+const cli = fileURLToPath(new URL('./unit-select.mjs', import.meta.url))
+const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' })
+
+test('CLI: the first line names the base used', () => {
+  const r = run('HEAD')
+  assert.equal(r.status, 0, r.stderr)
+  assert.match(r.stdout.split('\n')[0], /^unit-select: base [0-9a-f]{7,} \(given\)$/)
+  assert.match(r.stdout, /unit-select: scope /)
+})
+
+test('CLI: an unresolvable base exits non-zero', () => {
+  const r = run('no-such-ref-379')
+  assert.notEqual(r.status, 0)
+  assert.match(r.stderr, /no-such-ref-379/)
+})
+
+test('CLI --json: one JSON object with base, scope and projects', () => {
+  const r = run('--json', 'HEAD')
+  assert.equal(r.status, 0, r.stderr)
+  const j = JSON.parse(r.stdout)
+  assert.match(j.base, /^[0-9a-f]{40}$/)
+  assert.ok('scope' in j && 'projects' in j && Array.isArray(j.reasons))
+})
+
+// CI (#380): the PR checks workflow runs `unit-select.mjs --run --event <name> --files-from <PR paths> --summary <file>`.
+test('selectForEvent: a pull request uses its changed paths', () => {
+  assert.deepEqual(selectForEvent('pull_request', ['src/sims/terminal-twin/a.ts']).scope, ['terminal-twin'])
+  assert.equal(selectForEvent('pull_request', ['src/stores/audio.ts']).scope, 'all')
+  assert.equal(selectForEvent('pull_request', ['README.md']).scope, 'none')
+})
+
+test('selectForEvent: a push to main and a manual run use scope all, whatever the paths', () => {
+  for (const ev of ['push', 'workflow_dispatch']) {
+    const r = selectForEvent(ev, [])
+    assert.equal(r.scope, 'all', ev)
+    assert.match(r.reasons[0].why, new RegExp(ev))
+  }
+})
+
+test('summaryMarkdown: scope, projects and one line per reason', () => {
+  const md = summaryMarkdown({ scope: ['terminal-twin'], projects: ['terminal-twin'], skipped: [], reasons: [{ path: 'src/sims/terminal-twin/a.ts', why: 'sim terminal-twin' }] })
+  assert.match(md, /Unit-test scope: terminal-twin/)
+  assert.match(md, /Projects: terminal-twin/)
+  assert.match(md, /`src\/sims\/terminal-twin\/a.ts`: sim terminal-twin/)
+  assert.match(summaryMarkdown({ scope: 'none', projects: [], skipped: [], reasons: [] }), /no unit tests to run/)
+})
+
+const tmp = () => mkdtempSync(join(tmpdir(), 'unit-select-'))
+
+test('CLI --event push --summary: scope all without reading changed paths', () => {
+  const d = tmp()
+  const r = run('--event', 'push', '--files-from', join(d, 'missing.txt'), '--summary', join(d, 'sum.md'), '--json')
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(JSON.parse(r.stdout).projects, 'all')
+  assert.match(readFileSync(join(d, 'sum.md'), 'utf8'), /Unit-test scope: all/)
+})
+
+test('CLI docs-only PR with --run: a passing no-op, written to the summary', () => {
+  const d = tmp()
+  writeFileSync(join(d, 'files.txt'), 'README.md\ndocs/agents/tooling.md\n')
+  const r = run('--run', '--event', 'pull_request', '--files-from', join(d, 'files.txt'), '--summary', join(d, 'sum.md'))
+  assert.equal(r.status, 0, r.stderr)
+  assert.match(r.stdout, /no unit tests to run for this change: OK/)
+  assert.match(readFileSync(join(d, 'sum.md'), 'utf8'), /Unit-test scope: none/)
+})
+
+test("CLI one-sim PR: only that sim's project", () => {
+  const d = tmp()
+  writeFileSync(join(d, 'files.txt'), 'src/sims/terminal-twin/modules/x.ts\n')
+  const r = run('--json', '--event', 'pull_request', '--files-from', join(d, 'files.txt'))
+  assert.equal(r.status, 0, r.stderr)
+  assert.deepEqual(JSON.parse(r.stdout).projects, ['terminal-twin'])
+})
+
+// #396: paths that only affect browser smoke tests, or scripts covered by their own `node --test` file in verify:checks.
+const NODE_TESTED = nodeTestedScripts(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+
+test('smoke-only paths select no unit tests, with a reason', () => {
+  for (const f of [
+    'scripts/smoke-map.txt',
+    'src/tests/browser/home-wall.smoke.ts',
+    'src/sims/terminal-twin/tests/browser/bay-viewer.smoke.ts',
+    'src/sims/yardshift/tests/browser/yardshift.smoke.ts',
+    'src/tests/browser/someHelper.ts',
+  ]) {
+    const r = selectUnitScope([f], { nodeTested: NODE_TESTED })
+    assert.equal(r.scope, 'none', f)
+    assert.match(why(r, f), /no unit tests \(smoke/, f)
+  }
+})
+
+test('a sim browser helper that a unit test reads keeps its sim', () => {
+  assert.deepEqual(selectUnitScope(['src/sims/terminal-twin/tests/browser/renderBudget.budget.ts']).scope, ['terminal-twin'])
+})
+
+test('a smoke spec next to sim code still selects the sim for the code', () => {
+  const r = selectUnitScope(['src/sims/terminal-twin/tests/browser/bay-viewer.smoke.ts', 'src/sims/terminal-twin/modules/a.ts'])
+  assert.deepEqual(r.scope, ['terminal-twin'])
+})
+
+test('nodeTestedScripts reads the node --test files in verify:checks', () => {
+  const pkg = JSON.stringify({ scripts: { 'verify:checks': 'node a.mjs && node --test scripts/test-smoke-select.mjs scripts/test-foo.mjs && pnpm run lint' } })
+  assert.deepEqual(nodeTestedScripts(pkg).sort(), ['scripts/foo.mjs', 'scripts/smoke-select.mjs', 'scripts/test-foo.mjs', 'scripts/test-smoke-select.mjs'])
+  assert.ok(NODE_TESTED.includes('scripts/smoke-select.mjs'))
+})
+
+test('a script with its own node --test file in verify:checks selects no unit tests', () => {
+  for (const f of ['scripts/smoke-select.mjs', 'scripts/test-smoke-select.mjs', 'scripts/unit-select.mjs']) {
+    const r = selectUnitScope([f], { nodeTested: NODE_TESTED })
+    assert.equal(r.scope, 'none', f)
+    assert.match(why(r, f), /node --test/, f)
+  }
+})
+
+test('scripts that vitest config or unit tests import still select all, even with a node --test file', () => {
+  const r = selectUnitScope(['scripts/vitest-projects.mjs'], { nodeTested: NODE_TESTED })
+  assert.equal(r.scope, 'all')
+  assert.match(why(r, 'scripts/vitest-projects.mjs'), /imported by vitest/)
+  assert.equal(selectUnitScope(['scripts/bg.sh'], { nodeTested: NODE_TESTED }).scope, 'all')
+  assert.equal(selectUnitScope(['scripts/smoke-select.mjs']).scope, 'all', 'without the node-tested list a script stays all')
+})
+
+test('every scripts/ file the vitest config or a unit test imports is in UNIT_IMPORTED_SCRIPTS', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  const ls = spawnSync('git', ['ls-files', 'vitest.config.ts', 'src/**/*.test.ts'], { cwd: root, encoding: 'utf8' }).stdout
+  const imported = new Set()
+  for (const f of ls.split('\n').filter(Boolean)) {
+    for (const m of readFileSync(join(root, f), 'utf8').matchAll(/from\s+['"][^'"]*?(scripts\/[^'"]+)['"]/g)) imported.add(m[1])
+  }
+  for (const s of imported) assert.ok(UNIT_IMPORTED_SCRIPTS.includes(s), `${s} is imported by a unit test or vitest config`)
+  assert.ok(imported.has('scripts/vitest-projects.mjs'))
+})

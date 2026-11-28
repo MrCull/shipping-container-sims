@@ -330,6 +330,7 @@ watch(
 - Don't use Vue watchers at 60 fps, watchers for state changes, render loop for interpolation.
 - Use `Object3D` hierarchy for compound equipment (crane = base > boom > trolley > spreader).
 - Keep render loop lean: no allocations, reuse `Vector3` / `Matrix4` instances.
+- **Build once, update per frame.** Create meshes, geometries and materials when the layout changes (level start, resize), never in a render or a watcher that fires on every view-model change; per frame only move, recolour, relabel or hide them. Yardshift (#374) rebuilt its whole yard every frame through nine tickets and only code review caught it; its tutorial smoke spec went from 8 s to 4.5 s once fixed. Reviewers of scene code check this rule.
 
 ---
 

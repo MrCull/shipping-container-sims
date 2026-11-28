@@ -1,7 +1,8 @@
 /**
  * #155 browser smoke test: the main menu's volume slider drives the menu music level live, and at 0 the music is
  * silent and the speaker icon shows silent. The menu music is an `Audio` element outside the DOM, so an init script
- * records every element the page creates. Run with `pnpm run test:smoke`.
+ * records every element the page creates. Owner round 5: the menu music starts muted until the player unmutes on
+ * the home page, which is remembered (`menuMusicOn`). Run with `pnpm run test:smoke`.
  */
 import { expect, test, type Page } from '@playwright/test'
 
@@ -39,10 +40,30 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('the volume slider on the main menu changes the menu music level live; 0 is silent', { tag: '@core' }, async ({ page }) => {
+test('the menu music starts muted; unmuting it is remembered across visits, and muting it again is too', { tag: '@core' }, async ({ page }) => {
   await page.goto('/')
+  await expect(page.getByTestId('audio-button')).toHaveText('🔇')
+  await expect.poll(() => menuMusicVolume(page)).toBe(0)
+
+  await page.getByTestId('audio-button').click()
+  await expect(page.getByTestId('audio-button')).not.toHaveText('🔇')
   await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.4 * MENU_MUSIC_GAIN)
 
+  await page.reload()
+  await expect(page.getByTestId('audio-button')).not.toHaveText('🔇')
+  await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(0.4 * MENU_MUSIC_GAIN)
+
+  await page.getByTestId('audio-button').click()
+  await page.reload()
+  await expect(page.getByTestId('audio-button')).toHaveText('🔇')
+  await expect.poll(() => menuMusicVolume(page)).toBe(0)
+})
+
+test('the volume slider on the main menu changes the menu music level live; 0 is silent', { tag: '@core' }, async ({ page }) => {
+  await page.goto('/')
+  await expect.poll(() => menuMusicVolume(page)).toBe(0)
+
+  // Moving a slider on the muted menu turns the music on.
   await page.getByTestId('audio-menu-button').click()
   await setVolume(page, 100)
   await expect.poll(() => menuMusicVolume(page)).toBeCloseTo(MENU_MUSIC_GAIN)

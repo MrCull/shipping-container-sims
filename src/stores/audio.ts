@@ -70,9 +70,56 @@ export const useAudioStore = defineStore('audio', () => {
     persistGlobal({ sfxVolume: sfxVolume.value })
   }
 
+  /** The mute the player chose (stored); `soundMuted` differs from it only under a hold or a transient mute. */
+  const storedSoundMuted = ref(persistedStorage.global.soundMuted)
+  /** The player turned the menu music on at the home page (stored, owner round 5). */
+  const menuMusicOn = ref(persistedStorage.global.menuMusicOn)
+  /** True while the home page is shown (`enterMenu`): a mute choice there also sets `menuMusicOn`. */
+  let atMenu = false
+  /** Page-level mute holds, newest last: the newest decides `soundMuted` until it is released. */
+  let holds: Array<{ muted: boolean }> = []
+
+  function setMenuMusicOn(value: boolean): void {
+    menuMusicOn.value = value
+    persistGlobal({ menuMusicOn: value })
+  }
+
+  /** The player's own mute choice: stored, ends every hold, and at the menu also sets the menu music preference. */
   function setSoundMuted(value: boolean): void {
     soundMuted.value = value
+    storedSoundMuted.value = value
+    holds = []
     persistSoundMuted()
+    if (atMenu) setMenuMusicOn(!value)
+  }
+
+  /**
+   * Mute or unmute for as long as a page is shown, without writing the stored choice or touching the sliders.
+   * Returns the release: the newest remaining hold, else the stored choice, decides again. An explicit mute or
+   * unmute by the player (`setSoundMuted`) ends every hold, so the player's choice stays after the release.
+   */
+  function holdSoundMuted(muted: boolean): () => void {
+    const hold = { muted }
+    holds.push(hold)
+    soundMuted.value = muted
+    return () => {
+      if (!holds.includes(hold)) return
+      holds = holds.filter((h) => h !== hold)
+      soundMuted.value = holds[holds.length - 1]?.muted ?? storedSoundMuted.value
+    }
+  }
+
+  /**
+   * The home page is shown (owner round 5): unless the player turned the menu music on there, it starts muted for
+   * that page only. Returns the leave function (call it when the page unmounts).
+   */
+  function enterMenu(): () => void {
+    atMenu = true
+    const release = menuMusicOn.value ? null : holdSoundMuted(true)
+    return () => {
+      atMenu = false
+      release?.()
+    }
   }
 
   /** Mute or unmute for this page only, without writing the stored choice (a forced mute must not outlive the tab). */
@@ -130,6 +177,10 @@ export const useAudioStore = defineStore('audio', () => {
     moveSfxSlider,
     setSoundMuted,
     setSoundMutedTransient,
+    holdSoundMuted,
+    menuMusicOn,
+    setMenuMusicOn,
+    enterMenu,
     moveVolumeSlider,
     toggleSound,
     musicMuted,

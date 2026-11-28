@@ -1,0 +1,84 @@
+/*
+ * Yardshift palette: the sim's own colours as `--ys-*` custom properties, scoped to `.yardshift` (the root in
+ * Yardshift.vue; the HUD, queue and screens render inside it). Background, text and accent use the shared tokens of
+ * src/assets/main.css; components use those or `--ys-*`, never a hex colour (modules/palette.test.ts).
+ * The sequence colours and grey are mirrored in TS for the view-model and the canvas yard
+ * (modules/presentation.ts `SEQUENCE_COLOURS`, `GREY`), as are the yard drawing colours (modules/yardPalette.ts);
+ * the tests keep them equal.
+ */
+.yardshift {
+  /* Sequence colours: the next five containers in rainbow order (red, orange, green, blue, purple). */
+  --ys-seq-0: #ef5b52;
+  --ys-seq-1: #f59a3a;
+  --ys-seq-2: #4cc265;
+  --ys-seq-3: #4b9cf0;
+  --ys-seq-4: #a985ee;
+  /* Containers farther than five positions away. */
+  --ys-grey: #84949c;
+
+  /* Bonus gold: medallion, bonus countdown, titles, selection. */
+  --ys-gold: #ffc85c;
+  --ys-gold-bright: #ffda75;
+  --ys-gold-light: #fff2bd;
+  --ys-gold-mid: #f7cb66;
+  --ys-gold-dark: #72451d;
+  --ys-gold-deep: #634016;
+  --ys-selected: #ffcb60;
+
+  /* Warnings (red). */
+  --ys-red: #e9483d;
+  --ys-red-dark: #a83229;
+  --ys-red-light: #ff8776;
+  --ys-green-dark: #26443e;
+
+  /* Panels and lines over the yard. */
+  --ys-ink: #0d1b24;
+  --ys-panel: #142530;
+  --ys-panel-raised: #1d3442;
+  --ys-line: #3c5363;
+  --ys-track: #26404f;
+  --ys-scrim: rgb(8 19 29 / 45%);
+  --ys-scrim-strong: rgb(8 19 29 / 78%);
+
+  /* The 2D yard drawing (canvas), mirrored in modules/yardPalette.ts. */
+  --ys-yard-concrete: #d2cdc0;
+  --ys-yard-concrete-dark: #bdb7a8;
+  --ys-yard-slot-line: #c9a14a;
+  --ys-yard-yard-text: #2c3a44;
+  --ys-yard-gantry: #2f68a3;
+  --ys-yard-gantry-dark: #1c4675;
+  --ys-yard-trolley: #f2b632;
+  --ys-yard-cable: #1a1f24;
+  --ys-yard-outline: #1b2630;
+  --ys-yard-number-ink: #13212b;
+  --ys-yard-ghost: #5ff0b0;
+  --ys-yard-rim: #ffffff;
+  --ys-yard-urgent: #e9483d;
+  --ys-yard-collection-bay: #2c5759;
+  --ys-yard-collection-line: #8fd1c6;
+  --ys-yard-receipt-bay: #4b5863;
+  --ys-yard-receipt-line: #b4c2cc;
+  --ys-yard-receipt-urgent: #8f3a2e;
+  --ys-yard-chassis: #2a3138;
+  --ys-yard-wheel: #14181c;
+  --ys-yard-cab-white: #eef2f3;
+  --ys-yard-cab-steel: #6f93b0;
+  --ys-yard-glass: #6f97ad;
+  --ys-yard-medal-light: #fff2bd;
+  --ys-yard-medal-dark: #d39b31;
+  --ys-yard-medal-rim: #87531d;
+  --ys-yard-medal-star: #634016;
+  --ys-yard-heavy-tile: #1d232a;
+  --ys-yard-cab-teal: #2f9e93;
+  --ys-yard-hub: #c9d3d8;
+  --ys-yard-headlight: #ffe9a8;
+  --ys-yard-casting: #20282f;
+  --ys-yard-dust: #efe7d6;
+  --ys-yard-gold-shine: #fffbe8;
+  --ys-yard-gold-body: #ffd84a;
+  --ys-yard-gold-deep: #f0b428;
+  --ys-yard-receipt-cargo: #d3dadf;
+  --ys-yard-road: #39434b;
+  --ys-yard-kerb: #a3acb2;
+  --ys-yard-road-line: #e8ecee;
+}

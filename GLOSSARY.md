@@ -367,3 +367,17 @@ Domain terms used in code, tests, docs and conversations. Most are from **Termin
 - **Look-ahead:** how far the engine runs ahead of the displayed time while playing (1.5 wall seconds of playback, `TwinController`), requested in slices that each cost the worker about 150 ms. A box in flight at the displayed time is posed from motion planned in the look-ahead.
 - **Achieved speed:** the sim seconds per wall second playback really runs at. Equal to the chosen speed unless the engine cannot supply it; then the engine's measured rate, shown in the top bar next to the chosen speed when more than 10 % below it. *Avoid:* "FPS" for it.
 - **Benchmark (#254):** the performance panel's one-click frame-rate tour on a production build: the TTI baseline run to 7,200 s, then 20 timed stages (five camera views at Low, Medium and High, then five speed steps), downloaded as one JSON with per-stage fps, frame-time p50/p95/p99/longest, pose time, draw calls, triangles, boxes posed and **achieved speed** (`modules/frameBenchmark.ts`, `composables/useFrameBenchmark.ts`). Not the engine benchmark `tt:bench`.
+
+## Yardshift (`src/sims/yardshift/`)
+
+- **Rehandle (Yardshift):** moving an exposed container from one yard stack to another. Costs a move against the level's rehandle cap; collections and receipts never do.
+- **Receipt:** unloading the waiting incoming truck's container onto a stack (`receive` action). Its **deadline** is the number of other successful moves left before receiving becomes mandatory (0 blocks every other action).
+- **Mandatory receipt:** a waiting truck at deadline 0. The yard dims and a red arrow points at the receipt truck until the player selects it; with no legal space for its cargo the shift fails as **blocked**.
+- **Blocked (Yardshift):** the failure when no legal move exists after a move or at the start (`failure.reason` `blocked`), including a mandatory receipt with no legal space.
+- **Heavy cargo:** a container that may only be placed on an empty stack or on another heavy container (rejection reason `heavy`). Yardshift draws it with an "H" badge, also when buried or grey.
+- **Solver fixture:** `fixtures/level-NN.json`, written by `pnpm run ys:solve`: a level's proven minimum rehandles (the three-star target) and one optimal action list.
+- **Combo (Yardshift):** consecutive collections; a rehandle or receipt resets it to 0. Collection score is 100 + 50 x (min(combo, 5) - 1).
+- **Bonus container / bonus window:** a level's `bonusIds` container carries a gold star medallion; when it becomes the next required container a window of `bonusWindowSeconds` opens (`state.bonusMs`). Collecting it inside the window gives +250 points and +5 s shift; a miss makes it ordinary cargo. Stars never depend on it. On top of its stack it **glints** (rocks and flashes gold; still under reduced motion).
+- **Colour slot:** the position 0..5 of a container after the next required one, drawn in the six sequence colours (a hue walk: green, teal, blue, indigo, purple, pink); farther containers are grey.
+- **Urgency risk (Yardshift):** 0..1 shake level of a container: the shift-end risk (last 9 s) for all, plus the focus risk (0.08 rising to 1 below 35% of the next-truck clock) for the current container. Under reduced motion it becomes the static `urgent` flag. Never moves a hit region.
+- **Heavy hint (Yardshift):** the live coaching line while heavy cargo is selected, on levels with `heavyHints` (11 and 12 only); rejection messages stay on every level.

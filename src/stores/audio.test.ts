@@ -216,3 +216,112 @@ describe('separate music and effects levels under one mute', () => {
     stopVoice()
   })
 })
+
+describe('shared audio store: menu music default and sim sound-on holds (owner round 5)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const stored = (data: Map<string, string>) => JSON.parse(data.get(KEY) ?? '{}').global ?? {}
+
+  it('the home page starts muted by default without writing the stored mute, and leaving restores it', () => {
+    const data = stubStorage()
+    const audio = fresh()
+    expect(audio.menuMusicOn).toBe(false)
+    const leave = audio.enterMenu()
+    expect(audio.soundMuted).toBe(true)
+    expect(audio.musicGain).toBe(0)
+    expect(stored(data).soundMuted).toBeUndefined()
+    leave()
+    expect(audio.soundMuted).toBe(false)
+  })
+
+  it('turning the sound on at the menu is remembered, so the next visit plays the menu music', () => {
+    const data = stubStorage()
+    const audio = fresh()
+    const leave = audio.enterMenu()
+    audio.toggleSound()
+    expect(audio.soundMuted).toBe(false)
+    expect(audio.menuMusicOn).toBe(true)
+    expect(stored(data).menuMusicOn).toBe(true)
+    leave()
+    const next = fresh()
+    expect(next.menuMusicOn).toBe(true)
+    next.enterMenu()
+    expect(next.soundMuted).toBe(false)
+  })
+
+  it('a slider moved at the menu turns the menu music on too', () => {
+    stubStorage()
+    const audio = fresh()
+    audio.enterMenu()
+    audio.moveMusicSlider(0.6)
+    expect(audio.soundMuted).toBe(false)
+    expect(audio.menuMusicOn).toBe(true)
+  })
+
+  it('muting at the menu turns the menu music off and mutes every sim, as before', () => {
+    const data = stubStorage()
+    const audio = fresh()
+    audio.setMenuMusicOn(true)
+    const leave = audio.enterMenu()
+    expect(audio.soundMuted).toBe(false)
+    audio.toggleSound()
+    expect(audio.menuMusicOn).toBe(false)
+    expect(stored(data).soundMuted).toBe(true)
+    leave()
+    expect(audio.soundMuted).toBe(true)
+  })
+
+  it('a mute change outside the menu leaves the menu music preference alone', () => {
+    stubStorage()
+    const audio = fresh()
+    audio.toggleSound()
+    audio.toggleSound()
+    expect(audio.menuMusicOn).toBe(false)
+  })
+
+  it('a sim sound-on hold unmutes for its visit only: the stored mute and sliders are unchanged', () => {
+    const data = stubStorage()
+    const audio = fresh()
+    audio.setVolume(0.7)
+    audio.setSoundMuted(true)
+    const release = audio.holdSoundMuted(false)
+    expect(audio.soundMuted).toBe(false)
+    expect(audio.musicGain).toBeCloseTo(0.7)
+    expect(stored(data).soundMuted).toBe(true)
+    expect(stored(data).volume).toBeCloseTo(0.7)
+    release()
+    expect(audio.soundMuted).toBe(true)
+  })
+
+  it('an explicit mute inside a hold is kept after the hold is released', () => {
+    stubStorage()
+    const audio = fresh()
+    const release = audio.holdSoundMuted(false)
+    audio.toggleSound()
+    expect(audio.soundMuted).toBe(true)
+    release()
+    expect(audio.soundMuted).toBe(true)
+  })
+
+  it('holds release in any order: the sim leaving after the menu entered keeps the menu muted', () => {
+    stubStorage()
+    const audio = fresh()
+    const releaseSim = audio.holdSoundMuted(false)
+    const leaveMenu = audio.enterMenu()
+    releaseSim()
+    expect(audio.soundMuted).toBe(true)
+    leaveMenu()
+    expect(audio.soundMuted).toBe(false)
+  })
+
+  it('stored data without the preference migrates to menu music off; a non-boolean is ignored', () => {
+    stubStorage({ [KEY]: JSON.stringify({ version: 1, global: { soundMuted: false, volume: 0.5 }, sims: {} }) })
+    expect(fresh().menuMusicOn).toBe(false)
+    stubStorage({ [KEY]: JSON.stringify({ version: 1, global: { soundMuted: false, menuMusicOn: 'yes' }, sims: {} }) })
+    expect(fresh().menuMusicOn).toBe(false)
+    stubStorage({ [KEY]: JSON.stringify({ version: 1, global: { soundMuted: false, menuMusicOn: true }, sims: {} }) })
+    expect(fresh().menuMusicOn).toBe(true)
+  })
+})

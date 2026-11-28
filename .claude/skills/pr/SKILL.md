@@ -169,7 +169,7 @@ Execution-based evidence is A-tier. Test results, console output. Show the exact
 
 ### Smoke labels
 
-A PR that changes `src/` carries the `smoke:<group>` label of each area it touches (table: `AGENTS.md`, **Smoke labels**); add them to the PR and list them here.
+A PR that changes `src/` carries the `smoke:<group>` label of each area it touches (table: `docs/agents/tooling.md`, **Smoke labels**); add them to the PR and list them here.
 
 ### Merge Danger
 

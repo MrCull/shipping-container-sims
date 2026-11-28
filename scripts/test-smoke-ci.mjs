@@ -13,15 +13,24 @@ const map = parseMap(readFileSync(new URL('./smoke-map.txt', import.meta.url), '
 const plan = (event, labels, files, specGroup = () => null) => planSmoke({ event, labels, files, map, specGroup })
 const BAY = 'src/sims/terminal-twin/components/BayViewer.vue'
 
-test('a PR touching only the bay viewer runs core and vessel, and the comment says why', () => {
+test('a PR touching only the bay viewer runs the home wall spec and vessel, and the comment says why', () => {
   const p = plan('pull_request', [], [BAY])
   assert.equal(p.run, true)
-  assert.equal(p.grep, '@core|@vessel')
+  assert.equal(p.all, false)
+  assert.equal(p.grep, '@home-wall|@vessel')
   const body = commentBody(p)
   assert.ok(body.startsWith(COMMENT_MARKER))
-  assert.match(body, /2 of 9 groups ran/)
-  assert.match(body, /\| `core` \| core \| always \|/)
+  assert.match(body, new RegExp(`1 of ${GROUPS.length} groups ran, plus the home wall spec in place of \`core\` \\(sim-only change\\)`))
+  assert.match(body, /\| `home-wall` \| sim-only \| sim-only: every changed src\/ path is inside a sim folder/)
   assert.match(body, /\| `vessel` \| path \| path `src\/sims\/terminal-twin\/components\/BayViewer\.vue` \|/)
+})
+
+test('a shared src/ change keeps core; every non-core group plus the home wall spec is still not every group', () => {
+  const p = plan('pull_request', [], [BAY, 'src/utils/format.ts'])
+  assert.equal(p.grep, '@core|@vessel')
+  assert.match(commentBody(p), /\| `core` \| core \| always \|/)
+  const wide = plan('pull_request', [], ['src/sims/terminal-twin/tests/browser/openTwin.ts'])
+  assert.equal(wide.all, true)
 })
 
 test('a docs-only PR runs nothing, and the comment says so', () => {
@@ -43,9 +52,8 @@ test('the smoke label runs every group with no grep; a smoke:<group> label shows
   assert.equal(all.grep, '')
   assert.equal(all.groups.length, GROUPS.length)
   const one = plan('pull_request', ['smoke:yard'], [BAY])
-  assert.equal(one.grep, '@core|@vessel|@yard')
+  assert.equal(one.grep, '@home-wall|@vessel|@yard')
   assert.match(commentBody(one), /\| `yard` \| label \| label smoke:yard \|/)
-  assert.match(commentBody(one), /\| `core` \| core \| always \|/)
 })
 
 test('push to main and workflow_dispatch run every group, whatever changed', () => {
@@ -135,7 +143,7 @@ test('CLI: plan writes run and grep outputs and the comment; red-main --dry-run 
   writeFileSync(join(dir, 'files.txt'), `${BAY}\n`)
   const out = join(dir, 'out.txt')
   execFileSync(process.execPath, ['scripts/smoke-ci.mjs', 'plan', '--event', 'pull_request', '--labels', 'bug', '--files-from', join(dir, 'files.txt'), '--github-output', out, '--comment-out', join(dir, 'c.md')], { encoding: 'utf8' })
-  assert.equal(readFileSync(out, 'utf8'), 'run=true\ngrep=@core|@vessel\n')
+  assert.equal(readFileSync(out, 'utf8'), 'run=true\ngrep=@home-wall|@vessel\n')
   assert.match(readFileSync(join(dir, 'c.md'), 'utf8'), /`vessel` \| path/)
   writeFileSync(join(dir, 'docs.txt'), 'README.md\n')
   execFileSync(process.execPath, ['scripts/smoke-ci.mjs', 'plan', '--event', 'pull_request', '--files-from', join(dir, 'docs.txt'), '--github-output', out], { encoding: 'utf8' })
