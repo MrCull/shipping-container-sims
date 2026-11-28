@@ -22,16 +22,16 @@ export interface Gantry {
   left: number
   right: number
   legW: number
-  /** Top of the beam (the top of the concrete, just under the sky band) and its height; legs run down to `footY`. */
+  /** Top of the beam (at the top of the surface, over the road strip) and its height; legs run down to `footY`. */
   beamY: number
   beamH: number
   footY: number
 }
 
 export interface YardGeometry {
-  /** Quiet harbour backdrop (sky, faint distant cranes, quay band) across the top of the yard. */
-  backdrop: Rect
-  /** The concrete yard floor below the backdrop. */
+  /** The road strip over the yard (owner round 5): asphalt under both truck bays, the gantry beam spanning it. */
+  road: Rect
+  /** The concrete yard floor: the whole yard band, below the road strip. */
   floor: Rect
   /** Ground line: the bottom of every tier-0 container. */
   groundY: number
@@ -43,7 +43,7 @@ export interface YardGeometry {
   /** How far a selected container lifts. */
   lift: number
   gantry: Gantry
-  /** Where the crane hook carries a box: the front face top while travelling. */
+  /** Where the crane hook carries a box: the front face top while travelling, just under the road strip. */
   carryY: number
 }
 
@@ -64,10 +64,8 @@ export const ASPECT_MAX = 1.45
 export const NUMBER_SHARE = 0.58
 /** Lift of the selected container, as a share of its height. */
 export const LIFT = 0.3
-/** The sky strip kept above the gantry beam. */
-export const SKY_MIN = 22
-/** Most of the yard height the sky band takes (art pass 3 of the 2D yard: spare height is quiet sky, as in v1). */
-export const SKY_SHARE = 0.4
+/** Room at the top of the yard for the "YARD 01" and free-slot captions, over the crane headroom. */
+export const CAPTION_PX = 16
 /** Room between the beam and the top of a carried box, for the spreader. */
 const SPREADER = 8
 
@@ -76,9 +74,9 @@ export function beamHFor(colW: number): number {
   return Math.max(10, Math.min(16, Math.round(colW * 0.16)))
 }
 
-/** Yard height besides the stacks: sky, beam, spreader, top face, a clearance pixel pair and the stack labels. */
+/** Yard height besides the stacks: captions, spreader, top face, a clearance pixel pair and the stack labels. */
 function fixedFor(colW: number): number {
-  return SKY_MIN + beamHFor(colW) + SPREADER + colW * RISE + 2 + LABEL_PX
+  return CAPTION_PX + SPREADER + colW * RISE + 2 + LABEL_PX
 }
 
 /**
@@ -111,18 +109,15 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
   const boxH = boxHFor(colW, cap, groundY - yard.y - (fixedFor(colW) - LABEL_PX))
   // A short room keeps the box container shaped: it narrows instead of flattening.
   const boxW = Math.min(fullW, boxH * ASPECT_MAX)
-  // The crane carries a box one box above a full stack (the crane headroom); at rest the spreader hangs there.
-  const carryY = groundY - (cap + 1) * boxH - 2
-  // The beam sits at the top of the concrete, just under the sky band, and the hoist cables span the gap down to the
-  // spreader. Art pass 3 (owner: full stacks fill the yard): the beam sits just over the crane headroom (a carried box
-  // clears a full stack with spreader room), so spare height is quiet sky, not empty concrete, up to `SKY_SHARE` of the
-  // yard; the sky is never under `SKY_MIN`, and the beam never sinks into the headroom.
-  const lowestBeam = Math.floor(carryY - dy - SPREADER - beamH)
-  const skyCap = yard.y + yard.h * SKY_SHARE
-  const floorY = Math.round(Math.min(lowestBeam, Math.max(yard.y + SKY_MIN, Math.min(skyCap, lowestBeam - boxH * 0.25))))
-  const beamY = floorY
-  const backdrop = { x: yard.x, y: yard.y, w: yard.w, h: floorY - yard.y }
-  const floor = { x: yard.x, y: floorY, w: yard.w, h: yard.y + yard.h - floorY }
+  // The crane carries a box high, just under the road strip (owner round 5: it lifts boxes up to the trucks), always at
+  // least one box above a full stack (the crane headroom); at rest the spreader hangs there, under the road.
+  const carryY = Math.min(groundY - (cap + 1) * boxH - 2, Math.round(yard.y + CAPTION_PX + SPREADER + dy))
+  // Owner round 5 (trucks above the yard): the road strip with both bays runs across the top, the beam spans over it
+  // just under the HUD bands, and the hoist cables hang down across the road to the spreader; the crane lifts a box
+  // from the yard up to a truck, and lowers a receipt from its truck down into the yard. No sky band.
+  const road = layout.road
+  const beamY = Math.max(0, road.y - beamH - 2)
+  const floor = { ...yard }
   const legW = Math.max(6, Math.min(12, yard.x - 4))
   const gantry: Gantry = {
     left: Math.max(0, yard.x - legW - 2),
@@ -132,7 +127,7 @@ export function yardGeometry(layout: Layout, capacity: number): YardGeometry {
     beamH,
     footY: yard.y + yard.h - 4,
   }
-  return { backdrop, floor, groundY, boxW, boxH, dx, dy, lift: boxH * LIFT, gantry, carryY }
+  return { road, floor, groundY, boxW, boxH, dx, dy, lift: boxH * LIFT, gantry, carryY }
 }
 
 /** The box of the container at `tier` (0 = bottom) of stack `stack`, raised by `lift` px. */
@@ -152,14 +147,14 @@ export const CHEVRON_BOUNCE = 3
 
 /**
  * The bouncing NEXT chevron over stack `stack` holding `height` boxes: centred on the boxes' front, just above the
- * stack top (a buried next container's stack top too, so the player sees where to dig), never up into the beam. The
+ * stack top (a buried next container's stack top too, so the player sees where to dig), never up into the road. The
  * hit regions stay the columns; this is paint only.
  */
 export function chevronAt(g: YardGeometry, layout: Layout, stack: number, height: number): Rect {
   const col = layout.columns[stack]!
   const top = height > 0 ? boxBounds(boxAt(g, layout, stack, height - 1)).y : g.groundY
   const bottom = top - CHEVRON_BOUNCE - 2
-  const ceiling = g.gantry.beamY + g.gantry.beamH + CHEVRON_BOUNCE
+  const ceiling = col.y + CHEVRON_BOUNCE
   const h = Math.max(6, Math.min(g.boxH * 0.6, col.w * 0.32, bottom - ceiling))
   const w = Math.min(col.w - 4, h * 1.5)
   const cx = boxAt(g, layout, stack, 0).x + g.boxW / 2

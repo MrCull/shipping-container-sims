@@ -3,10 +3,6 @@
  * so they are mirrored here; `palette.test.ts` keeps each one equal to its `--ys-yard-*` entry in styles/palette.css.
  */
 export const YARD_COLOURS = {
-  'sky-top': '#a9c3cf',
-  'sky-low': '#dbe6e9',
-  distant: '#6d8a9c',
-  quay: '#e3ddcf',
   concrete: '#d2cdc0',
   'concrete-dark': '#bdb7a8',
   'slot-line': '#c9a14a',
@@ -35,7 +31,6 @@ export const YARD_COLOURS = {
   'medal-rim': '#87531d',
   'medal-star': '#634016',
   'heavy-tile': '#1d232a',
-  'sky-haze': '#c3d4da',
   'cab-teal': '#2f9e93',
   'hub': '#c9d3d8',
   'headlight': '#ffe9a8',
@@ -45,6 +40,9 @@ export const YARD_COLOURS = {
   'gold-body': '#ffd84a',
   'gold-deep': '#f0b428',
   'receipt-cargo': '#d3dadf',
+  road: '#39434b',
+  kerb: '#a3acb2',
+  'road-line': '#e8ecee',
 } as const
 
 export type YardColour = keyof typeof YARD_COLOURS

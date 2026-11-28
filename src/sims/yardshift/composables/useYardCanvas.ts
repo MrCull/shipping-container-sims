@@ -504,41 +504,28 @@ function poof(g: CanvasRenderingContext2D, b: Box, t: number): void {
   }
 }
 
-/** Quiet harbour backdrop: sky, faint distant crane silhouettes on a hazy horizon, and the quay band. */
-function backdrop(g: CanvasRenderingContext2D, r: Rect, seed: number): void {
-  const sky = g.createLinearGradient(0, r.y, 0, r.y + r.h)
-  sky.addColorStop(0, C['sky-top'])
-  sky.addColorStop(0.75, C['sky-low'])
-  g.fillStyle = sky
-  g.fillRect(r.x, r.y, r.w, r.h)
-  const horizon = r.y + r.h * 0.78
-  g.fillStyle = C['sky-haze']
-  g.fillRect(r.x, horizon, r.w, r.y + r.h - horizon)
-  // Distant ship-to-shore cranes, faint so nothing reads as a game object.
+/**
+ * The road strip over the yard (owner round 5: trucks above the yard): asphalt from the beam down to the yard, kerbs
+ * top and bottom, and a dashed lane line along the trucks' wheels and down the middle of any road above the bays, so
+ * the bays read as parking stalls on a road.
+ */
+function road(g: CanvasRenderingContext2D, r: Rect, top: number, lanes: number[]): void {
+  g.fillStyle = C.road
+  g.fillRect(r.x, top, r.w, r.y + r.h - top)
+  g.fillStyle = C.kerb
+  g.fillRect(r.x, top, r.w, 3)
+  g.fillRect(r.x, r.y + r.h - 3, r.w, 3)
   g.save()
-  g.globalAlpha = 0.28
-  g.strokeStyle = C.distant
-  g.lineWidth = 1.5
-  // Low on the horizon however tall the sky strip is, so they stay distant.
-  const craneH = Math.min((horizon - r.y) * 0.7, 56)
-  for (let i = 0; i < 4; i++) {
-    const cx = r.x + r.w * (0.1 + i * 0.26) + ((seed * 7 + i * 13) % 9)
-    const top = horizon - craneH
-    g.beginPath()
-    g.moveTo(cx - 5, horizon)
-    g.lineTo(cx - 2, top)
-    g.moveTo(cx + 5, horizon)
-    g.lineTo(cx + 2, top)
-    g.moveTo(cx - 12, top + craneH * 0.3)
-    g.lineTo(cx + 22, top + craneH * 0.3)
-    g.moveTo(cx - 2, top)
-    g.lineTo(cx + 20, top + craneH * 0.3)
-    g.stroke()
+  g.setLineDash([14, 10])
+  g.lineWidth = 2
+  g.strokeStyle = C['road-line']
+  g.beginPath()
+  for (const y of lanes) {
+    g.moveTo(r.x, Math.round(y) + 0.5)
+    g.lineTo(r.x + r.w, Math.round(y) + 0.5)
   }
+  g.stroke()
   g.restore()
-  // The quay edge between the backdrop and the yard.
-  g.fillStyle = C.quay
-  g.fillRect(r.x, r.y + r.h - 4, r.w, 4)
 }
 
 function floor(g: CanvasRenderingContext2D, geo: YardGeometry): void {
@@ -588,10 +575,14 @@ function ghost(g: CanvasRenderingContext2D, b: Box): void {
 
 /** A truck bay: painted floor, dashed edge, a lane line and the painted parking stall where a truck stands. */
 function bay(g: CanvasRenderingContext2D, r: Rect, fill: string, line: string, stall: Rect): void {
+  // Painted over the road, so a little of the asphalt shows through.
+  g.save()
+  g.globalAlpha = 0.82
   g.fillStyle = fill
   g.beginPath()
   g.roundRect(r.x, r.y, r.w, r.h, 6)
   g.fill()
+  g.restore()
   g.save()
   g.setLineDash([6, 4])
   g.lineWidth = 1.5
@@ -884,7 +875,11 @@ export function useYardCanvas(
     fx = liveFx(fx, now)
     let animated = fx.length > 0
 
-    backdrop(g, geo.backdrop, layout.columns.length)
+    const collectTruck = truckIn(layout.collection, geo, 'left')
+    const receiptTruck = truckIn(layout.receipt, geo, 'right')
+    // Lane lines: the trucks' kerb lane, and the middle of any road above the bays.
+    const above = layout.collection.y - geo.road.y
+    road(g, geo.road, geo.gantry.beamY, above > 30 ? [geo.road.y + above / 2, layout.collection.y + layout.collection.h - 3] : [layout.collection.y + layout.collection.h - 3])
     floor(g, geo)
     // Destination columns: a soft green floor tint under the ghost.
     layout.columns.forEach((col, i) => {
@@ -894,29 +889,29 @@ export function useYardCanvas(
       }
       slots(g, slotsFor(geo, layout, i, vm.capacity))
     })
-    // Yard captions over the quay edge.
+    // Yard captions along the top of the concrete, in the caption room over the crane headroom.
     g.font = '800 11px system-ui, sans-serif'
     g.textBaseline = 'alphabetic'
     g.fillStyle = C['yard-text']
     g.textAlign = 'left'
-    g.fillText('YARD 01', geo.backdrop.x + 8, geo.floor.y - 8)
+    g.fillText('YARD 01', geo.floor.x + 8, geo.floor.y + 13)
     g.textAlign = 'right'
     const free = freeSlots(vm.capacity, layout.columns.length, vm.containers.length)
-    g.fillText(`${free} FREE SLOT${free === 1 ? '' : 'S'}`, geo.backdrop.x + geo.backdrop.w - 8, geo.floor.y - 8)
+    g.fillText(`${free} FREE SLOT${free === 1 ? '' : 'S'}`, geo.floor.x + geo.floor.w - 8, geo.floor.y + 13)
 
     // Bays and trucks.
     const urgentBay = vm.incoming.status === 'mandatory'
-    const collectTruck = truckIn(layout.collection, geo, 'left')
-    const receiptTruck = truckIn(layout.receipt, geo, 'right')
     const stall = (t: Truck): Rect => ({ x: Math.min(t.cab.x, t.trailer.x) - 4, y: t.cab.y - 4, w: t.cab.w + t.trailer.w + 11, h: t.groundY - t.cab.y + 6 })
     bay(g, layout.collection, C['collection-bay'], C['collection-line'], stall(collectTruck))
     bay(g, layout.receipt, urgentBay ? C['receipt-urgent'] : C['receipt-bay'], urgentBay ? C.urgent : C['receipt-line'], stall(receiptTruck))
     // The collection truck: bounces when it takes a box, drives off with it and comes back empty.
     const collecting = fx.find((f): f is Extract<Fx, { kind: 'collect' }> => f.kind === 'collect')
-    const motion = collecting ? collectMotion(fxProgress(collecting, now), layout.collection.w) : { x: 0, y: 0, carrying: false }
+    // It drives off along the road strip, out past the left edge (clipped to the road), and comes back empty.
+    const driveOff = layout.collection.x - geo.road.x + layout.collection.w
+    const motion = collecting ? collectMotion(fxProgress(collecting, now), driveOff) : { x: 0, y: 0, carrying: false }
     g.save()
     g.beginPath()
-    g.roundRect(layout.collection.x, layout.collection.y, layout.collection.w, layout.collection.h, 6)
+    g.rect(geo.road.x, geo.road.y, geo.road.w, geo.road.h)
     g.clip()
     g.translate(motion.x, motion.y)
     truckFacing(g, layout.collection, geo, 'left', C['cab-white'], C['cab-teal'])

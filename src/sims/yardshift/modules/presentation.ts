@@ -78,33 +78,41 @@ const BAY_GAP = 12
 
 /** Share of the surface the truck bays take when the layout knows the capacity (art pass 3: 20 to 24 %). */
 export const BAY_SHARE = 0.22
-/** Most of the surface the bays grow to when a tall phone leaves height over. */
-export const MAX_BAY_SHARE = 0.3
+/** Most of the surface the bays grow to when a tall phone leaves height over (the rest goes to the road above). */
+export const MAX_BAY_SHARE = 0.24
+
+/** Room at the top of the surface for the gantry beam, which spans over the road strip (owner round 5). */
+export const BEAM_ROOM_PX = 20
+/** Gap between the road strip and the yard below it. */
+const ROAD_GAP = 6
 
 /**
- * Screen layout of the play surface: the yard band with one column per stack, and the two truck bays below. With the
- * `capacity` (art pass 3), the yard is exactly as tall as full stacks plus crane headroom need (`yardFit`, boxes sized
- * from the column width), the bays take `BAY_SHARE`, and height left on a tall phone goes to the bays first (up to
- * `MAX_BAY_SHARE`), then to the yard's concrete headroom. Without it the bays take their usual share under a yard
- * that fills the rest.
+ * Screen layout of the play surface (owner round 5: trucks above the yard): the gantry beam's room at the top, the
+ * road strip under it with the two truck bays side by side at its foot, then the yard band with one column per stack.
+ * With the `capacity` (art pass 3), the yard is exactly as tall as full stacks plus crane headroom need (`yardFit`,
+ * boxes sized from the column width) and sits on the bottom margin, the bays take `BAY_SHARE` (up to `MAX_BAY_SHARE`
+ * when a tall phone leaves height over) right over it, and the rest of the height is more road above the bays (where
+ * the sky band was), so the trucks always sit right over the stacks. Without it the bays sit under the beam and the
+ * yard fills the rest.
  */
 export function layoutFor(stackCount: number, vp: Viewport, capacity?: number): Layout {
   const innerW = Math.max(0, vp.width - 2 * SIDE)
-  const yardTop = Math.round(vp.height * 0.02)
-  const bayBottom = Math.max(yardTop, vp.height - 8)
-  // The yard is the hero (playtest fix 8): the bays take a fixed share under it, with a small gap.
+  const roadTop = Math.round(vp.height * 0.02) + BEAM_ROOM_PX
+  const yardBottom = Math.max(roadTop, vp.height - 8)
   let bayH = Math.round(Math.min(vp.height * 0.25, Math.max(84, vp.height * 0.24)))
+  let bayTop = roadTop
   if (capacity !== undefined && stackCount > 0) {
-    const total = bayBottom - yardTop
+    const total = yardBottom - roadTop
     bayH = Math.round(Math.min(total * 0.26, Math.max(84, total * BAY_SHARE)))
-    const fit = yardFit(innerW / stackCount, capacity, total - bayH - 6)
-    // Height over on a tall phone goes to the bays first (their trucks scale up with them) up to `MAX_BAY_SHARE`;
-    // the yard takes the rest, where `yardGeometry` caps the sky and adds concrete headroom. The canvas always fills
-    // the whole play surface: no dark gaps.
-    bayH += Math.max(0, Math.min(Math.round(total * MAX_BAY_SHARE) - bayH, total - bayH - 6 - fit.h))
+    const fit = yardFit(innerW / stackCount, capacity, total - bayH - ROAD_GAP)
+    // Height over on a tall phone goes to the bays first (their trucks scale up with them) up to `MAX_BAY_SHARE`,
+    // then to the road above them. The canvas always fills the whole play surface: no dark gaps.
+    const spare = () => Math.max(0, total - bayH - ROAD_GAP - fit.h)
+    bayH += Math.min(Math.max(0, Math.round(total * MAX_BAY_SHARE) - bayH), spare())
+    bayTop = roadTop + spare()
   }
-  const bayTop = Math.max(yardTop, bayBottom - bayH)
-  const yardBottom = Math.max(yardTop, bayTop - 6)
+  const bayBottom = Math.min(yardBottom, bayTop + bayH)
+  const yardTop = Math.min(yardBottom, bayBottom + ROAD_GAP)
   const yard: Rect = { x: SIDE, y: yardTop, w: innerW, h: yardBottom - yardTop }
   // Whole-pixel column edges, so neighbouring columns share an edge exactly and never overlap by a rounding error.
   const edge = (i: number) => SIDE + Math.round((i * innerW) / Math.max(1, stackCount))
@@ -113,6 +121,7 @@ export function layoutFor(stackCount: number, vp: Viewport, capacity?: number): 
   return {
     yard,
     columns,
+    road: { x: SIDE, y: roadTop, w: innerW, h: bayBottom - roadTop },
     collection: { x: SIDE, y: bayTop, w: bayW, h: bayBottom - bayTop },
     receipt: { x: SIDE + bayW + BAY_GAP, y: bayTop, w: bayW, h: bayBottom - bayTop },
   }
@@ -175,9 +184,9 @@ export function incomingView(state: ShiftState): IncomingView {
     const text = state.status === 'playing' && state.next <= state.level.count ? `COLLECT #${state.next} · READY` : ''
     return { status: 'none', text, bay: 'NO TRUCK' }
   }
-  if (state.deadline === 0) return { status: 'mandatory', text: `↑ RECEIPT #${id} · MANDATORY`, bay: 'MANDATORY NOW' }
+  if (state.deadline === 0) return { status: 'mandatory', text: `↓ RECEIPT #${id} · MANDATORY`, bay: 'MANDATORY NOW' }
   const left = `${plural(state.deadline, 'MOVE')} LEFT`
-  return { status: 'optional', text: `↑ RECEIPT #${id} · ${left}`, bay: left }
+  return { status: 'optional', text: `↓ RECEIPT #${id} · ${left}`, bay: left }
 }
 
 /** The selected container's id (a stack top, or the receipt truck's cargo), or undefined. */

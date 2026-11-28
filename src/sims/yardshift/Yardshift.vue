@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
         <span
           class="bay-label"
           :style="{ left: `${region.rect.x + 10}px`, top: `${region.rect.y + 7}px` }"
-        >{{ region.kind === 'collection' ? '▼ COLLECTION' : '▲ RECEIPT' }}</span>
+        >{{ region.kind === 'collection' ? '▲ COLLECTION' : '▼ RECEIPT' }}</span>
         <span
           class="bay-status"
           :class="region.kind === 'receipt' ? view.incoming.status : ''"

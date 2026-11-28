@@ -48,6 +48,11 @@ export interface Layout {
   yard: Rect
   /** One column per stack, left to right. */
   columns: Rect[]
+  /**
+   * The road strip over the yard (owner round 5: trucks above the yard), under the gantry beam: both truck bays sit at
+   * its foot, right over the stacks; spare height on a tall phone is more road above them. Paint only, never a target.
+   */
+  road: Rect
   collection: Rect
   receipt: Rect
 }
@@ -99,7 +104,7 @@ export interface QueueItem {
 export interface IncomingView {
   /** `none`: no truck waits; `optional`: orange signal; `mandatory`: deadline 0, red signal. */
   status: 'none' | 'optional' | 'mandatory'
-  /** Band text ("↑ RECEIPT #8 · 3 MOVES LEFT"), or "COLLECT #n · READY" when no truck waits (empty once over). */
+  /** Band text ("↓ RECEIPT #8 · 3 MOVES LEFT"), or "COLLECT #n · READY" when no truck waits (empty once over). */
   text: string
   /** Receipt bay status ("NO TRUCK", "3 MOVES LEFT", "MANDATORY NOW"). */
   bay: string

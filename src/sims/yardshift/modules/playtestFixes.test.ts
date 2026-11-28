@@ -64,21 +64,26 @@ describe('Yardshift playtest fixes', () => {
     expect(arrow.x + arrow.w).toBeLessThanOrEqual(bay.x + bay.w)
   })
 
-  it('the yard fills the surface: the bays sit right under it and take at most a quarter of the height', () => {
+  it('the trucks sit above the yard (owner round 5): the bays right over it, at most a quarter of the height', () => {
     for (const vp of [PHONE, { width: 840, height: 520 }, { width: 390, height: 420 }]) {
       const l = layoutFor(4, vp)
-      expect(l.collection.y - (l.yard.y + l.yard.h)).toBeLessThanOrEqual(8)
+      // The road strip with both bays is above the yard, with a small gap, and the yard runs to the bottom.
+      expect(l.yard.y - (l.collection.y + l.collection.h)).toBeGreaterThanOrEqual(0)
+      expect(l.yard.y - (l.collection.y + l.collection.h)).toBeLessThanOrEqual(8)
+      expect(l.receipt.y).toBe(l.collection.y)
       expect(l.collection.h).toBeLessThanOrEqual(vp.height * 0.25)
-      expect(l.yard.h / vp.height).toBeGreaterThan(0.68)
-      // Art pass 3: with the capacity, the bays take about a fifth of the surface right under a yard that fits its
-      // stacks; the play area stays inside the surface (centred when a tall phone leaves height over).
+      expect(l.yard.h / vp.height).toBeGreaterThan(0.62)
+      // With the capacity, the bays take about a fifth of the surface right over a yard that fits its stacks.
       const fit = layoutFor(4, vp, 3)
-      expect(fit.collection.y - (fit.yard.y + fit.yard.h)).toBeLessThanOrEqual(8)
+      expect(fit.yard.y - (fit.collection.y + fit.collection.h)).toBeLessThanOrEqual(8)
       expect(fit.collection.h).toBeGreaterThanOrEqual(Math.min(84, vp.height * 0.2) - 1)
       expect(fit.collection.h).toBeLessThanOrEqual(Math.max(84, vp.height * 0.3) + 1)
-      // No dark gaps: the yard starts at the top margin and the bays end at the bottom margin.
-      expect(fit.yard.y).toBe(l.yard.y)
-      expect(fit.collection.y + fit.collection.h).toBe(l.collection.y + l.collection.h)
+      // No dark gaps: the road starts under the beam room at the top, holds both bays at its foot (spare height is
+      // more road above them) and the yard ends at the bottom margin.
+      expect(fit.road.y).toBe(l.road.y)
+      expect(l.collection.y).toBe(l.road.y)
+      for (const lay of [l, fit]) expect(lay.collection.y + lay.collection.h).toBe(lay.road.y + lay.road.h)
+      expect(fit.yard.y + fit.yard.h).toBe(l.yard.y + l.yard.h)
     }
   })
 })

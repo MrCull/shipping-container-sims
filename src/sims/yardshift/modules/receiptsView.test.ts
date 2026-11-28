@@ -31,7 +31,7 @@ describe('Yardshift receipt presentation', () => {
       expect(vm.arrow).toBeNull()
       expect(vm.dimYard).toBe(false)
       expect(vm.incoming.status).toBe('optional')
-      expect(vm.incoming.text).toBe(`↑ RECEIPT #8 · ${3 - k} ${3 - k === 1 ? 'MOVE' : 'MOVES'} LEFT`)
+      expect(vm.incoming.text).toBe(`↓ RECEIPT #8 · ${3 - k} ${3 - k === 1 ? 'MOVE' : 'MOVES'} LEFT`)
       expect(vm.receiptCargo?.id).toBe(8)
     }
   })
@@ -40,7 +40,7 @@ describe('Yardshift receipt presentation', () => {
     const vm = present(level4(TO_ZERO), NONE, PHONE)
     expect(vm.dimYard).toBe(true)
     expect(vm.arrow).toBe('receipt')
-    expect(vm.incoming).toMatchObject({ status: 'mandatory', text: '↑ RECEIPT #8 · MANDATORY', bay: 'MANDATORY NOW' })
+    expect(vm.incoming).toMatchObject({ status: 'mandatory', text: '↓ RECEIPT #8 · MANDATORY', bay: 'MANDATORY NOW' })
     expect(vm.hint).toMatch(/receipt truck/i)
   })
 

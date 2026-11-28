@@ -7,13 +7,13 @@ import {
   ASPECT_MIN,
   BAY_STATUS_PX,
   BAY_TITLE_PX,
+  CAPTION_PX,
   boxAt,
   boxBounds,
   CHEVRON_BOUNCE,
   chevronAt,
   freeSlots,
   numberSize,
-  SKY_SHARE,
   slotsFor,
   truckIn,
   yardGeometry,
@@ -40,37 +40,54 @@ describe('Yardshift 2D yard geometry', () => {
           layout.columns.forEach((col, i) => {
             const slots = slotsFor(g, layout, i, level.capacity)
             for (const b of slots) expect(contains(col, boxBounds(b)), `level ${level.number} stack ${i}`).toBe(true)
-            // Even the top slot stays on the concrete, below the backdrop band.
+            // Even the top slot stays on the concrete, below the road strip.
             expect(boxBounds(slots[slots.length - 1]!).y).toBeGreaterThanOrEqual(g.floor.y)
             const lifted = boxAt(g, layout, i, level.capacity - 1, g.lift)
             expect(contains(col, boxBounds(lifted))).toBe(true)
-            expect(boxBounds(lifted).y).toBeGreaterThan(g.gantry.beamY + g.gantry.beamH)
+            expect(boxBounds(lifted).y).toBeGreaterThan(g.road.y + g.road.h)
             for (let t = 1; t < slots.length; t++) expect(overlaps(slots[t]!, slots[t - 1]!)).toBe(false)
           })
         }
       })
 
-      it('full stacks fill the yard; the beam tops the concrete and a carried box clears a full stack', () => {
+      it('the beam tops the road strip, the trucks sit above the yard and a carried box clears a full stack', () => {
         for (const level of LEVELS) {
           const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
-          // The sky band is at most `SKY_SHARE` (40 %) of the yard.
-          expect(g.backdrop.h, `level ${level.number}`).toBeLessThanOrEqual(layout.yard.h * SKY_SHARE + 1)
-          // Full stacks fill the concrete (owner, art pass 3): under the beam there is the crane headroom (one box and
-          // spreader room) and at most a quarter box more, unless the sky has hit its cap.
-          const beamBottom = g.gantry.beamY + g.gantry.beamH
-          const spare = g.groundY - level.capacity * g.boxH - g.dy - beamBottom - g.boxH - 10
-          if (g.backdrop.h < layout.yard.h * SKY_SHARE - 1) expect(spare, `level ${level.number}`).toBeLessThanOrEqual(g.boxH * 0.25 + 2)
-          // A carried box clears a full stack, and still hangs below the beam (room for the spreader).
+          const where = `level ${level.number}`
+          // Owner round 5: the gantry beam spans the top, over the road strip with both truck bays; the yard is below.
+          expect(g.gantry.beamY, where).toBeGreaterThanOrEqual(0)
+          expect(g.gantry.beamY + g.gantry.beamH, where).toBeLessThanOrEqual(layout.collection.y)
+          for (const bay of [layout.collection, layout.receipt]) expect(contains(g.road, bay), where).toBe(true)
+          expect(g.road.y + g.road.h, where).toBeLessThanOrEqual(layout.yard.y)
+          // A carried box clears a full stack.
           const fullTop = g.groundY - level.capacity * g.boxH
           expect(g.carryY + g.boxH).toBeLessThanOrEqual(fullTop)
-          expect(g.carryY - g.dy - (g.gantry.beamY + g.gantry.beamH)).toBeGreaterThanOrEqual(8)
-          // The beam sits at the top of the concrete, just under the sky band, not across the middle of the yard.
-          expect(Math.abs(g.gantry.beamY - (g.backdrop.y + g.backdrop.h)), `level ${level.number}`).toBeLessThanOrEqual(3)
+          expect(g.carryY - g.dy - layout.yard.y, where).toBeGreaterThanOrEqual(8)
+          // The crane lifts high, just under the road (captions and spreader room), so the lift up to a truck is short.
+          expect(g.carryY - g.dy - layout.yard.y, where).toBeLessThanOrEqual(CAPTION_PX + 8 + 1)
           // The legs run from the beam down the full yard.
           expect(g.gantry.footY).toBeGreaterThanOrEqual(g.groundY)
           // Boxes are sized from the column width first: on a phone they are as tall as the 1.3:1 shape allows.
-          if (s.w < 600) expect(g.boxW / g.boxH, `level ${level.number}`).toBeLessThan(1.35)
+          if (s.w < 600) expect(g.boxW / g.boxH, where).toBeLessThan(1.35)
+        }
+      })
+
+      it('the crane carries a box up to each truck: the cargo slots sit above the carry height, under the beam', () => {
+        for (const level of LEVELS) {
+          const layout = layoutFor(level.stacks.length, vp, level.capacity)
+          const g = yardGeometry(layout, level.capacity)
+          for (const [bay, facing] of [
+            [layout.collection, 'left'],
+            [layout.receipt, 'right'],
+          ] as const) {
+            const cargo = truckIn(bay, g, facing).cargo
+            expect(cargo.y + cargo.h, `level ${level.number}`).toBeLessThan(g.carryY)
+            expect(cargo.y - cargo.dy).toBeGreaterThan(g.gantry.beamY + g.gantry.beamH)
+            // Between the legs, so the trolley reaches it.
+            expect(cargo.x).toBeGreaterThan(g.gantry.left + g.gantry.legW)
+            expect(cargo.x + cargo.w + cargo.dx).toBeLessThan(g.gantry.right - g.gantry.legW)
+          }
         }
       })
 
@@ -86,7 +103,7 @@ describe('Yardshift 2D yard geometry', () => {
               // Clear of the stack top even at the bottom of its bounce, and clear of the beam at the top of it.
               const stackTop = height > 0 ? boxBounds(boxAt(g, layout, i, height - 1)).y : g.groundY
               expect(c.y + c.h + CHEVRON_BOUNCE, where).toBeLessThanOrEqual(stackTop)
-              expect(c.y - CHEVRON_BOUNCE, where).toBeGreaterThanOrEqual(g.gantry.beamY + g.gantry.beamH)
+              expect(c.y - CHEVRON_BOUNCE, where).toBeGreaterThanOrEqual(layout.yard.y)
               expect(c.w, where).toBeGreaterThanOrEqual(12)
             }
           })
@@ -106,11 +123,12 @@ describe('Yardshift 2D yard geometry', () => {
         }
       })
 
-      it('the backdrop sits above the floor, and the stacks start on the floor', () => {
+      it('the road strip sits above the floor (no sky band), and the stacks start on the floor', () => {
         for (const level of LEVELS) {
           const layout = layoutFor(level.stacks.length, vp, level.capacity)
           const g = yardGeometry(layout, level.capacity)
-          expect(g.backdrop.y + g.backdrop.h).toBe(g.floor.y)
+          expect(g.road.y + g.road.h).toBeLessThanOrEqual(g.floor.y)
+          expect(g.floor).toEqual(layout.yard)
           expect(g.groundY).toBeGreaterThan(g.floor.y)
           expect(g.groundY).toBeLessThan(layout.yard.y + layout.yard.h)
           // Chunky boxes (owner, art pass 3 of the 2D yard: the v1 look): 1.3 to 1.45 times as wide as tall, filling

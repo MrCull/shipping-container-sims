@@ -98,7 +98,7 @@ describe('Yardshift singular and plural copy (#389)', () => {
     shift.dispatch({ type: 'rehandle', from: 0, to: 4 })
     shift.dispatch({ type: 'collect', from: 0 })
     const vm = present(shift.state, { selection: null }, { width: 390, height: 520 })
-    expect(vm.incoming.text).toBe('↑ RECEIPT #8 · 1 MOVE LEFT')
+    expect(vm.incoming.text).toBe('↓ RECEIPT #8 · 1 MOVE LEFT')
     expect(vm.incoming.bay).toBe('1 MOVE LEFT')
     const result = resultView({ ...shift.state, rehandles: 1, golds: 1 }, 1, LEVELS.length)
     expect(result.rehandles).toBe('1 rehandle · minimum 1')
