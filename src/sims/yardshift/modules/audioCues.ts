@@ -90,7 +90,17 @@ export const COMBO_LADDER_TOP = 8
  * this, still a relative sound gain scaled by the shared `'sfx'` channel through `gainFor` (the bus).
  */
 export const SFX_BOOST = 1.5
-/** The loudest a cue's overlapping tones may sum to: the old 0.306 cap times `SFX_BOOST`. */
+/**
+ * Owner round 5: "sound effects still too quiet". The sfx bus doubles every cue after the sliders (a makeup gain,
+ * composables/useYardAudio.ts) and then a limiter (`SFX_LIMITER`) keeps overlapping cues from clipping. The cue
+ * levels here, and the peak caps the tests check, are measured before the makeup gain and the limiter.
+ */
+export const SFX_MAKEUP_GAIN = 2
+
+/** The `DynamicsCompressorNode` settings of the limiter at the end of the sfx bus: a hard knee, fast attack. */
+export const SFX_LIMITER = { threshold: -10, knee: 0, ratio: 12, attack: 0.003, release: 0.25 } as const
+
+/** The loudest a cue's overlapping tones may sum to: the old 0.306 cap times `SFX_BOOST` (before the makeup gain). */
 export const CUE_PEAK_CAP = 0.306 * SFX_BOOST
 
 /** `vol` is the design level; the tone plays at `vol * SFX_BOOST`. */

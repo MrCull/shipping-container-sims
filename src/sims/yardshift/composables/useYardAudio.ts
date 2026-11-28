@@ -2,11 +2,13 @@
  * Yardshift sound (#388): plays the store's cues (modules/audioCues.ts) through Web Audio. Every tone and sample
  * goes through one bus `GainNode` on the shared `'sfx'` channel, set from `gainFor(1, 'sfx')` and watched, so the
  * master and effects sliders and mute change sounds live, even mid-note. A cue's own levels (`Tone.vol`,
- * `sampleGain`) are relative sound gains scaled by that bus; no fixed volume anywhere.
+ * `sampleGain`) are relative sound gains scaled by that bus; no fixed volume anywhere. Owner round 5: after the bus,
+ * a makeup gain (`SFX_MAKEUP_GAIN`, 2x) and a limiter (`SFX_LIMITER`) make the effects louder without clipping
+ * (`createSfxChain`). Mute still silences them: the bus gain is 0.
  */
 import { onBeforeUnmount, watch } from 'vue'
 import { useAudioStore } from '@/stores/audio'
-import type { Cue, SampleName, Tone } from '../modules/audioCues'
+import { SFX_LIMITER, SFX_MAKEUP_GAIN, type Cue, type SampleName, type Tone } from '../modules/audioCues'
 
 const SAMPLE_URLS: Record<SampleName, string> = {
   pick: new URL('../assets/audio/crane-pick.mp3', import.meta.url).href,
@@ -66,6 +68,26 @@ export function playTone(ac: BaseAudioContext, out: AudioNode, t: Tone): void {
   src.stop(start + t.dur + 0.01)
 }
 
+/**
+ * The sfx chain: `bus` (gain `busGain`, the shared `gainFor(1, 'sfx')`) into a makeup gain (`SFX_MAKEUP_GAIN`) into a
+ * limiter (`SFX_LIMITER`) into the destination. Cues play into `bus`; the caps on cue levels are measured there,
+ * before the makeup gain and the limiter.
+ */
+export function createSfxChain(ac: BaseAudioContext, busGain: number): { bus: GainNode; limiter: DynamicsCompressorNode } {
+  const bus = ac.createGain()
+  bus.gain.value = busGain
+  const makeup = ac.createGain()
+  makeup.gain.value = SFX_MAKEUP_GAIN
+  const limiter = ac.createDynamicsCompressor()
+  limiter.threshold.value = SFX_LIMITER.threshold
+  limiter.knee.value = SFX_LIMITER.knee
+  limiter.ratio.value = SFX_LIMITER.ratio
+  limiter.attack.value = SFX_LIMITER.attack
+  limiter.release.value = SFX_LIMITER.release
+  bus.connect(makeup).connect(limiter).connect(ac.destination)
+  return { bus, limiter }
+}
+
 /** The gestures that may start audio: iOS Safari unlocks on `touchend` and `pointerdown`, desktops on any of them. */
 const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'keydown'] as const
 
@@ -108,9 +130,7 @@ export function useYardAudio(onCue: (listener: (cue: Cue) => void) => () => void
     const Ctor = typeof window === 'undefined' ? undefined : window.AudioContext
     if (!Ctor) return null
     ctx = new Ctor()
-    bus = ctx.createGain()
-    bus.gain.value = audio.gainFor(1, 'sfx')
-    bus.connect(ctx.destination)
+    bus = createSfxChain(ctx, audio.gainFor(1, 'sfx')).bus
     for (const [name, url] of Object.entries(SAMPLE_URLS) as [SampleName, string][]) {
       fetch(url)
         .then((r) => r.arrayBuffer())

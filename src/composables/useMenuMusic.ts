@@ -22,8 +22,13 @@ function getAudio(): HTMLAudioElement {
   return sharedAudio
 }
 
+/**
+ * The home page's menu music. Owner round 5: it starts muted (for the home page only, `enterMenu` in the audio
+ * store) until the player unmutes there; that choice is stored (`menuMusicOn`) so later visits play it.
+ */
 export function useMenuMusic() {
   const audioStore = useAudioStore()
+  const leaveMenu = audioStore.enterMenu()
 
   function tryPlay() {
     const audio = getAudio()
@@ -66,5 +71,6 @@ export function useMenuMusic() {
     if (audio) {
       audio.pause()
     }
+    leaveMenu()
   })
 }

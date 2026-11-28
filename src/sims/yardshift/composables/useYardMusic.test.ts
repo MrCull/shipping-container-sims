@@ -33,8 +33,19 @@ class FakeAudio {
   load(): void {}
 }
 
+const Host = defineComponent({
+  props: { store: { type: Object, required: true } },
+  setup: (props) => useYardMusic(() => (props.store as ReturnType<typeof useYardshiftStore>).state),
+  render: () => null,
+})
+
+function mountMusic(store: ReturnType<typeof useYardshiftStore>) {
+  return mount(Host, { props: { store } })
+}
+
 describe('useYardMusic', () => {
   beforeEach(() => {
+    window.localStorage.clear()
     setActivePinia(createPinia())
     FakeAudio.made = []
     vi.stubGlobal('Audio', FakeAudio)
@@ -45,7 +56,7 @@ describe('useYardMusic', () => {
     const store = useYardshiftStore()
     const audio = useAudioStore()
     store.loadLevel(1, { intro: true })
-    const wrapper = mount(defineComponent({ setup: () => useYardMusic(() => store.state), render: () => null }))
+    const wrapper = mountMusic(store)
     const [music] = FakeAudio.made
     expect(FakeAudio.made).toHaveLength(1)
     expect(music!.loop).toBe(true)
@@ -72,5 +83,30 @@ describe('useYardMusic', () => {
 
     wrapper.unmount()
     expect(music!.paused).toBe(true)
+  })
+
+  it('unmutes for the visit (owner round 5) without writing the stored mute, and leaving restores it', async () => {
+    const store = useYardshiftStore()
+    const audio = useAudioStore()
+    audio.setSoundMuted(true)
+    store.loadLevel(1)
+    const wrapper = mountMusic(store)
+    const [music] = FakeAudio.made
+    await nextTick()
+    expect(audio.soundMuted).toBe(false)
+    expect(music!.paused).toBe(false)
+    expect(music!.volume).toBeGreaterThan(0)
+    wrapper.unmount()
+    expect(audio.soundMuted).toBe(true)
+  })
+
+  it('a mute the player chooses inside Yardshift is kept after leaving', () => {
+    const store = useYardshiftStore()
+    const audio = useAudioStore()
+    store.loadLevel(1)
+    const wrapper = mountMusic(store)
+    audio.toggleSound()
+    wrapper.unmount()
+    expect(audio.soundMuted).toBe(true)
   })
 })

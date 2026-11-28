@@ -317,6 +317,8 @@ describe('Yardshift audio cues', () => {
   })
 
   // The cap was 0.306 (the old jackpot); owner round 4 asked for louder effects, so it is 0.306 x SFX_BOOST now.
+  // Every cap here is measured on the cue levels, before the sfx bus's 2x makeup gain and limiter (owner round 5,
+  // SFX_MAKEUP_GAIN and SFX_LIMITER, composables/useYardAudio.test.ts): the limiter keeps the doubled sum from clipping.
   it('no cue sums louder than the peak cap (0.306 x SFX_BOOST)', () => {
     const s = createShift(timed).state
     const events: ShiftEvent[] = [
