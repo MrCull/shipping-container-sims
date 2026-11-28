@@ -44,6 +44,21 @@ export interface PickerRow {
   best: string
 }
 
+/** The start choice on entering Yardshift with progress past level 1 (owner round 6). */
+export interface StartChoiceView {
+  title: string
+  detail: string
+  continueLevel: number
+  continueLabel: string
+  restartLabel: string
+}
+
+/** What entering Yardshift opens: the level loaded under the first screen, and the start choice or null (its intro). */
+export interface EntryPlan {
+  level: number
+  choice: StartChoiceView | null
+}
+
 export interface UndoView {
   enabled: boolean
   label: string
@@ -107,6 +122,25 @@ export function pickerRows(levels: readonly LevelDef[], progress: Progress, unlo
       best: locked ? 'Locked' : best?.score != null ? `Best ${best.score}` : 'Not played',
     }
   })
+}
+
+/**
+ * Entering Yardshift (owner round 6): with only level 1 unlocked, or with the `?unlock=all` dev flag, level 1's intro;
+ * otherwise level N (the highest unlocked) under a choice of "Continue at level N" or "Start from level 1".
+ */
+export function entryPlan(progress: Progress, levels: readonly LevelDef[], unlockAll: boolean): EntryPlan {
+  const n = Math.min(levels.length, progress.unlocked)
+  if (unlockAll || n <= 1) return { level: 1, choice: null }
+  return {
+    level: n,
+    choice: {
+      title: 'Welcome back',
+      detail: `Your furthest shift: ${n}. ${levels[n - 1]!.name}`,
+      continueLevel: n,
+      continueLabel: `Continue at level ${n}`,
+      restartLabel: 'Start from level 1',
+    },
+  }
 }
 
 export function undoView(state: ShiftState): UndoView {

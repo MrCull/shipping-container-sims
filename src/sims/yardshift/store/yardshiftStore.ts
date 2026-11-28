@@ -13,9 +13,10 @@ import type { DispatchResult, Shift, ShiftAction, ShiftEvent, ShiftState } from 
 import type { HitTarget, UiAction, UiEvent, UiState, Viewport } from '../types/presentation'
 import { loadProgress, recordCompletion, saveProgress, type Progress } from '../modules/progress'
 import { minRehandlesFor, starsFor } from '../modules/stars'
+import { entryPlan, type StartChoiceView } from '../modules/screens'
 
 /** A screen over the yard. Result and fail follow the shift status; the others are opened by the player. */
-export type Overlay = 'intro' | 'pause' | 'levels' | null
+export type Overlay = 'start' | 'intro' | 'pause' | 'levels' | null
 
 /**
  * What the yard effects hear: engine events, a move the engine refused (the tapped container shakes red), and the
@@ -62,6 +63,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   /** `?unlock=all` in a dev or smoke build (set by the host). */
   const unlockAll = ref(false)
   const overlay = ref<Overlay>(null)
+  /** The start choice while it is open, or reachable again from the level picker it opened. */
+  const startChoice = ref<StartChoiceView | null>(null)
   /** The pointer that went down and has not come up yet: where, on what, and whether it became a drag. */
   let pointer: { x: number; y: number; target: HitTarget | null; dragging: boolean } | null = null
   /** Audio cue listeners (#388); each engine step's cues are sent once, when the step happens. */
@@ -153,6 +156,7 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     watchEvents()
     if (hidden) shift.dispatch({ type: 'pause', reason: 'hidden' })
     overlay.value = options.intro ? 'intro' : null
+    startChoice.value = null
     if (options.intro) shift.dispatch({ type: 'pause', reason: 'intro' })
     move.value = null
     lastFrame = null
@@ -168,6 +172,30 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   function announceWaiting(): void {
     const waiting = waitingArrival(shift.state)
     if (waiting !== undefined) announce(waiting, shift.state.deadline ?? 0)
+  }
+
+  /**
+   * Entering Yardshift (owner round 6, `entryPlan`): level 1's intro, or, with progress past level 1, the highest
+   * unlocked level loaded under the start choice (held by the `intro` pause).
+   */
+  function enter(): void {
+    const plan = entryPlan(progress.value, LEVELS, unlockAll.value)
+    loadLevel(plan.level, { intro: true })
+    if (plan.choice) {
+      startChoice.value = plan.choice
+      overlay.value = 'start'
+    }
+  }
+
+  /** "Continue at level N": the intro of the level already loaded under the choice. */
+  function continueAt(): void {
+    startChoice.value = null
+    overlay.value = 'intro'
+  }
+
+  /** "Start from level 1". */
+  function startFromOne(): void {
+    loadLevel(1, { intro: true })
   }
 
   /** Close the intro and start the clocks. */
@@ -204,7 +232,8 @@ export const useYardshiftStore = defineStore('yardshift', () => {
   }
 
   function closeLevels(): void {
-    if (shift.state.pauses.includes('intro')) overlay.value = 'intro'
+    if (startChoice.value) overlay.value = 'start'
+    else if (shift.state.pauses.includes('intro')) overlay.value = 'intro'
     else if (shift.state.status === 'playing') overlay.value = 'pause'
     else overlay.value = null
   }
@@ -408,6 +437,10 @@ export const useYardshiftStore = defineStore('yardshift', () => {
     progress,
     unlockAll,
     overlay,
+    startChoice,
+    enter,
+    continueAt,
+    startFromOne,
     startShift,
     pause,
     resume,

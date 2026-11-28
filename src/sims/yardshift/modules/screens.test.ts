@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
 import { LEVELS, TUTORIAL, truckSecondsFrom } from './levels'
 import { emptyProgress, recordCompletion } from './progress'
-import { failView, introView, pickerRows, resultView, undoView } from './screens'
+import { entryPlan, failView, introView, pickerRows, resultView, undoView } from './screens'
 import type { LevelDef } from '../types/engine'
 
 const open: LevelDef = {
@@ -85,5 +85,34 @@ describe('screens', () => {
     expect(undoView({ ...shift.state, shiftMs: 3000 }).reason).toBe('Undo needs more than 3s of shift.')
     shift.dispatch({ type: 'undo' })
     expect(undoView(shift.state)).toMatchObject({ enabled: false, label: 'Undo (0)', reason: 'Undo already used this shift.' })
+  })
+})
+
+describe('entry flow (owner round 6)', () => {
+  const unlockedTo = (n: number) => ({ ...emptyProgress(), unlocked: n })
+
+  it('only level 1 unlocked: straight to the level 1 intro, no choice', () => {
+    expect(entryPlan(emptyProgress(), LEVELS, false)).toEqual({ level: 1, choice: null })
+  })
+
+  it('highest unlocked N above 1: a choice between continuing at N and starting from level 1, with level N under it', () => {
+    expect(entryPlan(unlockedTo(4), LEVELS, false)).toEqual({
+      level: 4,
+      choice: {
+        title: 'Welcome back',
+        detail: `Your furthest shift: 4. ${LEVELS[3]!.name}`,
+        continueLevel: 4,
+        continueLabel: 'Continue at level 4',
+        restartLabel: 'Start from level 1',
+      },
+    })
+  })
+
+  it('progress beyond the last level offers the last level', () => {
+    expect(entryPlan(unlockedTo(99), LEVELS, false).choice?.continueLevel).toBe(LEVELS.length)
+  })
+
+  it('?unlock=all: no choice, level 1', () => {
+    expect(entryPlan(unlockedTo(4), LEVELS, true)).toEqual({ level: 1, choice: null })
   })
 })

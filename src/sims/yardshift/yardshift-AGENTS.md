@@ -136,8 +136,8 @@ and crane frames, and a backing store scaled by `devicePixelRatio` (capped at 3)
   (#1 included, false once the shift ends), `bonusActive` and `glint` (active bonus, no glint under reduced motion),
   `QueueItem.active`, and `ViewModel.nextMarker` (`{ stack, buried }`, null when the shift is over, the next box is
   not in the yard, or a receipt is mandatory). Hit regions stay layout-only (tested calm, urgent, reduced and selected).
-- Screenshots: `docs/prototypes/2d/` (art pass 3, phone 390x844 at 2x: level 3 after one rehandle, the owner's
-  `owner-2d-v3` state; level 2 bonus window open on #3; level 4 mandatory receipt; tutorial start; tutorial with #4's bonus window open
+- Screenshots: `docs/prototypes/2d/` (art pass 3, phone 390x844 at 2x: owner round 6 start choice at level 3, and
+  level 3 before and after collecting #1 (colours unchanged, #6 red); level 2 bonus window open on #3; level 4 mandatory receipt; tutorial start; tutorial with #4's bonus window open
   and its coaching line; desktop 1280x800 level 4). Re-captured in owner round 5 (five rainbow colours, bright gold,
   trucks above the yard), 8-bit palette PNGs.
 - Active bonus shine (owner round 4): the sweep is clipped inside the front face's outline, and the next box's white
@@ -223,7 +223,7 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   leave it alone. Collecting with `bonusMs > 0` adds +250 and +5 s and a gold (`bonus-awarded`); reaching 0 emits
   `bonus-missed` once. Undo (#386) keeps the smaller of now and the snapshot's `bonusMs` (no farming).
   Stars never read score or golds.
-- Presentation: `ContainerView.slot` (0..4 or null), `colour` (`SEQUENCE_COLOURS` or `GREY`), `bonus` (medallion:
+- Presentation: `ContainerView.slot` (`(id - 1) mod 5` inside the next-five window, or null), `colour` (`SEQUENCE_COLOURS` or `GREY`), `bonus` (medallion:
   a later bonus id, or the current one while its window is open, so it shows buried or grey and vanishes on a miss),
   `border` (selection only, never the current container). `view.queue` is the five HUD positions (empty slot `–`
   past the last container), `view.bonus` the open window (`{ id, text }`), `hud.score` and `hud.combo` (`×n`).
@@ -250,7 +250,11 @@ keeps the behaviours (lift and rim, ghosts, slot outlines, stack labels, arrow b
   three-star target and max, shift, tip), `resultView` (stars, verdict, actual and minimum rehandles, score, best combo,
   bonuses, time earned, `hasNext`), `failView` (title, reason, containers left, `canUndo` after a blocked failure),
   `pickerRows` (best stars, best score, locks), `undoView` (enabled, label, reason). Store `overlay`: `intro`, `pause`
-  or `levels`; result and fail follow the shift status. The route opens on the intro of the highest unlocked level;
+  or `levels`; result and fail follow the shift status. Entry (owner round 6): `store.enter()` follows `entryPlan(progress,
+  levels, unlockAll)`: only level 1 unlocked, or `?unlock=all`, opens level 1's intro; otherwise the highest unlocked
+  level N loads (held by the `intro` pause) under the `start` overlay, "Welcome back" with "Continue at level N"
+  (`continueAt`, its intro), "Start from level 1" (`startFromOne`) and Levels (closing the picker returns to the
+  choice); `yardshiftStoreEntry.test.ts`;
   `store.loadLevel(n, { intro: true })` holds the `intro` pause until `startShift`. The control bar under the hint has
   Pause, Undo (reason shown at 3 s or less) and Restart (restart skips the intro). U calls `store.undo()`; Esc opens the pause menu, and closes it (or the level
   picker) again.
@@ -465,7 +469,11 @@ records it. The bonus does not change rehandles, so the solver fixtures are unch
 `styles/palette.css` (loaded by `Yardshift.vue`, scoped to `.yardshift`) holds the sim's own palette as `--ys-*`
 properties: the five sequence colours in rainbow order, so the sequence reads like a spectrum (owner round 5: #1 red
 `#ef5b52`, #2 orange `#f59a3a`, #3 green `#4cc265`, #4 blue `#4b9cf0`, #5 purple `#a985ee`; every container after
-#5 is grey `#84949c` and the queue shows five chips; yellow stays out so gold is only ever the active bonus; each
+#5 is grey `#84949c` and the queue shows five chips;
+**fixed colours (owner round 6):** a container's colour never changes once it has one: `colourSlot` is
+`(n - 1) mod 5` for container n inside the next-five window (n - next in 0..4) and null (grey) beyond it, so #6 takes
+red as #1 leaves and the queue chips match; the "next" marker (outline, bob, chevron), not colour, shows which is next,
+`presentationScore.test.ts` replays every level's solver fixture and checks no container ever changes colour; yellow stays out so gold is only ever the active bonus; each
 holds the dark number ink at 4.5:1 or more, `presentationScore.test.ts`). Because red and orange are sequence colours,
 urgency is a white outline flashing red, the receipt cargo is steel with an "IN" tag, the receipt bay slate and the
 receipt truck cab steel blue; the deadline arrow stays red. The HUD's shift bar uses `--ys-seq-2` (green). Also grey,
@@ -498,8 +506,8 @@ coordinates so smoke tests tap real points.
   `yardshift-tutorial.smoke.ts` (phone viewport, home tile to route, tutorial won by touch taps); spec 2
   `yardshift-receipt.smoke.ts` (level 4 driven to a mandatory receipt through `window.__ys`: arrow over the receipt bay
   and dimming, both cleared by a real tap on the receipt truck); spec 3 `yardshift-progress.smoke.ts` (desktop
-  viewport: level 1's fixture through `window.__ys` gives the result screen, the reload opens on level 2 and the
-  picker shows level 1's stars and level 2 unlocked). Each spec under 10 s. Spec 1 taps "Start shift" first.
+  viewport: level 1's fixture through `window.__ys` gives the result screen, the reload shows the start choice, "Continue at
+  level 2" opens level 2's intro and the picker shows level 1's stars and level 2 unlocked). Each spec under 10 s. Spec 1 taps "Start shift" first.
   Timings (review of #374, `--repeat-each=2`, dev project): tutorial 4.6 to 4.7 s, receipt 1.4 to 2.0 s, progress
   2.8 to 3.0 s (before the scene rework: 8.1, 4.2 to 5.5 and 2.3 to 2.9 s). A software-GL frame was about 140 ms there and a touch tap costs about 5 frames, so spec 1 reads the tap
   points once and waits for each crane move with a `raf`-polled `waitForFunction`, not `expect` retries.

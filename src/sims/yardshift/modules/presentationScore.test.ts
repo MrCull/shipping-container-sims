@@ -3,7 +3,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createShift, MAX_STEP_MS } from './engine'
-import { levelByNumber, TUTORIAL } from './levels'
+import { fixtureFor } from './fixtures'
+import { LEVELS, levelByNumber, TUTORIAL } from './levels'
 import { GREY, present, SEQUENCE_COLOURS } from './presentation'
 import { YARD_COLOURS } from './yardPalette'
 import type { LevelDef, Shift } from '../types/engine'
@@ -30,6 +31,7 @@ function run(shift: Shift, ms: number): void {
 }
 
 const view = (shift: Shift, ui: UiState = NONE) => present(shift.state, ui, PHONE)
+const vm = view
 const byId = (shift: Shift, ui: UiState = NONE) => new Map(view(shift, ui).containers.map((c) => [c.id, c]))
 
 describe('Yardshift colours and queue', () => {
@@ -54,14 +56,43 @@ describe('Yardshift colours and queue', () => {
     for (const id of [6, 7, 8, 9]) expect(c.get(id)).toMatchObject({ slot: null, colour: GREY, label: String(id) })
   })
 
-  it('slots follow the next container as collections advance', () => {
+  it('a colour is fixed by sequence number: (n - 1) mod 5, and beyond the window is grey (owner round 6)', () => {
     const shift = createShift(deep)
     shift.dispatch({ type: 'collect' })
     const c = byId(shift)
-    expect(c.get(2)!.slot).toBe(0)
-    expect(c.get(6)!.slot).toBe(4)
-    expect(c.get(7)!.slot).toBeNull()
+    // #2..#5 keep orange, green, blue, purple; #6 enters the window with red, the colour #1 freed.
+    for (const id of [2, 3, 4, 5, 6]) expect(c.get(id), `#${id}`).toMatchObject({ slot: (id - 1) % 5, colour: SEQUENCE_COLOURS[(id - 1) % 5] })
+    expect(c.get(7)).toMatchObject({ slot: null, colour: GREY })
+    vm(shift).queue.forEach((q) => expect(q.colour).toBe(SEQUENCE_COLOURS[(q.id! - 1) % 5]))
   })
+
+  it.each(LEVELS.map((l) => [l.number, l] as const))(
+    'level %i solver replay: a container keeps one colour from the moment it has one',
+    (n, level) => {
+      const shift = createShift(level)
+      const seen = new Map<number, string>()
+      const check = () => {
+        const v = vm(shift)
+        const shown = [...v.containers.map((c) => [c.id, c.colour] as const), ...v.queue.filter((q) => q.id !== null).map((q) => [q.id!, q.colour] as const)]
+        for (const [id, colour] of shown) {
+          const inWindow = id - shift.state.next >= 0 && id - shift.state.next < 5
+          if (!inWindow) {
+            expect(colour, `#${id} beyond the window`).toBe(GREY)
+            continue
+          }
+          expect(colour, `#${id}`).toBe(SEQUENCE_COLOURS[(id - 1) % 5])
+          expect(colour, `#${id} changed colour`).toBe(seen.get(id) ?? colour)
+          seen.set(id, colour)
+        }
+      }
+      check()
+      for (const action of fixtureFor(n)!.actions) {
+        expect(shift.dispatch(action).ok).toBe(true)
+        check()
+      }
+      expect(shift.state.status).toBe('complete')
+    },
+  )
 
   it('the HUD queue has five items matching the yard colours and bonus stars', () => {
     const shift = createShift(deep)
