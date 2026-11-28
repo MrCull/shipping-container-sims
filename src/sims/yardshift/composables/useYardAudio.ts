@@ -27,22 +27,43 @@ export function releaseOnEnded(src: AudioScheduledSourceNode, ...nodes: AudioNod
 
 /**
  * Plays one tone into `out` (the sfx bus): an oscillator ramping f0 to f1 through its own envelope gain (8 ms attack
- * to `vol`, exponential decay over `dur`). Both nodes disconnect when the oscillator ends.
+ * to `vol`, exponential decay over `dur`). A `noise` tone is a white-noise buffer through a band-pass filter whose
+ * centre ramps f0 to f1 (the air-brake hiss). Every node disconnects when the source ends.
  */
 export function playTone(ac: BaseAudioContext, out: AudioNode, t: Tone): void {
   const start = ac.currentTime + t.delay
-  const osc = ac.createOscillator()
   const env = ac.createGain()
-  osc.type = t.type
-  osc.frequency.setValueAtTime(t.f0, start)
-  osc.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
   env.gain.setValueAtTime(SILENT, start)
   env.gain.exponentialRampToValueAtTime(t.vol, start + 0.008)
   env.gain.exponentialRampToValueAtTime(SILENT, start + t.dur)
-  osc.connect(env).connect(out)
-  releaseOnEnded(osc, env)
-  osc.start(start)
-  osc.stop(start + t.dur + 0.01)
+  env.connect(out)
+  let src: AudioScheduledSourceNode
+  if (t.type === 'noise') {
+    const length = Math.max(1, Math.ceil(ac.sampleRate * (t.dur + 0.01)))
+    const buffer = ac.createBuffer(1, length, ac.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1
+    const noise = ac.createBufferSource()
+    noise.buffer = buffer
+    const filter = ac.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.Q.value = 1.2
+    filter.frequency.setValueAtTime(t.f0, start)
+    filter.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
+    noise.connect(filter).connect(env)
+    releaseOnEnded(noise, filter, env)
+    src = noise
+  } else {
+    const osc = ac.createOscillator()
+    osc.type = t.type
+    osc.frequency.setValueAtTime(t.f0, start)
+    osc.frequency.exponentialRampToValueAtTime(t.f1, start + t.dur)
+    osc.connect(env)
+    releaseOnEnded(osc, env)
+    src = osc
+  }
+  src.start(start)
+  src.stop(start + t.dur + 0.01)
 }
 
 /** The gestures that may start audio: iOS Safari unlocks on `touchend` and `pointerdown`, desktops on any of them. */
